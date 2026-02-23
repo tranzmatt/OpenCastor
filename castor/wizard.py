@@ -126,6 +126,30 @@ PROVIDERS = {
         "label": "MLX (Apple Silicon — 400+ tok/s)",
         "env_var": None,
     },
+    # ── Chinese models (OpenAI-compatible APIs) ──────────────────────────────
+    "9": {
+        "provider": "openai",
+        "model": "moonshot-v1-8k",
+        "label": "Kimi k2.5 (Moonshot AI — 中文友好)",
+        "env_var": "MOONSHOT_API_KEY",
+        "base_url": "https://api.moonshot.cn/v1",
+        "note": "Get key: platform.moonshot.cn | Supports Chinese & English",
+    },
+    "10": {
+        "provider": "openai",
+        "model": "MiniMax-Text-01",
+        "label": "MiniMax M2.5 (MiniMax AI — 中文友好)",
+        "env_var": "MINIMAX_API_KEY",
+        "base_url": "https://api.minimax.chat/v1",
+        "note": "Get key: platform.minimax.io | Supports Chinese & English",
+    },
+    "11": {
+        "provider": "ollama",
+        "model": "qwen3:8b",
+        "label": "Qwen 3 Local (Ollama — 中文 · 免费 · 离线)",
+        "env_var": None,
+        "note": "Free & offline. Run: ollama pull qwen3:8b | Also try qwen3:1.7b for lower memory",
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -170,6 +194,21 @@ PROVIDER_AUTH = {
         "label": "MLX (Apple Silicon)",
         "desc": "Native GPU, 400+ tok/s on Mac",
     },
+    # ── Chinese models (OpenAI-compatible APIs) ────────────────────────────
+    "moonshot": {
+        "env_var": "MOONSHOT_API_KEY",
+        "label": "Kimi / Moonshot AI (中文)",
+        "desc": "Chinese & English · platform.moonshot.cn",
+        "base_url": "https://api.moonshot.cn/v1",
+        "openai_compat": True,
+    },
+    "minimax": {
+        "env_var": "MINIMAX_API_KEY",
+        "label": "MiniMax M2.5 (中文)",
+        "desc": "Chinese & English · platform.minimax.io",
+        "base_url": "https://api.minimax.chat/v1",
+        "openai_compat": True,
+    },
 }
 
 # Ordered list for menu display
@@ -181,6 +220,8 @@ PROVIDER_ORDER = [
     "ollama",
     "llamacpp",
     "mlx",
+    "moonshot",
+    "minimax",
 ]
 
 MODELS = {
@@ -294,6 +335,35 @@ MODELS = {
             "label": "Mistral Small 3.1 24B (4-bit)",
             "desc": "Strong reasoning",
             "tags": ["reasoning"],
+        },
+    ],
+    # ── Chinese models ──────────────────────────────────────────────────────
+    "moonshot": [
+        {
+            "id": "moonshot-v1-8k",
+            "label": "Kimi k2.5 (8K context)",
+            "desc": "Fast, bilingual Chinese/English",
+            "tags": ["fast", "bilingual"],
+        },
+        {
+            "id": "moonshot-v1-32k",
+            "label": "Kimi k2.5 (32K context)",
+            "desc": "Longer context, bilingual",
+            "tags": ["long-context", "bilingual"],
+        },
+    ],
+    "minimax": [
+        {
+            "id": "MiniMax-Text-01",
+            "label": "MiniMax M2.5 Text",
+            "desc": "Strong Chinese & English reasoning",
+            "tags": ["reasoning", "bilingual"],
+        },
+        {
+            "id": "abab6.5s-chat",
+            "label": "MiniMax ABAB 6.5s",
+            "desc": "Fast, cost-effective",
+            "tags": ["fast", "bilingual"],
         },
     ],
 }
@@ -473,6 +543,10 @@ def authenticate_provider(provider_key, *, already_authed=None):
     # Standard API key flow
     print(f"\n{Colors.GREEN}--- AUTHENTICATION ({info['label']}) ---{Colors.ENDC}")
     print(f"  Your {info['label']} API key is needed.")
+    # Show where to get the key for Chinese providers
+    if info.get("openai_compat") and info.get("base_url"):
+        domain = info["base_url"].replace("https://", "").split("/")[0]
+        print(f"  Get your key at: {Colors.BOLD}https://{domain}{Colors.ENDC}")
     print(
         f"  It will be saved to your local "
         f"{Colors.BOLD}.env{Colors.ENDC} file (never committed to git)."
@@ -1485,6 +1559,16 @@ def _validate_api_key(provider: str, api_key: str) -> bool:
                 timeout=10,
             )
             return resp.status_code == 200
+        elif provider in ("moonshot", "minimax"):
+            # OpenAI-compatible Chinese providers
+            info = PROVIDER_AUTH.get(provider, {})
+            base_url = info.get("base_url")
+            if base_url:
+                import openai
+
+                client = openai.OpenAI(api_key=api_key, base_url=base_url)
+                client.models.list()
+                return True
     except Exception:
         return False
 
@@ -1964,14 +2048,20 @@ def _build_agent_config(provider_key, model_info):
     """Build the agent_config dict from new-style provider + model selection.
 
     Maintains backward compatibility: returns dict with provider, model, label, env_var.
+    OpenAI-compatible providers (moonshot, minimax) use the openai provider with base_url.
     """
     info = PROVIDER_AUTH[provider_key]
-    return {
-        "provider": provider_key,
+    # OpenAI-compatible Chinese providers route through the openai provider
+    actual_provider = "openai" if info.get("openai_compat") else provider_key
+    config = {
+        "provider": actual_provider,
         "model": model_info["id"],
         "label": f"{info['label'].split('(')[0].strip()} {model_info['label']}",
         "env_var": info["env_var"],
     }
+    if info.get("base_url"):
+        config["base_url"] = info["base_url"]
+    return config
 
 
 def generate_preset_config(preset_name, robot_name, agent_config, secondary_models=None):
@@ -1990,6 +2080,8 @@ def generate_preset_config(preset_name, robot_name, agent_config, secondary_mode
         config["metadata"]["created_at"] = datetime.now(timezone.utc).isoformat()
         config["agent"]["provider"] = agent_config["provider"]
         config["agent"]["model"] = agent_config["model"]
+        if agent_config.get("base_url"):
+            config["agent"]["base_url"] = agent_config["base_url"]
     else:
         config = {
             "rcan_version": "1.0.0-alpha",
@@ -2068,6 +2160,7 @@ def generate_custom_config(robot_name, agent_config, links, drivers):
         "agent": {
             "provider": agent_config["provider"],
             "model": agent_config["model"],
+            **({"base_url": agent_config["base_url"]} if agent_config.get("base_url") else {}),
             "vision_enabled": True,
             "latency_budget_ms": 200,
             "safety_stop": True,
