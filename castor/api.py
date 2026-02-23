@@ -165,6 +165,7 @@ class AppState:
     nav_job = None  # Current nav job dict or None (issue #120)
     behavior_runner = None  # BehaviorRunner instance (issue #121)
     behavior_job = None  # Current behavior job dict or None (issue #121)
+    personality_registry = None  # PersonalityRegistry singleton (lazy-init)
 
 
 state = AppState()
@@ -2034,6 +2035,103 @@ async def gesture_list():
 
 
 # ---------------------------------------------------------------------------
+# Personality endpoints
+# ---------------------------------------------------------------------------
+
+
+def _get_personality_registry():
+    """Return the process-wide PersonalityRegistry, lazy-init if needed."""
+    if state.personality_registry is None:
+        from castor.personalities import PersonalityRegistry
+
+        state.personality_registry = PersonalityRegistry()
+    return state.personality_registry
+
+
+@app.get("/api/personality/list", dependencies=[Depends(verify_token)])
+async def personality_list():
+    """GET /api/personality/list — Return all personality profiles."""
+    return {"personalities": _get_personality_registry().list_profiles()}
+
+
+@app.get("/api/personality/current", dependencies=[Depends(verify_token)])
+async def personality_current():
+    """GET /api/personality/current — Return the active personality profile."""
+    reg = _get_personality_registry()
+    return {"personality": reg.current.to_dict(), "name": reg.active_name}
+
+
+class _PersonalitySetRequest(BaseModel):
+    name: str
+
+
+@app.post("/api/personality/set", dependencies=[Depends(verify_token)])
+async def personality_set(req: _PersonalitySetRequest):
+    """POST /api/personality/set — Switch active personality profile.
+
+    Body: ``{"name": "<profile_name>"}``
+
+    Returns:
+        200: ``{"name": str, "greeting": str}``
+        404: profile not found
+    """
+    try:
+        profile = _get_personality_registry().set_active(req.name)
+        return {"name": profile.name, "greeting": profile.greeting}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Fine-tune export endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/finetune/export", dependencies=[Depends(verify_token)])
+async def finetune_export(
+    format: str = "chatml",
+    limit: int = 1000,
+    require_action: bool = False,
+):
+    """GET /api/finetune/export — Download episode memory as a fine-tuning dataset.
+
+    Query params:
+        format: jsonl | alpaca | sharegpt | chatml (default: chatml)
+        limit: max episodes to export (default: 1000)
+        require_action: skip episodes with no parsed action (default: false)
+
+    Returns:
+        JSONL file download (``Content-Disposition: attachment``)
+    """
+    from castor.finetune import EpisodeFinetuneExporter
+
+    try:
+        exporter = EpisodeFinetuneExporter()
+        data = exporter.export_to_bytes(
+            fmt=format,  # type: ignore[arg-type]
+            limit=min(limit, 10000),
+            require_action=require_action,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    filename = f"castor_episodes_{format}.jsonl"
+    return StreamingResponse(
+        iter([data]),
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/finetune/stats", dependencies=[Depends(verify_token)])
+async def finetune_stats():
+    """GET /api/finetune/stats — Return dataset statistics for the episode memory."""
+    from castor.finetune import EpisodeFinetuneExporter
+
+    return EpisodeFinetuneExporter().stats()
+
+
+# ---------------------------------------------------------------------------
 # Webhook endpoints for messaging channels
 # ---------------------------------------------------------------------------
 def _verify_twilio_signature(request_url: str, form_params: dict, signature: str) -> bool:
@@ -2557,6 +2655,19 @@ async def on_startup():
                 logger.info("BehaviorRunner initialized")
             except Exception as _beh_exc:
                 logger.debug("BehaviorRunner init skipped: %s", _beh_exc)
+
+            # Initialize PersonalityRegistry from config
+            try:
+                from castor.personalities import PersonalityRegistry
+
+                state.personality_registry = PersonalityRegistry()
+                state.personality_registry.init_from_config(state.config)
+                logger.info(
+                    "Personality registry initialized (active: %s)",
+                    state.personality_registry.active_name,
+                )
+            except Exception as _pers_exc:
+                logger.debug("Personality registry init skipped: %s", _pers_exc)
 
         except Exception as e:
             logger.warning(f"Config load error (gateway still operational): {e}")
