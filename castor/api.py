@@ -646,6 +646,13 @@ async def reload_config(request: Request):
     try:
         with open(config_path) as _f:
             new_config = yaml.safe_load(_f)
+
+        # Record config version before applying (issue #146)
+        if state.config is not None:
+            from castor.config_history import get_history
+
+            get_history().record(state.config, config_path=config_path)
+
         state.config = new_config
         # Propagate updated model name to the active brain if changed
         if state.brain and "agent" in new_config:
@@ -660,6 +667,43 @@ async def reload_config(request: Request):
         ) from None
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Config reload failed: {exc}") from exc
+
+
+@app.get("/api/config/history", dependencies=[Depends(verify_token)])
+async def config_history(request: Request):
+    """GET /api/config/history — List versioned config snapshots (newest first)."""
+    _check_min_role(request, "operator")
+    from castor.config_history import get_history
+
+    return {"versions": get_history().list()}
+
+
+class _ConfigRollbackRequest(BaseModel):
+    version_id: str
+
+
+@app.post("/api/config/rollback", dependencies=[Depends(verify_token)])
+async def config_rollback(req: _ConfigRollbackRequest, request: Request):
+    """POST /api/config/rollback — Restore a config version and reload.
+
+    Body: ``{"version_id": "<version_id>"}``
+    """
+    _check_min_role(request, "admin")
+    config_path = os.getenv("OPENCASTOR_CONFIG", "robot.rcan.yaml")
+    from castor.config_history import get_history
+
+    try:
+        restored = get_history().rollback(req.version_id, config_path=config_path)
+        state.config = restored
+        if state.brain and "agent" in restored:
+            new_model = restored["agent"].get("model")
+            if new_model:
+                state.brain.model_name = new_model
+        return {"status": "rolled_back", "version_id": req.version_id, "config_path": config_path}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Write failed: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -764,6 +808,22 @@ async def replay_episode(episode_id: str):
         return {"replayed": True, "episode_id": episode_id, "action": action}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Replay failed: {exc}") from exc
+
+
+@app.get("/api/memory/search", dependencies=[Depends(verify_token)])
+async def memory_search(q: str, limit: int = 10):
+    """GET /api/memory/search — Find episodes by semantic similarity (TF-IDF).
+
+    Query params:
+        q: Search query text.
+        limit: Max results (default 10).
+    """
+    from castor.episode_search import get_searcher
+
+    if not q.strip():
+        raise HTTPException(status_code=422, detail="Query 'q' must not be empty")
+    results = get_searcher().search(q, limit=min(limit, 100))
+    return {"query": q, "results": results, "count": len(results)}
 
 
 # ---------------------------------------------------------------------------
@@ -2035,6 +2095,278 @@ async def gesture_list():
 
 
 # ---------------------------------------------------------------------------
+# Snapshot endpoints (issue #148)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/snapshot/latest", dependencies=[Depends(verify_token)])
+async def snapshot_latest():
+    """GET /api/snapshot/latest — Most recent full-state snapshot."""
+    from castor.snapshot import get_manager
+
+    snap = get_manager().latest()
+    if snap is None:
+        raise HTTPException(status_code=404, detail="No snapshots taken yet")
+    return snap
+
+
+@app.get("/api/snapshot/history", dependencies=[Depends(verify_token)])
+async def snapshot_history(limit: int = 20):
+    """GET /api/snapshot/history — Recent state snapshots (newest first)."""
+    from castor.snapshot import get_manager
+
+    return {"snapshots": get_manager().history(limit=min(limit, 100))}
+
+
+@app.post("/api/snapshot/take", dependencies=[Depends(verify_token)])
+async def snapshot_take():
+    """POST /api/snapshot/take — Capture a snapshot immediately."""
+    from castor.snapshot import get_manager
+
+    snap = get_manager().take(state=state)
+    return snap
+
+
+# ---------------------------------------------------------------------------
+# API key rotation endpoints (issue #145)
+# ---------------------------------------------------------------------------
+
+
+class _KeyGenerateRequest(BaseModel):
+    label: str = "key"
+    role: str = "operator"
+    expires_in_days: Optional[int] = None
+
+
+@app.post("/api/keys/generate", dependencies=[Depends(verify_token)])
+async def keys_generate(req: _KeyGenerateRequest, request: Request):
+    """POST /api/keys/generate — Generate a new named API key.
+
+    Body: ``{"label": str, "role": str, "expires_in_days": int|null}``
+
+    Returns:
+        200: ``{"key": "<raw_key>", "key_id": str, "role": str}``
+             **The raw key is shown only once — store it securely.**
+    """
+    _check_min_role(request, "admin")
+    from castor.apikeys import get_manager as _km
+
+    try:
+        raw = _km().generate(
+            label=req.label,
+            role=req.role,
+            expires_in_days=req.expires_in_days,
+        )
+        mgr = _km()
+        # Find the newly created key_id by verifying the raw key
+        role = mgr.verify(raw)
+        return {"key": raw, "role": role, "label": req.label}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/keys/list", dependencies=[Depends(verify_token)])
+async def keys_list(request: Request):
+    """GET /api/keys/list — List all API keys (hashes hidden)."""
+    _check_min_role(request, "admin")
+    from castor.apikeys import get_manager as _km
+
+    return {"keys": _km().list()}
+
+
+@app.delete("/api/keys/{key_id}", dependencies=[Depends(verify_token)])
+async def keys_revoke(key_id: str, request: Request):
+    """DELETE /api/keys/{key_id} — Revoke an API key."""
+    _check_min_role(request, "admin")
+    from castor.apikeys import get_manager as _km
+
+    removed = _km().revoke(key_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Key '{key_id}' not found")
+    return {"revoked": True, "key_id": key_id}
+
+
+# ---------------------------------------------------------------------------
+# Safety event telemetry endpoints (issue #143)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/safety/events", dependencies=[Depends(verify_token)])
+async def safety_events(limit: int = 50, event_type: Optional[str] = None):
+    """GET /api/safety/events — Recent safety events.
+
+    Query params:
+        limit: Max events (default 50).
+        event_type: Filter by type (bounds_violation, estop, guardian_veto, etc.).
+    """
+    from castor.safety_telemetry import get_telemetry
+
+    return {
+        "events": get_telemetry().recent(limit=min(limit, 500), event_type=event_type)
+    }
+
+
+@app.get("/api/safety/stats", dependencies=[Depends(verify_token)])
+async def safety_stats():
+    """GET /api/safety/stats — Safety event statistics (counts by type, last 24h)."""
+    from castor.safety_telemetry import get_telemetry
+
+    return get_telemetry().stats()
+
+
+class _SafetyTestBoundsRequest(BaseModel):
+    action: Dict[str, Any]
+
+
+@app.post("/api/safety/test-bounds", dependencies=[Depends(verify_token)])
+async def safety_test_bounds(req: _SafetyTestBoundsRequest):
+    """POST /api/safety/test-bounds — Test an action dict against the BoundsChecker.
+
+    Body: ``{"action": {"speed": 0.8, "direction": "forward", ...}}``
+
+    Returns:
+        200: ``{"within_bounds": bool, "violations": list, "margin": float|null}``
+    """
+    try:
+        from castor.safety.bounds import BoundsChecker
+
+        checker = (
+            BoundsChecker.from_config(state.config)
+            if state.config
+            else BoundsChecker.from_robot_type("generic")
+        )
+        result = checker.check_action(req.action)
+        return {
+            "within_bounds": result.ok,
+            "violations": result.details if not result.ok else [],
+            "status": result.status.value if hasattr(result.status, "value") else str(result.status),
+            "margin": result.margin,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Bounds check failed: {exc}") from exc
+
+
+@app.websocket("/ws/safety")
+async def ws_safety(websocket: WebSocket):
+    """WS /ws/safety — Real-time safety event push at 2Hz."""
+    token = websocket.query_params.get("token", "")
+    if API_TOKEN and token != API_TOKEN:
+        await websocket.close(code=4003)
+        return
+    await websocket.accept()
+    from castor.safety_telemetry import get_telemetry
+
+    seen: set = set()
+    try:
+        while True:
+            events = get_telemetry().recent(limit=20)
+            new_events = [e for e in events if e["id"] not in seen]
+            if new_events:
+                for ev in new_events:
+                    seen.add(ev["id"])
+                await websocket.send_json({"events": new_events})
+            await asyncio.sleep(0.5)
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Time-lapse generator endpoints (issue #139)
+# ---------------------------------------------------------------------------
+
+
+class _TimelapseGenerateRequest(BaseModel):
+    recording_ids: Optional[List[str]] = None
+    speed_factor: float = 4.0
+    output_fps: int = 24
+
+
+@app.post("/api/timelapse/generate", dependencies=[Depends(verify_token)])
+async def timelapse_generate(req: _TimelapseGenerateRequest):
+    """POST /api/timelapse/generate — Compile recordings into a time-lapse MP4.
+
+    Body: ``{"recording_ids": [...], "speed_factor": 4.0, "output_fps": 24}``
+    """
+    from castor.timelapse import get_generator
+
+    try:
+        result = await asyncio.to_thread(
+            get_generator().generate,
+            recording_ids=req.recording_ids,
+            speed_factor=req.speed_factor,
+            output_fps=req.output_fps,
+        )
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Timelapse generation failed: {exc}") from exc
+
+
+@app.get("/api/timelapse/list", dependencies=[Depends(verify_token)])
+async def timelapse_list():
+    """GET /api/timelapse/list — List all generated timelapses."""
+    from castor.timelapse import get_generator
+
+    return {"timelapses": get_generator().list()}
+
+
+# ---------------------------------------------------------------------------
+# i18n translation endpoints (issue #141)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/i18n/languages", dependencies=[Depends(verify_token)])
+async def i18n_languages():
+    """GET /api/i18n/languages — List supported languages and phrase counts."""
+    from castor.i18n import get_translator
+
+    return {"languages": get_translator().supported_languages()}
+
+
+class _I18nDetectRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/i18n/detect", dependencies=[Depends(verify_token)])
+async def i18n_detect(req: _I18nDetectRequest):
+    """POST /api/i18n/detect — Detect language of input text.
+
+    Body: ``{"text": "<text>"}``
+    Returns: ``{"lang": "<lang_code>"}``
+    """
+    from castor.i18n import get_translator
+
+    lang = get_translator().detect(req.text)
+    return {"lang": lang, "text": req.text}
+
+
+class _I18nTranslateRequest(BaseModel):
+    text: str
+    source_lang: Optional[str] = None
+    target_lang: Optional[str] = None
+
+
+@app.post("/api/i18n/translate", dependencies=[Depends(verify_token)])
+async def i18n_translate(req: _I18nTranslateRequest):
+    """POST /api/i18n/translate — Translate text to/from English.
+
+    Translates to English if source_lang is set (or auto-detected).
+    Translates from English if target_lang is set.
+
+    Body: ``{"text": str, "source_lang": str|null, "target_lang": str|null}``
+    """
+    from castor.i18n import get_translator
+
+    t = get_translator()
+    if req.target_lang and req.target_lang != "en":
+        result = t.from_english(req.text, req.target_lang)
+        return {"translated": result, "source_lang": "en", "target_lang": req.target_lang}
+    translated, detected = t.to_english(req.text, source_lang=req.source_lang)
+    return {"translated": translated, "source_lang": detected, "target_lang": "en"}
+
+
+# ---------------------------------------------------------------------------
 # Personality endpoints
 # ---------------------------------------------------------------------------
 
@@ -2668,6 +3000,21 @@ async def on_startup():
                 )
             except Exception as _pers_exc:
                 logger.debug("Personality registry init skipped: %s", _pers_exc)
+
+            # Start snapshot manager background thread (issue #148)
+            try:
+                from castor.snapshot import get_manager as _snap_mgr
+
+                _snap_interval = float(
+                    state.config.get("snapshot_interval_s", 60)
+                )
+                _snap_mgr().start(
+                    interval_s=_snap_interval,
+                    state_getter=lambda: state,
+                )
+                logger.info("Snapshot manager started (interval=%ss)", _snap_interval)
+            except Exception as _snap_exc:
+                logger.debug("Snapshot manager init skipped: %s", _snap_exc)
 
         except Exception as e:
             logger.warning(f"Config load error (gateway still operational): {e}")

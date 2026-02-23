@@ -1,23 +1,30 @@
 """
-castor/channels/mqtt_channel.py — MQTT channel bridge (issue #98).
+castor/channels/mqtt_channel.py — MQTT channel bridge (issue #98, #147).
 
 Connects to an MQTT broker and routes messages between the broker and the
 robot brain.  Inbound messages on the subscribe topic are forwarded to the
 brain callback; replies are published to the publish topic.
 
+Also supports a bidirectional REST bridge (issue #147): messages published
+to ``command_topic`` (default ``castor/command/in``) are forwarded directly
+to the robot brain as /api/command instructions; results are published to
+``command_response_topic`` (default ``castor/command/out``).
+
 Required config:
-    broker_host:     MQTT broker hostname (default: localhost)
+    broker_host:              MQTT broker hostname (default: localhost)
 
 Optional config:
-    broker_port:     Broker port (default: 1883)
-    subscribe_topic: Topic to subscribe (default: opencastor/input)
-    publish_topic:   Response topic (default: opencastor/output)
-    username:        MQTT username  (or env MQTT_USERNAME)
-    password:        MQTT password  (or env MQTT_PASSWORD)
-    client_id:       MQTT client ID (default: opencastor-<pid>)
-    keepalive:       Keepalive in seconds (default: 60)
-    qos:             QoS level 0/1/2 (default: 0)
-    tls:             Enable TLS (default: false)
+    broker_port:              Broker port (default: 1883)
+    subscribe_topic:          Topic to subscribe (default: opencastor/input)
+    publish_topic:            Response topic (default: opencastor/output)
+    command_topic:            REST bridge inbound topic (default: castor/command/in)
+    command_response_topic:   REST bridge outbound topic (default: castor/command/out)
+    username:                 MQTT username  (or env MQTT_USERNAME)
+    password:                 MQTT password  (or env MQTT_PASSWORD)
+    client_id:                MQTT client ID (default: opencastor-<pid>)
+    keepalive:                Keepalive in seconds (default: 60)
+    qos:                      QoS level 0/1/2 (default: 0)
+    tls:                      Enable TLS (default: false)
 
 Install::
 
@@ -30,6 +37,8 @@ RCAN config example::
         broker_host: mqtt.example.com
         subscribe_topic: opencastor/input
         publish_topic: opencastor/output
+        command_topic: castor/command/in
+        command_response_topic: castor/command/out
 """
 
 from __future__ import annotations
@@ -67,6 +76,10 @@ class MQTTChannel(BaseChannel):
         self._broker_port = int(config.get("broker_port", os.getenv("MQTT_BROKER_PORT", "1883")))
         self._subscribe_topic = config.get("subscribe_topic", "opencastor/input")
         self._publish_topic = config.get("publish_topic", "opencastor/output")
+        self._command_topic = config.get("command_topic", "castor/command/in")
+        self._command_response_topic = config.get(
+            "command_response_topic", "castor/command/out"
+        )
         self._username = config.get("username", os.getenv("MQTT_USERNAME", ""))
         self._password = config.get("password", os.getenv("MQTT_PASSWORD", ""))
         self._keepalive = int(config.get("keepalive", 60))
@@ -138,8 +151,15 @@ class MQTTChannel(BaseChannel):
     def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             client.subscribe(self._subscribe_topic, qos=self._qos)
+            # Also subscribe to the REST bridge command topic
+            client.subscribe(self._command_topic, qos=self._qos)
             self._connected.set()
-            logger.debug("MQTT connected (rc=%d), subscribed to %r", rc, self._subscribe_topic)
+            logger.debug(
+                "MQTT connected (rc=%d), subscribed to %r and command bridge %r",
+                rc,
+                self._subscribe_topic,
+                self._command_topic,
+            )
         else:
             logger.error("MQTT connect failed: rc=%d", rc)
 
@@ -149,7 +169,12 @@ class MQTTChannel(BaseChannel):
         self._connected.clear()
 
     def _on_message(self, client, userdata, msg):
-        """Dispatch an inbound MQTT message to the brain callback."""
+        """Dispatch an inbound MQTT message to the brain callback.
+
+        Messages arriving on the REST bridge command_topic are forwarded
+        directly to the brain as /api/command instructions and results are
+        published to command_response_topic.
+        """
         if not self._running:
             return
 
@@ -161,6 +186,11 @@ class MQTTChannel(BaseChannel):
         chat_id = msg.topic
         logger.debug("MQTT message on %r: %.80s", chat_id, payload)
 
+        # REST bridge: command_topic → brain → command_response_topic
+        if msg.topic == self._command_topic:
+            self._handle_command_bridge(payload)
+            return
+
         if self._loop and not self._loop.is_closed():
             future = asyncio.run_coroutine_threadsafe(
                 self.handle_message(chat_id, payload), self._loop
@@ -171,3 +201,40 @@ class MQTTChannel(BaseChannel):
                     self._client.publish(self._publish_topic, reply.encode(), qos=self._qos)
             except Exception as exc:
                 logger.warning("MQTT message handling error: %s", exc)
+
+    def _handle_command_bridge(self, payload: str) -> None:
+        """Forward a command_topic message to the brain and publish the result.
+
+        The payload may be plain text (treated as instruction) or a JSON object
+        with an ``instruction`` key.
+        """
+        import json
+
+        try:
+            data = json.loads(payload)
+            instruction = data.get("instruction", payload) if isinstance(data, dict) else payload
+        except (json.JSONDecodeError, TypeError):
+            instruction = payload
+
+        if not self._loop or self._loop.is_closed():
+            return
+
+        async def _run():
+            return await self.handle_message(self._command_topic, instruction)
+
+        future = asyncio.run_coroutine_threadsafe(_run(), self._loop)
+        try:
+            reply = future.result(timeout=30.0)
+            if self._client:
+                response_payload = (
+                    json.dumps({"response": reply, "instruction": instruction})
+                    if reply
+                    else json.dumps({"error": "no response"})
+                )
+                self._client.publish(
+                    self._command_response_topic,
+                    response_payload.encode(),
+                    qos=self._qos,
+                )
+        except Exception as exc:
+            logger.warning("MQTT command bridge error: %s", exc)
