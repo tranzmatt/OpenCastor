@@ -186,7 +186,7 @@ class LocalTTS:
 
             buf = io.BytesIO()
             with wave.open(buf, "wb") as wav_file:
-                audio = self._piper_voice.synthesize(text, wav_file=wav_file)
+                self._piper_voice.synthesize(text, wav_file=wav_file)
             return buf.getvalue()
         except Exception as exc:
             logger.warning("Piper TTS error: %s", exc)

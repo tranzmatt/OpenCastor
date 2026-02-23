@@ -95,7 +95,7 @@ class VoiceAssistantLoop:
             try:
                 self._state = "waiting"
                 woke = threading.Event()
-                detector.start(on_wake=lambda: woke.set())
+                detector.start(on_wake=lambda e=woke: e.set())
                 woke.wait(timeout=30)
 
                 if not self._running:

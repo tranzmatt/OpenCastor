@@ -73,7 +73,7 @@ class EpisodeSimilaritySearch:
         self._idf = {term: math.log((n + 1) / (df[term] + 1)) + 1.0 for term in df}
 
         self._index = []
-        for ep, tokens in zip(episodes, docs):
+        for ep, tokens in zip(episodes, docs, strict=False):
             tf = Counter(tokens)
             vec: Dict[str, float] = {}
             for term, count in tf.items():

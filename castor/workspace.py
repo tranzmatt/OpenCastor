@@ -33,10 +33,10 @@ logger = logging.getLogger("OpenCastor.Workspace")
 _STORE_DIR = Path(os.getenv("CASTOR_WORKSPACE_DIR", str(Path.home() / ".castor" / "workspaces")))
 
 try:
-    import jwt as _jwt
+    import importlib.util as _ilu
 
-    HAS_JWT = True
-except ImportError:
+    HAS_JWT = _ilu.find_spec("jwt") is not None
+except Exception:
     HAS_JWT = False
 
 

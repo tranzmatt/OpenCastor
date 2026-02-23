@@ -44,10 +44,10 @@ except ImportError:
     HAS_H5PY = False
 
 try:
-    import mujoco
+    import importlib.util as _ilu
 
-    HAS_MUJOCO = True
-except ImportError:
+    HAS_MUJOCO = _ilu.find_spec("mujoco") is not None
+except Exception:
     HAS_MUJOCO = False
 
 _singleton: Optional["SimBridge"] = None
@@ -289,7 +289,6 @@ class SimBridge:
     def _import_hdf5(self, data: bytes) -> list[dict]:
         import io as _io
 
-        import numpy as np
 
         buf = _io.BytesIO(data)
         episodes = []

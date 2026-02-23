@@ -242,7 +242,6 @@ class ReactiveAvoider:
 
                         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                         zones = get_obstacle_zones(img)
-                        center_cm = zones.get("center_cm", 999)
                         nearest = min(
                             zones.get("left_cm", 999),
                             zones.get("center_cm", 999),

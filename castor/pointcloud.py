@@ -20,7 +20,6 @@ Install:  pip install depthai   (already in requirements for OAK cameras)
 
 import logging
 import os
-import struct
 import threading
 from typing import Optional
 
@@ -39,10 +38,10 @@ except ImportError:
     HAS_DEPTHAI = False
 
 try:
-    import open3d as o3d
+    import importlib.util as _ilu
 
-    HAS_OPEN3D = True
-except ImportError:
+    HAS_OPEN3D = _ilu.find_spec("open3d") is not None
+except Exception:
     HAS_OPEN3D = False
 
 _singleton: Optional["PointCloudCapture"] = None

@@ -3279,9 +3279,9 @@ async def fleet_command(ruri: str, body: _FleetCommandRequest, request: Request)
             resp = await client.post(url, json={"instruction": body.instruction}, headers=headers)
             return resp.json()
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail={"error": "Fleet robot timeout"})
+        raise HTTPException(status_code=504, detail={"error": "Fleet robot timeout"}) from None
     except Exception as exc:
-        raise HTTPException(status_code=502, detail={"error": str(exc)})
+        raise HTTPException(status_code=502, detail={"error": str(exc)}) from exc
 
 
 @app.get("/api/fleet/{ruri}/status", dependencies=[Depends(verify_token)])
@@ -3302,7 +3302,7 @@ async def fleet_status(ruri: str):
             resp = await client.get(url, headers=headers)
             return resp.json()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail={"error": str(exc)})
+        raise HTTPException(status_code=502, detail={"error": str(exc)}) from exc
 
 
 def _find_fleet_peer(ruri: str) -> Optional[dict]:
@@ -3362,7 +3362,7 @@ async def webrtc_offer(body: _WebRTCOfferRequest):
         raise
     except Exception as exc:
         logger.exception("WebRTC offer error: %s", exc)
-        raise HTTPException(status_code=500, detail={"error": str(exc)})
+        raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -3456,7 +3456,7 @@ async def setup_save_config(body: _SetupSaveConfigRequest):
 
         return {"ok": True, "config_path": config_path}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail={"error": str(exc)})
+        raise HTTPException(status_code=500, detail={"error": str(exc)}) from exc
 
 
 # ── Privacy Mode ──────────────────────────────────────────────────────────────
@@ -3599,9 +3599,9 @@ async def pointcloud_json():
 
 @app.get("/api/depth/pointcloud.ply")
 async def pointcloud_ply():
-    from castor.pointcloud import get_capture
-
     from fastapi.responses import Response
+
+    from castor.pointcloud import get_capture
 
     ply_bytes = get_capture().to_ply_bytes()
     return Response(content=ply_bytes, media_type="application/octet-stream",
@@ -3621,9 +3621,9 @@ async def pointcloud_stats():
 @app.get("/api/detection/frame")
 async def detection_frame():
     """Return JPEG with bounding box overlays."""
-    from castor.detection import get_detector
-
     from fastapi.responses import Response
+
+    from castor.detection import get_detector
 
     det = get_detector()
     jpeg = b""

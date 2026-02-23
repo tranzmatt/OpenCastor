@@ -99,7 +99,8 @@
             "mlx",
             "mlx-lm",
             "vllm-mlx",
-            "claude_oauth"
+            "claude_oauth",
+            "groq"
           ]
         },
         "model": {
@@ -504,6 +505,16 @@
           "type": "boolean",
           "default": false,
           "description": "Enable stereo depth (OAK-D and similar)."
+        },
+        "fps": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Capture frame rate in frames-per-second."
+        },
+        "imu_enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable on-board IMU (OAK-4 Pro and similar)."
         }
       },
       "additionalProperties": false
@@ -692,6 +703,23 @@
           "additionalProperties": true
         }
       ]
+    },
+    "safety": {
+      "type": "object",
+      "description": "Runtime safety constraints for obstacle avoidance and emergency stop behaviour.",
+      "properties": {
+        "obstacle_stop_cm": {
+          "type": "number",
+          "description": "Distance in centimetres at which the robot stops automatically.",
+          "default": 30
+        },
+        "estop_on_startup": {
+          "type": "boolean",
+          "description": "Engage emergency stop immediately on startup (cleared once the operator confirms).",
+          "default": false
+        }
+      },
+      "additionalProperties": true
     },
     "ros2": {
       "type": "object",
