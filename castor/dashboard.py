@@ -260,7 +260,7 @@ with st.sidebar:
 
     # Emergency Stop — always prominent
     st.markdown("### 🛑 Emergency Stop")
-    if st.button("EMERGENCY STOP", type="primary", use_container_width=True):
+    if st.button("EMERGENCY STOP", type="primary", width="stretch"):
         try:
             _req.post(f"{GW}/api/stop", headers=_hdr(), timeout=3)
             st.warning("⚠️ Motors disengaged!")
@@ -601,7 +601,7 @@ with right_col:
         st.dataframe(
             pd.DataFrame(ch_rows),
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
             height=min(250, 36 + 36 * len(ch_rows)),
         )
     else:
@@ -679,7 +679,7 @@ if history_entries:
     st.dataframe(
         pd.DataFrame(rows),
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         height=min(240, 36 + 36 * len(rows)),
     )
 else:
@@ -713,7 +713,7 @@ with st.expander(
         st.dataframe(
             pd.DataFrame(ep_rows),
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
             height=min(300, 36 + 36 * len(ep_rows)),
         )
         # Per-episode replay buttons
@@ -847,7 +847,7 @@ else:
     st.dataframe(
         _fleet_df,
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         height=min(300, 36 + 36 * len(_fleet_results)),
     )
 
@@ -861,7 +861,7 @@ else:
             label_visibility="collapsed",
         )
     with _fleet_col2:
-        _fleet_send = st.button("Send to fleet", use_container_width=True)
+        _fleet_send = st.button("Send to fleet", width="stretch")
 
     if _fleet_send and _fleet_instruction:
         _active_nodes = [r for r in _fleet_results if r["_online"]]
@@ -926,7 +926,7 @@ with st.expander("🎬 Behaviors", expanded=False):
     )
     _bcol1, _bcol2 = st.columns(2)
     with _bcol1:
-        if st.button("Run", key="behavior_run_btn", use_container_width=True):
+        if st.button("Run", key="behavior_run_btn", width="stretch"):
             if _beh_path.strip():
                 try:
                     _br = _req.post(
@@ -948,7 +948,7 @@ with st.expander("🎬 Behaviors", expanded=False):
             else:
                 st.toast("Enter a behavior file path first", icon="⚠")
     with _bcol2:
-        if st.button("Stop", key="behavior_stop_btn", use_container_width=True):
+        if st.button("Stop", key="behavior_stop_btn", width="stretch"):
             try:
                 _bs = _req.post(
                     f"{GW}/api/behavior/stop",
@@ -1077,13 +1077,13 @@ with st.expander("🗺 SLAM / Nav Map", expanded=False):
                     _pil = _PILImg.fromarray(_img)
                     _buf = _io.BytesIO()
                     _pil.save(_buf, format="PNG")
-                    st.image(_buf.getvalue(), caption="Occupancy Map", use_container_width=True)
+                    st.image(_buf.getvalue(), caption="Occupancy Map", width="stretch")
                 except Exception as _me:
                     st.warning(f"Map render error: {_me}")
             else:
                 _map_img_url = _map_data.get("image_url")
                 if _map_img_url:
-                    st.image(f"{GW}{_map_img_url}", caption="SLAM Map", use_container_width=True)
+                    st.image(f"{GW}{_map_img_url}", caption="SLAM Map", width="stretch")
                 else:
                     st.info("Map data received but no cells/image available.")
         else:
