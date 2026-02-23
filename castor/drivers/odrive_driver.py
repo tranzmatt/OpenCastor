@@ -65,7 +65,9 @@ class ODriveDriver(DriverBase):
                 self._odrv = _odrive.find_any(timeout=5)
                 if self._odrv is not None:
                     self._mode = "hardware"
-                    logger.info("ODrive connected: serial=%s", getattr(self._odrv, "serial_number", "?"))
+                    logger.info(
+                        "ODrive connected: serial=%s", getattr(self._odrv, "serial_number", "?")
+                    )
                 else:
                     logger.warning("ODrive not found — mock mode")
             except Exception as exc:

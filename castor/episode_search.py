@@ -142,11 +142,7 @@ class EpisodeSimilaritySearch:
 
         scored: List[tuple] = []
         for entry in self._index:
-            score = sum(
-                qvec[t] * entry["vec"].get(t, 0.0)
-                for t in qvec
-                if t in entry["vec"]
-            )
+            score = sum(qvec[t] * entry["vec"].get(t, 0.0) for t in qvec if t in entry["vec"])
             if score >= min_score:
                 scored.append((score, entry))
 
@@ -160,9 +156,7 @@ class EpisodeSimilaritySearch:
 
         return results
 
-    def _keyword_fallback(
-        self, tokens: List[str], limit: int
-    ) -> List[Dict[str, Any]]:
+    def _keyword_fallback(self, tokens: List[str], limit: int) -> List[Dict[str, Any]]:
         """Simple keyword matching when all query terms are out-of-vocabulary."""
         query_set = set(tokens)
         scored = []

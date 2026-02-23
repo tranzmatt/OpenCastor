@@ -37,7 +37,7 @@ ExportFormat = Literal["jsonl", "alpaca", "sharegpt", "chatml"]
 
 _SYSTEM_MSG = (
     "You are a robot controller. Given a scene description or instruction, "
-    "output a JSON action dict. Example: {\"action\": \"forward\", \"speed\": 0.5}"
+    'output a JSON action dict. Example: {"action": "forward", "speed": 0.5}'
 )
 
 
@@ -141,9 +141,7 @@ class EpisodeFinetuneExporter:
             yield converter(ep)
             exported += 1
 
-        logger.info(
-            "FinetuneExporter: exported=%d skipped=%d fmt=%s", exported, skipped, fmt
-        )
+        logger.info("FinetuneExporter: exported=%d skipped=%d fmt=%s", exported, skipped, fmt)
 
     def export_to_file(
         self,
@@ -209,6 +207,4 @@ def export_episodes(
 
     Returns number of records written.
     """
-    return EpisodeFinetuneExporter(memory).export_to_file(
-        output_path, fmt=fmt, limit=limit
-    )
+    return EpisodeFinetuneExporter(memory).export_to_file(output_path, fmt=fmt, limit=limit)

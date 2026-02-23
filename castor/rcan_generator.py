@@ -221,5 +221,7 @@ def generate_from_template(template_name: str, brain=None) -> str:
     """Generate a RCAN config from a named built-in template."""
     desc = BUILT_IN_TEMPLATES.get(template_name)
     if not desc:
-        raise ValueError(f"Unknown template '{template_name}'. Available: {list(BUILT_IN_TEMPLATES)}")
+        raise ValueError(
+            f"Unknown template '{template_name}'. Available: {list(BUILT_IN_TEMPLATES)}"
+        )
     return generate_rcan_config(desc, brain=brain)

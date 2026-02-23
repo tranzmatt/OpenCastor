@@ -128,8 +128,7 @@ class VideoRecorder:
         with self._lock:
             if self._current is not None:
                 raise RuntimeError(
-                    f"Recording already in progress (id={self._current.id}). "
-                    "Call stop() first."
+                    f"Recording already in progress (id={self._current.id}). Call stop() first."
                 )
 
             rec_id = f"rec_{int(time.time() * 1000)}"
@@ -142,11 +141,11 @@ class VideoRecorder:
 
             if HAS_CV2:
                 fourcc = cv2.VideoWriter_fourcc(*_FOURCC)
-                self._writer = cv2.VideoWriter(
-                    str(path), fourcc, self._fps, self._resolution
-                )
+                self._writer = cv2.VideoWriter(str(path), fourcc, self._fps, self._resolution)
                 if not self._writer.isOpened():
-                    logger.warning("VideoWriter failed to open %s; falling back to frame dump", path)
+                    logger.warning(
+                        "VideoWriter failed to open %s; falling back to frame dump", path
+                    )
                     self._writer = None
             else:
                 self._writer = None
@@ -219,7 +218,9 @@ class VideoRecorder:
 
             logger.info(
                 "Recording stopped: id=%s frames=%d duration=%.1fs",
-                meta.id, meta.frames, meta.duration_s,
+                meta.id,
+                meta.frames,
+                meta.duration_s,
             )
             return meta.to_dict()
 
@@ -245,8 +246,10 @@ class VideoRecorder:
         for r in recs:
             p = Path(r["path"])
             if p.exists():
-                r["size_bytes"] = p.stat().st_size if p.is_file() else sum(
-                    f.stat().st_size for f in p.rglob("*") if f.is_file()
+                r["size_bytes"] = (
+                    p.stat().st_size
+                    if p.is_file()
+                    else sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
                 )
         return sorted(recs, key=lambda r: r.get("created_at", 0), reverse=True)
 
@@ -265,6 +268,7 @@ class VideoRecorder:
                 p.unlink()
             elif p.is_dir():
                 import shutil
+
                 shutil.rmtree(p)
         except Exception as exc:
             logger.warning("Could not delete recording %s: %s", rec_id, exc)

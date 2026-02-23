@@ -77,7 +77,7 @@ _BUILTIN_PROFILES: List[PersonalityProfile] = [
             "You are a professional robot assistant. "
             "Respond with clear, concise JSON actions. "
             "Prioritize safety and accuracy. "
-            "Format: {\"action\": \"<verb>\", \"direction\": \"<dir>\", \"speed\": 0.5}"
+            'Format: {"action": "<verb>", "direction": "<dir>", "speed": 0.5}'
         ),
         emoji_mode=False,
         response_style="balanced",
@@ -91,7 +91,7 @@ _BUILTIN_PROFILES: List[PersonalityProfile] = [
             "You are an explorer robot — curious, enthusiastic, and adventurous! "
             "You LOVE navigating new spaces and discovering things. "
             "Respond with JSON actions and add a brief excited observation. "
-            "Format: {\"action\": \"<verb>\", \"direction\": \"<dir>\", \"speed\": 0.7, \"thought\": \"wow!\"}"
+            'Format: {"action": "<verb>", "direction": "<dir>", "speed": 0.7, "thought": "wow!"}'
         ),
         emoji_mode=True,
         response_style="verbose",
@@ -104,9 +104,9 @@ _BUILTIN_PROFILES: List[PersonalityProfile] = [
         system_prompt=(
             "You are a guardian robot. Safety is your highest priority. "
             "Before any movement, assess risks. Prefer slow speeds. "
-            "If anything seems unsafe, output {\"action\": \"stop\"}. "
+            'If anything seems unsafe, output {"action": "stop"}. '
             "Always explain your safety reasoning in the 'reason' field. "
-            "Format: {\"action\": \"<verb>\", \"speed\": 0.3, \"reason\": \"<safety note>\"}"
+            'Format: {"action": "<verb>", "speed": 0.3, "reason": "<safety note>"}'
         ),
         emoji_mode=False,
         response_style="verbose",
@@ -121,7 +121,7 @@ _BUILTIN_PROFILES: List[PersonalityProfile] = [
             "Approach all tasks with analytical precision. "
             "Include sensor readings, timestamps, and hypotheses in responses. "
             "Output structured JSON with measurement fields. "
-            "Format: {\"action\": \"<verb>\", \"speed\": 0.5, \"hypothesis\": \"...\", \"confidence\": 0.9}"
+            'Format: {"action": "<verb>", "speed": 0.5, "hypothesis": "...", "confidence": 0.9}'
         ),
         emoji_mode=False,
         response_style="verbose",
@@ -135,7 +135,7 @@ _BUILTIN_PROFILES: List[PersonalityProfile] = [
             "You are a friendly companion robot! You care about the people around you. "
             "Be warm, encouraging, and a little playful. "
             "Always acknowledge the human before acting. "
-            "Format: {\"action\": \"<verb>\", \"direction\": \"<dir>\", \"speech\": \"<friendly response>\"}"
+            'Format: {"action": "<verb>", "direction": "<dir>", "speech": "<friendly response>"}'
         ),
         emoji_mode=True,
         response_style="balanced",
@@ -147,7 +147,7 @@ _BUILTIN_PROFILES: List[PersonalityProfile] = [
         description="Ultra-terse. JSON only, no commentary. Maximum speed.",
         system_prompt=(
             "Robot. JSON only. No text. "
-            "Format: {\"action\": \"<verb>\", \"direction\": \"<dir>\", \"speed\": 0.5}"
+            'Format: {"action": "<verb>", "direction": "<dir>", "speed": 0.5}'
         ),
         emoji_mode=False,
         response_style="terse",
@@ -167,9 +167,7 @@ class PersonalityRegistry:
     """
 
     def __init__(self, default_name: str = "assistant"):
-        self._profiles: Dict[str, PersonalityProfile] = {
-            p.name: p for p in _BUILTIN_PROFILES
-        }
+        self._profiles: Dict[str, PersonalityProfile] = {p.name: p for p in _BUILTIN_PROFILES}
         self._active_name: str = default_name
         if default_name not in self._profiles:
             logger.warning(
@@ -209,10 +207,7 @@ class PersonalityRegistry:
         """
         key = name.lower()
         if key not in self._profiles:
-            raise ValueError(
-                f"Unknown personality '{name}'. "
-                f"Available: {sorted(self._profiles)}"
-            )
+            raise ValueError(f"Unknown personality '{name}'. Available: {sorted(self._profiles)}")
         self._active_name = key
         logger.info("Personality switched to '%s'", key)
         return self._profiles[key]

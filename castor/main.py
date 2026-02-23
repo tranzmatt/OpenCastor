@@ -287,7 +287,7 @@ class Camera:
         self._oakd_depth_q = None
         self._oakd_imu_q = None
         self.last_depth = None  # Expose depth for reactive layer
-        self.last_imu = None   # Expose IMU for orientation-aware navigation (OAK-4 Pro)
+        self.last_imu = None  # Expose IMU for orientation-aware navigation (OAK-4 Pro)
 
         cam_cfg = config.get("camera", {})
         cam_type = cam_cfg.get("type", "auto")

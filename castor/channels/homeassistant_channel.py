@@ -65,9 +65,7 @@ class HomeAssistantChannel(BaseChannel):
         cfg = config or {}
 
         self._ha_url: str = cfg.get("ha_url", "http://homeassistant.local:8123").rstrip("/")
-        self._ha_token: str = cfg.get(
-            "ha_token", os.environ.get("HA_LONG_LIVED_TOKEN", "")
-        )
+        self._ha_token: str = cfg.get("ha_token", os.environ.get("HA_LONG_LIVED_TOKEN", ""))
         self._entity_id: str = cfg.get("entity_id", "input_text.castor_command")
         self._robot_name: str = cfg.get("robot_name", "castor")
         self._poll_interval: float = float(cfg.get("poll_interval_s", 2))
@@ -189,9 +187,7 @@ class HomeAssistantChannel(BaseChannel):
         url = f"{self._ha_url}/api/services/switch/{service}"
         payload = {"entity_id": self._switch_entity}
         try:
-            async with session.post(
-                url, json=payload, timeout=aiohttp.ClientTimeout(total=5)
-            ):
+            async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=5)):
                 pass
         except Exception as exc:
             logger.debug("HA switch state set error: %s", exc)

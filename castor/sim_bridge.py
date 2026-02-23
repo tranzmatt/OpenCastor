@@ -153,7 +153,9 @@ class SimBridge:
         os.makedirs(_SIM_DIR, exist_ok=True)
         logger.info(
             "SimBridge ready (sim_dir=%s, mujoco=%s, h5py=%s)",
-            _SIM_DIR, HAS_MUJOCO, HAS_H5PY,
+            _SIM_DIR,
+            HAS_MUJOCO,
+            HAS_H5PY,
         )
 
     # ── Export ────────────────────────────────────────────────────────
@@ -288,7 +290,6 @@ class SimBridge:
 
     def _import_hdf5(self, data: bytes) -> list[dict]:
         import io as _io
-
 
         buf = _io.BytesIO(data)
         episodes = []

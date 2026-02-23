@@ -84,7 +84,9 @@ class WakeWordDetector:
         else:
             self._engine = engine
 
-        logger.info("WakeWordDetector initialized (engine=%s, phrase=%r)", self._engine, wake_phrase)
+        logger.info(
+            "WakeWordDetector initialized (engine=%s, phrase=%r)", self._engine, wake_phrase
+        )
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -103,9 +105,7 @@ class WakeWordDetector:
             self._on_wake = on_wake
         self._stop_event.clear()
         self._active = True
-        self._thread = threading.Thread(
-            target=self._loop, daemon=True, name="hotword-loop"
-        )
+        self._thread = threading.Thread(target=self._loop, daemon=True, name="hotword-loop")
         self._thread.start()
         logger.info("WakeWordDetector started (engine=%s)", self._engine)
 

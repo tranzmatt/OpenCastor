@@ -104,7 +104,6 @@ class CameraTrack:
 
 # Patch CameraTrack to inherit from VideoStreamTrack when aiortc is available
 if HAS_AIORTC:
-
     _orig_init = CameraTrack.__init__
 
     class CameraTrack(MediaStreamTrack):  # type: ignore[no-redef]
@@ -174,15 +173,13 @@ async def handle_webrtc_offer(
         RuntimeError: If aiortc is not installed.
     """
     if not HAS_AIORTC:
-        raise RuntimeError(
-            "aiortc is required for WebRTC. Install: pip install opencastor[webrtc]"
-        )
+        raise RuntimeError("aiortc is required for WebRTC. Install: pip install opencastor[webrtc]")
 
     # Build RTCConfiguration from ice_servers list
     from aiortc import RTCConfiguration, RTCIceServer
 
     ice_cfg_servers = []
-    for s in (ice_servers or [{"urls": ["stun:stun.l.google.com:19302"]}]):
+    for s in ice_servers or [{"urls": ["stun:stun.l.google.com:19302"]}]:
         urls = s.get("urls", [])
         if isinstance(urls, str):
             urls = [urls]

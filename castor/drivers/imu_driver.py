@@ -65,11 +65,11 @@ _BNO_OPR_MODE_NDOF = 0x0C  # 9-DOF fusion mode
 
 # Scale factors
 _MPU6050_ACCEL_SCALE = 16384.0  # LSB/g  (±2g default)
-_MPU6050_GYRO_SCALE = 131.0     # LSB/dps (±250dps default)
+_MPU6050_GYRO_SCALE = 131.0  # LSB/dps (±250dps default)
 _ICM42688_ACCEL_SCALE = 2048.0  # LSB/g  (±16g default FS_SEL=0 → use 16g range)
-_ICM42688_GYRO_SCALE = 16.4     # LSB/dps (±2000dps default)
-_BNO055_ACCEL_SCALE = 100.0     # LSB/m·s⁻² → convert to g by dividing by 9.80665*100
-_BNO055_GYRO_SCALE = 16.0       # LSB/dps
+_ICM42688_GYRO_SCALE = 16.4  # LSB/dps (±2000dps default)
+_BNO055_ACCEL_SCALE = 100.0  # LSB/m·s⁻² → convert to g by dividing by 9.80665*100
+_BNO055_GYRO_SCALE = 16.0  # LSB/dps
 
 # Singleton
 _singleton: Optional["IMUDriver"] = None
@@ -94,8 +94,8 @@ class IMUDriver:
     _PROBE_TARGETS = [
         (0x68, "mpu_or_icm"),  # MPU6050 or ICM-42688-P (AD0 low)
         (0x69, "mpu_or_icm"),  # MPU6050 or ICM-42688-P (AD0 high)
-        (0x28, "bno055"),       # BNO055 (COM3 low)
-        (0x29, "bno055"),       # BNO055 (COM3 high)
+        (0x28, "bno055"),  # BNO055 (COM3 low)
+        (0x29, "bno055"),  # BNO055 (COM3 high)
     ]
 
     def __init__(
@@ -119,8 +119,7 @@ class IMUDriver:
 
         if not HAS_SMBUS2:
             logger.info(
-                "IMU driver: smbus2 not installed — mock mode "
-                "(install: pip install smbus2)"
+                "IMU driver: smbus2 not installed — mock mode (install: pip install smbus2)"
             )
             self._detected_model = "mock"
             return
@@ -142,9 +141,7 @@ class IMUDriver:
 
     def _autodetect(self, hint_address: Optional[int]):
         """Probe I2C bus to detect sensor model and address."""
-        targets = (
-            [(hint_address, "auto")] if hint_address is not None else self._PROBE_TARGETS
-        )
+        targets = [(hint_address, "auto")] if hint_address is not None else self._PROBE_TARGETS
         for addr, hint in targets:
             try:
                 if hint in ("auto", "mpu_or_icm"):
@@ -300,7 +297,11 @@ class IMUDriver:
         t = time.monotonic()
         wobble = math.sin(t * 0.5) * 0.002
         return {
-            "accel_g": {"x": round(wobble, 4), "y": round(wobble * 0.5, 4), "z": round(1.0 + wobble, 4)},
+            "accel_g": {
+                "x": round(wobble, 4),
+                "y": round(wobble * 0.5, 4),
+                "z": round(1.0 + wobble, 4),
+            },
             "gyro_dps": {"x": round(wobble * 10, 4), "y": 0.0, "z": 0.0},
             "mag_uT": None,
             "temp_c": 25.0,

@@ -382,7 +382,9 @@ def cmd_hub_plugins(args) -> None:
         print(f"{'Package':<30} {'Version':<12} {'Entry Point':<25} Description")
         print("-" * 80)
         for p in plugins:
-            print(f"{p['name']:<30} {p['version']:<12} {p['entry_point']:<25} {p.get('description', '')}")
+            print(
+                f"{p['name']:<30} {p['version']:<12} {p['entry_point']:<25} {p.get('description', '')}"
+            )
         if not plugins:
             print("No OpenCastor plugins installed.")
 
@@ -418,7 +420,9 @@ def cmd_hub_install_plugin(args) -> None:
             print(f"✓ Installed {package}")
             # Reload entry points
             plugins = _discover_installed_plugins()
-            matching = [p for p in plugins if p["name"] == package.replace("-", "_") or p["name"] == package]
+            matching = [
+                p for p in plugins if p["name"] == package.replace("-", "_") or p["name"] == package
+            ]
             if matching:
                 print(f"  Entry point: {matching[0]['entry_point']} → {matching[0]['value']}")
         else:

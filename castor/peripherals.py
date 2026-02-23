@@ -79,24 +79,20 @@ _USB_DEVICES: dict[str, dict] = {
         "driver_hint": "depthai",
         "rcan_snippet": (
             'camera:\n  type: "oakd"\n  depth_enabled: true\n'
-            '  resolution: [1920, 1080]\n  fps: 30\n  imu_enabled: true'
+            "  resolution: [1920, 1080]\n  fps: 30\n  imu_enabled: true"
         ),
     },
     "03e7:3000": {
         "name": "OAK-4 Lite",
         "category": "depth",
         "driver_hint": "depthai",
-        "rcan_snippet": (
-            'camera:\n  type: "oakd"\n  depth_enabled: true\n  fps: 30'
-        ),
+        "rcan_snippet": ('camera:\n  type: "oakd"\n  depth_enabled: true\n  fps: 30'),
     },
     "03e7:f63c": {
         "name": "Luxonis OAK device (bootloader/DFU mode)",
         "category": "depth",
         "driver_hint": "depthai",
-        "rcan_snippet": (
-            'camera:\n  type: "oakd"\n  depth_enabled: true\n  fps: 30'
-        ),
+        "rcan_snippet": ('camera:\n  type: "oakd"\n  depth_enabled: true\n  fps: 30'),
     },
     # Intel RealSense
     "8086:0b3a": {

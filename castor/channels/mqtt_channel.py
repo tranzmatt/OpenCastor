@@ -77,9 +77,7 @@ class MQTTChannel(BaseChannel):
         self._subscribe_topic = config.get("subscribe_topic", "opencastor/input")
         self._publish_topic = config.get("publish_topic", "opencastor/output")
         self._command_topic = config.get("command_topic", "castor/command/in")
-        self._command_response_topic = config.get(
-            "command_response_topic", "castor/command/out"
-        )
+        self._command_response_topic = config.get("command_response_topic", "castor/command/out")
         self._username = config.get("username", os.getenv("MQTT_USERNAME", ""))
         self._password = config.get("password", os.getenv("MQTT_PASSWORD", ""))
         self._keepalive = int(config.get("keepalive", 60))

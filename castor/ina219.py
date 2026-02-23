@@ -60,8 +60,7 @@ class BatteryMonitor:
                 logger.warning("INA219 init failed: %s — mock mode", exc)
         else:
             logger.info(
-                "INA219 running in mock mode "
-                "(install: pip install adafruit-circuitpython-ina219)"
+                "INA219 running in mock mode (install: pip install adafruit-circuitpython-ina219)"
             )
 
     # ── Public API ────────────────────────────────────────────────────
@@ -140,11 +139,15 @@ def get_monitor(
     global _singleton
     with _lock:
         if _singleton is None:
-            addr = i2c_address if i2c_address is not None else int(
-                os.getenv("INA219_I2C_ADDRESS", "0x40"), 16
+            addr = (
+                i2c_address
+                if i2c_address is not None
+                else int(os.getenv("INA219_I2C_ADDRESS", "0x40"), 16)
             )
-            ohms = shunt_ohms if shunt_ohms is not None else float(
-                os.getenv("INA219_SHUNT_OHMS", "0.1")
+            ohms = (
+                shunt_ohms
+                if shunt_ohms is not None
+                else float(os.getenv("INA219_SHUNT_OHMS", "0.1"))
             )
             _singleton = BatteryMonitor(addr, ohms)
     return _singleton

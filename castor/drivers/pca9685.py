@@ -145,8 +145,13 @@ class PCA9685RCDriver(DriverBase):
         time.sleep(0.5)  # give the ESC time to recognise the neutral signal
         logger.info("ESC armed (neutral throttle sent)")
 
-    def move(self, linear: float = 0.0, angular: float = 0.0,
-             linear_x: float | None = None, angular_z: float | None = None):
+    def move(
+        self,
+        linear: float = 0.0,
+        angular: float = 0.0,
+        linear_x: float | None = None,
+        angular_z: float | None = None,
+    ):
         """
         Drive the RC car.
 
@@ -255,8 +260,13 @@ class PCA9685Driver(DriverBase):
         self.motor_left.decay_mode = motor.SLOW_DECAY
         self.motor_right.decay_mode = motor.SLOW_DECAY
 
-    def move(self, linear: float = 0.0, angular: float = 0.0,
-             linear_x: float | None = None, angular_z: float | None = None):
+    def move(
+        self,
+        linear: float = 0.0,
+        angular: float = 0.0,
+        linear_x: float | None = None,
+        angular_z: float | None = None,
+    ):
         """Arcade-drive mixing."""
         if linear_x is not None:
             linear = linear_x

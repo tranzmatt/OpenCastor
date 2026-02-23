@@ -149,9 +149,7 @@ class ResponseCache:
                     return None
 
                 # Update hit count
-                conn.execute(
-                    "UPDATE response_cache SET hits = hits + 1 WHERE key = ?", (key,)
-                )
+                conn.execute("UPDATE response_cache SET hits = hits + 1 WHERE key = ?", (key,))
                 self._hits += 1
 
         action = None
@@ -192,9 +190,7 @@ class ResponseCache:
                     (key, instruction[:500], raw_text, action_json, now),
                 )
                 # LRU eviction
-                count = conn.execute(
-                    "SELECT COUNT(*) FROM response_cache"
-                ).fetchone()[0]
+                count = conn.execute("SELECT COUNT(*) FROM response_cache").fetchone()[0]
                 if count > self._max_size:
                     to_delete = count - self._max_size
                     conn.execute(
@@ -212,9 +208,7 @@ class ResponseCache:
         """Delete all cached entries. Returns count deleted."""
         with self._lock:
             with self._connect() as conn:
-                count = conn.execute(
-                    "SELECT COUNT(*) FROM response_cache"
-                ).fetchone()[0]
+                count = conn.execute("SELECT COUNT(*) FROM response_cache").fetchone()[0]
                 conn.execute("DELETE FROM response_cache")
         self._hits = 0
         self._misses = 0
@@ -224,9 +218,7 @@ class ResponseCache:
     def stats(self) -> dict:
         """Return cache statistics."""
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT COUNT(*), SUM(hits) FROM response_cache"
-            ).fetchone()
+            row = conn.execute("SELECT COUNT(*), SUM(hits) FROM response_cache").fetchone()
             entries = row[0] or 0
             total_hits_stored = row[1] or 0
 
@@ -254,9 +246,7 @@ class ResponseCache:
     def _prune(self, conn: sqlite3.Connection, now: float) -> None:
         """Delete expired entries (called inside lock)."""
         cutoff = now - self._max_age_s
-        conn.execute(
-            "DELETE FROM response_cache WHERE created_at < ?", (cutoff,)
-        )
+        conn.execute("DELETE FROM response_cache WHERE created_at < ?", (cutoff,))
 
 
 class CachedProvider:
@@ -304,8 +294,12 @@ class CachedProvider:
         full_text = "".join(chunks)
         from castor.providers.base import Thought
 
-        thought = Thought(raw_text=full_text, action=self._provider._clean_json(full_text)
-                          if hasattr(self._provider, "_clean_json") else None)
+        thought = Thought(
+            raw_text=full_text,
+            action=self._provider._clean_json(full_text)
+            if hasattr(self._provider, "_clean_json")
+            else None,
+        )
         self._cache.put(instruction, full_text, thought.action, image_bytes)
 
     def health_check(self) -> dict:

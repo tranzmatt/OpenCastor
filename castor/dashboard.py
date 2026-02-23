@@ -831,7 +831,7 @@ with st.expander("🎮 Gamepad / Manual Drive", expanded=False):
 <script>
 (function() {{
   const GW = "{GW}";
-  const TOKEN = "{st.session_state.get('token', '')}";
+  const TOKEN = "{st.session_state.get("token", "")}";
   const headers = TOKEN ? {{"Authorization": "Bearer " + TOKEN}} : {{}};
   let interval = null;
   let gpIndex = null;
@@ -889,29 +889,34 @@ with st.expander("🗺 SLAM / Nav Map", expanded=False):
             _map_height = _map_data.get("height", 0)
             _map_res = _map_data.get("resolution_m", 0)
             st.caption(
-                f"Map: {_map_width}×{_map_height} cells | "
-                f"Resolution: {_map_res * 100:.1f} cm/cell"
+                f"Map: {_map_width}×{_map_height} cells | Resolution: {_map_res * 100:.1f} cm/cell"
             )
             _cells = _map_data.get("cells")
             if _cells:
                 try:
                     import numpy as _np
+
                     _arr = _np.array(_cells, dtype=float)
                     # Normalize: -1=unknown→grey, 0=free→white, 100=occupied→black
                     _img = _np.zeros((_arr.shape[0], _arr.shape[1], 3), dtype=_np.uint8)
-                    _img[_arr < 0] = [80, 80, 80]      # unknown: grey
+                    _img[_arr < 0] = [80, 80, 80]  # unknown: grey
                     _img[_arr == 0] = [230, 230, 230]  # free: light grey
-                    _img[_arr > 50] = [20, 20, 20]     # occupied: dark
+                    _img[_arr > 50] = [20, 20, 20]  # occupied: dark
                     # Mark robot pose
                     _pose = _map_data.get("robot_pose", {})
                     if _pose:
                         _rx = int(_pose.get("x", 0))
                         _ry = int(_pose.get("y", 0))
                         if 0 <= _rx < _img.shape[1] and 0 <= _ry < _img.shape[0]:
-                            _img[max(0,_ry-2):_ry+3, max(0,_rx-2):_rx+3] = [63, 185, 80]
+                            _img[max(0, _ry - 2) : _ry + 3, max(0, _rx - 2) : _rx + 3] = [
+                                63,
+                                185,
+                                80,
+                            ]
                     import io as _io
 
                     from PIL import Image as _PILImg
+
                     _pil = _PILImg.fromarray(_img)
                     _buf = _io.BytesIO()
                     _pil.save(_buf, format="PNG")

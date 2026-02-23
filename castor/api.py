@@ -1878,9 +1878,7 @@ async def behavior_generate(req: _BehaviorGenerateRequest):
         # Strip markdown fences if present
         if yaml_text.startswith("```"):
             lines = yaml_text.splitlines()
-            yaml_text = "\n".join(
-                line for line in lines if not line.startswith("```")
-            ).strip()
+            yaml_text = "\n".join(line for line in lines if not line.startswith("```")).strip()
 
         tmp = tempfile.NamedTemporaryFile(
             suffix=".yaml",
@@ -2202,9 +2200,7 @@ async def safety_events(limit: int = 50, event_type: Optional[str] = None):
     """
     from castor.safety_telemetry import get_telemetry
 
-    return {
-        "events": get_telemetry().recent(limit=min(limit, 500), event_type=event_type)
-    }
+    return {"events": get_telemetry().recent(limit=min(limit, 500), event_type=event_type)}
 
 
 @app.get("/api/safety/stats", dependencies=[Depends(verify_token)])
@@ -2240,7 +2236,9 @@ async def safety_test_bounds(req: _SafetyTestBoundsRequest):
         return {
             "within_bounds": result.ok,
             "violations": result.details if not result.ok else [],
-            "status": result.status.value if hasattr(result.status, "value") else str(result.status),
+            "status": result.status.value
+            if hasattr(result.status, "value")
+            else str(result.status),
             "margin": result.margin,
         }
     except Exception as exc:
@@ -2383,7 +2381,9 @@ async def hotword_start():
             logger.info("Wake word detected — triggering STT listen")
 
     det = get_detector()
-    det.start(on_wake=lambda: asyncio.run_coroutine_threadsafe(_on_wake(), asyncio.get_event_loop()))
+    det.start(
+        on_wake=lambda: asyncio.run_coroutine_threadsafe(_on_wake(), asyncio.get_event_loop())
+    )
     return det.status
 
 
@@ -2423,7 +2423,12 @@ def _get_slam_mapper():
 async def slam_start():
     """POST /api/nav/map/start — Begin a SLAM mapping session."""
     _get_slam_mapper().start_mapping()
-    return {"status": "mapping", "engine": "depthai" if __import__("castor.slam", fromlist=["HAS_DEPTHAI"]).HAS_DEPTHAI else "mock"}
+    return {
+        "status": "mapping",
+        "engine": "depthai"
+        if __import__("castor.slam", fromlist=["HAS_DEPTHAI"]).HAS_DEPTHAI
+        else "mock",
+    }
 
 
 @app.post("/api/nav/map/stop", dependencies=[Depends(verify_token)])
@@ -2811,10 +2816,16 @@ def _execute_action(action: dict):
                 state.nav_job = {"job_id": job_id, "running": False, "result": result}
             except Exception as exc:
                 logger.warning(f"Nav job {job_id} failed: {exc}")
-                state.nav_job = {"job_id": job_id, "running": False, "result": {"ok": False, "error": str(exc)}}
+                state.nav_job = {
+                    "job_id": job_id,
+                    "running": False,
+                    "result": {"ok": False, "error": str(exc)},
+                }
 
         threading.Thread(target=_run_nav, daemon=True).start()
-        logger.info(f"Nav waypoint started: job={job_id} distance={distance_m}m heading={heading_deg}°")
+        logger.info(
+            f"Nav waypoint started: job={job_id} distance={distance_m}m heading={heading_deg}°"
+        )
     elif action_type == "stop":
         state.driver.stop()
     elif action_type == "grip":
@@ -3087,7 +3098,7 @@ async def on_startup():
             from castor.providers import get_provider
 
             state.brain = get_provider(state.config["agent"])
-            state.brain._caps = (state.config.get("rcan_protocol", {}).get("capabilities", []))
+            state.brain._caps = state.config.get("rcan_protocol", {}).get("capabilities", [])
             state.brain._robot_name = state.config.get("metadata", {}).get("robot_name", "robot")
             logger.info(f"Brain online: {state.config['agent'].get('model')}")
 
@@ -3187,9 +3198,7 @@ async def on_startup():
             try:
                 from castor.snapshot import get_manager as _snap_mgr
 
-                _snap_interval = float(
-                    state.config.get("snapshot_interval_s", 60)
-                )
+                _snap_interval = float(state.config.get("snapshot_interval_s", 60))
                 _snap_mgr().start(
                     interval_s=_snap_interval,
                     state_getter=lambda: state,
@@ -3427,7 +3436,9 @@ async def setup_test_provider(body: _SetupTestProviderRequest):
         }
         env_var = env_map.get(body.provider.lower())
         if not env_var:
-            raise HTTPException(status_code=400, detail={"error": f"Unknown provider: {body.provider}"})
+            raise HTTPException(
+                status_code=400, detail={"error": f"Unknown provider: {body.provider}"}
+            )
 
         # Test by importing the provider and calling health_check
         import os as _os
@@ -3439,7 +3450,11 @@ async def setup_test_provider(body: _SetupTestProviderRequest):
             cfg = {"provider": body.provider, env_var.lower(): body.api_key}
             provider = get_provider(cfg)
             health = provider.health_check()
-            return {"ok": health.get("ok", False), "latency_ms": health.get("latency_ms"), "error": health.get("error")}
+            return {
+                "ok": health.get("ok", False),
+                "latency_ms": health.get("latency_ms"),
+                "error": health.get("error"),
+            }
         finally:
             # Do not persist the key in env — caller must save it
             pass
@@ -3626,8 +3641,11 @@ async def pointcloud_ply():
     from castor.pointcloud import get_capture
 
     ply_bytes = get_capture().to_ply_bytes()
-    return Response(content=ply_bytes, media_type="application/octet-stream",
-                    headers={"Content-Disposition": "attachment; filename=pointcloud.ply"})
+    return Response(
+        content=ply_bytes,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": "attachment; filename=pointcloud.ply"},
+    )
 
 
 @app.get("/api/depth/pointcloud/stats", dependencies=[Depends(verify_token)])

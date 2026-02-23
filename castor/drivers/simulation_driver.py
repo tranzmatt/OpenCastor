@@ -151,9 +151,8 @@ class SimulationDriver(DriverBase):
                 self._backend = _GazeboBackend(topic=topic)
                 self._mode = "hardware"
             elif self._backend_name == "webots":
-                url = (
-                    os.getenv("WEBOTS_SUPERVISOR_URL")
-                    or config.get("webots_url", "http://localhost:1234")
+                url = os.getenv("WEBOTS_SUPERVISOR_URL") or config.get(
+                    "webots_url", "http://localhost:1234"
                 )
                 self._backend = _WebotsBackend(base_url=url)
                 self._mode = "hardware"
@@ -216,7 +215,9 @@ class SimulationDriver(DriverBase):
         else:
             logger.debug(
                 "SimulationDriver (mock) move: dir=%s linear=%.2f angular=%.2f",
-                direction, linear, angular,
+                direction,
+                linear,
+                angular,
             )
 
     def stop(self) -> None:

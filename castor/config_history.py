@@ -86,9 +86,7 @@ class ConfigHistoryManager:
             "config": copy.deepcopy(config),
         }
         self._versions.append(entry)
-        logger.info(
-            "Config version recorded: id=%s path=%s", version_id, config_path
-        )
+        logger.info("Config version recorded: id=%s path=%s", version_id, config_path)
         return version_id
 
     # ------------------------------------------------------------------
@@ -165,9 +163,7 @@ class ConfigHistoryManager:
         with open(config_path, "w") as f:
             yaml.dump(restored, f, default_flow_style=False)
 
-        logger.info(
-            "Config rolled back to version %s → %s", version_id, config_path
-        )
+        logger.info("Config rolled back to version %s → %s", version_id, config_path)
         return restored
 
     def clear(self) -> None:

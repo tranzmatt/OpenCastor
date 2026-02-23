@@ -98,10 +98,7 @@ class OccupancyGrid:
             import zlib
 
             # Build a simple 1-channel PNG
-            raw = b"".join(
-                b"\x00" + bytes(row)
-                for row in self._grid.tolist()
-            )
+            raw = b"".join(b"\x00" + bytes(row) for row in self._grid.tolist())
             compressed = zlib.compress(raw)
             header = b"\x89PNG\r\n\x1a\n"
 
@@ -147,9 +144,7 @@ class SLAMMapper:
         self._session_start = time.time()
         self._grid.reset()
         self._stop_event.clear()
-        self._thread = threading.Thread(
-            target=self._loop, daemon=True, name="slam-loop"
-        )
+        self._thread = threading.Thread(target=self._loop, daemon=True, name="slam-loop")
         self._thread.start()
         logger.info("SLAM mapping started (engine=%s)", "depthai" if HAS_DEPTHAI else "mock")
 
@@ -176,9 +171,7 @@ class SLAMMapper:
         with self._lock:
             return dict(self._pose)
 
-    def navigate_to(
-        self, goal_x: float, goal_y: float
-    ) -> Dict[str, Any]:
+    def navigate_to(self, goal_x: float, goal_y: float) -> Dict[str, Any]:
         """Plan a path to the goal and return waypoints.
 
         Uses simple Bresenham line in grid space (mock path planning).

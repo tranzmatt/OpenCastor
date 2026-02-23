@@ -100,9 +100,7 @@ class SnapshotManager:
         self._interval_s = interval_s
         self._state_getter = state_getter
         self._stop_event.clear()
-        self._thread = threading.Thread(
-            target=self._loop, daemon=True, name="snapshot-loop"
-        )
+        self._thread = threading.Thread(target=self._loop, daemon=True, name="snapshot-loop")
         self._thread.start()
         logger.info("Snapshot manager started (interval=%ss)", interval_s)
 
@@ -139,9 +137,7 @@ class SnapshotManager:
             snap["provider"] = _safe_health(getattr(state, "brain", None))
             snap["driver"] = _safe_health(getattr(state, "driver", None))
             channels = getattr(state, "channels", {}) or {}
-            snap["channels"] = {
-                name: _safe_health(ch) for name, ch in channels.items()
-            }
+            snap["channels"] = {name: _safe_health(ch) for name, ch in channels.items()}
             last_thought = getattr(state, "last_thought", None)
             snap["last_thought"] = last_thought
             snap["paused"] = getattr(state, "paused", False)

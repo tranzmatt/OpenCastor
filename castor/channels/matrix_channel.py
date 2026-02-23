@@ -52,8 +52,7 @@ class MatrixChannel(BaseChannel):
     async def start(self):
         if not HAS_NIO:
             logger.warning(
-                "matrix-nio not installed — Matrix channel unavailable "
-                "(pip install matrix-nio)"
+                "matrix-nio not installed — Matrix channel unavailable (pip install matrix-nio)"
             )
             return
         if not self._user_id or not self._access_token:

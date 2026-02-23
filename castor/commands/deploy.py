@@ -55,7 +55,9 @@ def cmd_deploy(args) -> None:
     no_restart: bool = getattr(args, "no_restart", False)
 
     if not host_arg:
-        print("  Error: host is required. Usage: castor deploy pi@192.168.1.10 --config robot.rcan.yaml")
+        print(
+            "  Error: host is required. Usage: castor deploy pi@192.168.1.10 --config robot.rcan.yaml"
+        )
         sys.exit(1)
 
     user, host = _parse_host(host_arg)
@@ -145,8 +147,8 @@ def _restart_service(
     )
     restart_cmd = (
         f"SERVICE=$({detect_cmd}); "
-        "if [ -n \"$SERVICE\" ]; then "
-        "  systemctl --user restart $SERVICE && echo \"Restarted $SERVICE\"; "
+        'if [ -n "$SERVICE" ]; then '
+        '  systemctl --user restart $SERVICE && echo "Restarted $SERVICE"; '
         "else "
         "  echo 'No OpenCastor service found — skipping restart'; "
         "fi"
@@ -163,10 +165,13 @@ def _remote_status(
     dry_run: bool,
 ) -> None:
     """Show the status of the OpenCastor service on remote host."""
-    status_cmd = " ; ".join(
-        f"systemctl --user status {name}.service 2>/dev/null && exit 0"
-        for name in _DEFAULT_SERVICE_NAMES
-    ) + "; echo 'No OpenCastor service found'"
+    status_cmd = (
+        " ; ".join(
+            f"systemctl --user status {name}.service 2>/dev/null && exit 0"
+            for name in _DEFAULT_SERVICE_NAMES
+        )
+        + "; echo 'No OpenCastor service found'"
+    )
     _run_remote(user, host, port, key_file, status_cmd, dry_run, label="service status")
 
 

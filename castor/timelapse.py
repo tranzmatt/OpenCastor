@@ -188,7 +188,10 @@ class TimelapseGenerator:
         self._save_index()
         logger.info(
             "Timelapse generated: id=%s frames=%d duration=%.1fs path=%s",
-            timelapse_id, frame_count, duration_s, output_path,
+            timelapse_id,
+            frame_count,
+            duration_s,
+            output_path,
         )
         return meta
 

@@ -82,10 +82,27 @@ class ObjectDetector:
     """Unified object detection interface (YOLOv8 / MobileNet / mock)."""
 
     _MOBILENET_CLASSES = [
-        "background", "aeroplane", "bicycle", "bird", "boat", "bottle",
-        "bus", "car", "cat", "chair", "cow", "diningtable", "dog",
-        "horse", "motorbike", "person", "pottedplant", "sheep", "sofa",
-        "train", "tvmonitor",
+        "background",
+        "aeroplane",
+        "bicycle",
+        "bird",
+        "boat",
+        "bottle",
+        "bus",
+        "car",
+        "cat",
+        "chair",
+        "cow",
+        "diningtable",
+        "dog",
+        "horse",
+        "motorbike",
+        "person",
+        "pottedplant",
+        "sheep",
+        "sofa",
+        "train",
+        "tvmonitor",
     ]
 
     def __init__(self, model_name: str = "auto", conf_threshold: float = 0.5):
@@ -175,8 +192,14 @@ class ObjectDetector:
                 (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
                 cv2.rectangle(img, (x1, y1 - th - 4), (x1 + tw, y1), color, -1)
                 cv2.putText(
-                    img, label, (x1, y1 - 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA
+                    img,
+                    label,
+                    (x1, y1 - 2),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 0, 0),
+                    1,
+                    cv2.LINE_AA,
                 )
 
             _, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
@@ -234,9 +257,7 @@ class ObjectDetector:
             return []
 
         h, w = img.shape[:2]
-        blob = cv2.dnn.blobFromImage(
-            cv2.resize(img, (300, 300)), 0.007843, (300, 300), 127.5
-        )
+        blob = cv2.dnn.blobFromImage(cv2.resize(img, (300, 300)), 0.007843, (300, 300), 127.5)
         self._net.setInput(blob)
         out = self._net.forward()
         detections = []
@@ -245,7 +266,11 @@ class ObjectDetector:
             if conf < self._conf:
                 continue
             cls_id = int(out[0, 0, i, 1])
-            name = self._MOBILENET_CLASSES[cls_id] if cls_id < len(self._MOBILENET_CLASSES) else str(cls_id)
+            name = (
+                self._MOBILENET_CLASSES[cls_id]
+                if cls_id < len(self._MOBILENET_CLASSES)
+                else str(cls_id)
+            )
             x1 = int(out[0, 0, i, 3] * w)
             y1 = int(out[0, 0, i, 4] * h)
             x2 = int(out[0, 0, i, 5] * w)
@@ -255,6 +280,7 @@ class ObjectDetector:
 
     def _mock_detections(self) -> list[Detection]:
         import random
+
         classes = ["person", "chair", "bottle", "laptop", "cup"]
         n = random.randint(0, 3)
         dets = []

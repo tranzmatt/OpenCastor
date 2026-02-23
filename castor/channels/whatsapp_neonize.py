@@ -118,9 +118,7 @@ class WhatsAppChannel(BaseChannel):
 
         # Group filtering: name-based (substring) or explicit JID allowlist
         self._group_name_filter: Optional[str] = config.get("group_name_filter") or None
-        self._group_jids: List[str] = [
-            str(j).strip() for j in config.get("group_jids", []) if j
-        ]
+        self._group_jids: List[str] = [str(j).strip() for j in config.get("group_jids", []) if j]
 
         # Cache for group JID → subject lookups (avoids repeated API calls)
         self._group_name_cache: dict = {}  # {chat_user: str | None}
@@ -257,7 +255,10 @@ class WhatsAppChannel(BaseChannel):
                     self.logger.info(
                         f"Group message from JID={chat_user}@g.us name={group_subject!r}"
                     )
-                    if group_subject is None or self._group_name_filter.lower() not in group_subject.lower():
+                    if (
+                        group_subject is None
+                        or self._group_name_filter.lower() not in group_subject.lower()
+                    ):
                         self.logger.debug(
                             f"Group message skipped — "
                             f"name {group_subject!r} doesn't match filter {self._group_name_filter!r}"
@@ -268,8 +269,8 @@ class WhatsAppChannel(BaseChannel):
                     group_subject = self._get_group_name(client, chat_user)
                     self.logger.info(
                         f"Group message from JID={chat_user}@g.us name={group_subject!r} "
-                        f"(tip: set group_jids: [\"{chat_user}\"] or "
-                        f"group_name_filter: \"{group_subject or chat_user}\" to filter)"
+                        f'(tip: set group_jids: ["{chat_user}"] or '
+                        f'group_name_filter: "{group_subject or chat_user}" to filter)'
                     )
 
             # ── Self-chat handling (DMs only) ────────────────────────────

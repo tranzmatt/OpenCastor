@@ -87,9 +87,7 @@ def _classify_gesture(landmarks: List[Any]) -> Tuple[str, float]:
     pips = [3, 6, 10, 14, 18]
 
     # Which fingers are extended (tip above pip)
-    extended = [
-        landmarks[tips[i]].y < landmarks[pips[i]].y for i in range(1, 5)
-    ]
+    extended = [landmarks[tips[i]].y < landmarks[pips[i]].y for i in range(1, 5)]
     thumb_extended = landmarks[4].x < landmarks[3].x  # left-hand approx
 
     n_extended = sum(extended)

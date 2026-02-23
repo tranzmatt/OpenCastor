@@ -68,7 +68,9 @@ def get_driver(config: dict):
 
         return IMUDriver(
             bus=int(driver_config.get("i2c_bus", 1)),
-            address=int(driver_config["i2c_address"], 16) if "i2c_address" in driver_config else None,
+            address=int(driver_config["i2c_address"], 16)
+            if "i2c_address" in driver_config
+            else None,
             model=driver_config.get("model", "auto"),
         )
     elif protocol == "lidar":

@@ -51,7 +51,11 @@ class GroqProvider(BaseProvider):
             self.client.models.list()
             return {"ok": True, "latency_ms": round((time.time() - t0) * 1000, 1), "error": None}
         except Exception as exc:
-            return {"ok": False, "latency_ms": round((time.time() - t0) * 1000, 1), "error": str(exc)}
+            return {
+                "ok": False,
+                "latency_ms": round((time.time() - t0) * 1000, 1),
+                "error": str(exc),
+            }
 
     def think(self, image_bytes: bytes, instruction: str, surface: str = "whatsapp") -> Thought:
         safety_block = self._check_instruction_safety(instruction)

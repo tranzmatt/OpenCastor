@@ -137,10 +137,7 @@ class EmbeddingProvider:
             all_texts = [query] + candidates
             vecs = self.encode(all_texts)
             q_vec = vecs[0]
-            scores = [
-                (idx, _cosine(q_vec, vecs[idx + 1]))
-                for idx in range(len(candidates))
-            ]
+            scores = [(idx, _cosine(q_vec, vecs[idx + 1])) for idx in range(len(candidates))]
             scores.sort(key=lambda x: x[1], reverse=True)
             return scores[:top_k]
         except Exception as exc:
@@ -165,6 +162,7 @@ class EmbeddingProvider:
 # Helpers                                                             #
 # ------------------------------------------------------------------ #
 
+
 def _cosine(a: list[float], b: list[float]) -> float:
     """Cosine similarity between two float vectors."""
     dot = sum(x * y for x, y in zip(a, b, strict=False))
@@ -178,6 +176,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
 # ------------------------------------------------------------------ #
 # Singleton factory                                                   #
 # ------------------------------------------------------------------ #
+
 
 def get_embedding_provider(
     model_name: Optional[str] = None,

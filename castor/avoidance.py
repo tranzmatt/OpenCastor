@@ -247,9 +247,7 @@ class ReactiveAvoider:
                             zones.get("center_cm", 999),
                             zones.get("right_cm", 999),
                         )
-                        sectors = {
-                            k: v * 10 for k, v in zones.items()
-                        }  # cm → mm
+                        sectors = {k: v * 10 for k, v in zones.items()}  # cm → mm
                         return float(nearest) * 10, sectors  # cm → mm
                     except Exception:
                         pass

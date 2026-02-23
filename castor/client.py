@@ -45,7 +45,11 @@ class CastorError(Exception):
     def __init__(self, status: int, body: Any):
         self.status = status
         self.body = body
-        msg = body.get("error", body.get("detail", str(body))) if isinstance(body, dict) else str(body)
+        msg = (
+            body.get("error", body.get("detail", str(body)))
+            if isinstance(body, dict)
+            else str(body)
+        )
         super().__init__(f"HTTP {status}: {msg}")
 
 
@@ -167,9 +171,7 @@ class CastorClient:
         """
         url = f"{self.base_url}/api/command/stream"
         body = json.dumps({"instruction": instruction}).encode()
-        req = urllib.request.Request(
-            url, data=body, headers=self._headers(), method="POST"
-        )
+        req = urllib.request.Request(url, data=body, headers=self._headers(), method="POST")
         try:
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 for line in resp:
@@ -387,7 +389,9 @@ try:
             return self._client
 
         async def _get(self, path: str, **params: Any) -> Any:
-            resp = await self._check_client().get(path, params={k: v for k, v in params.items() if v is not None})
+            resp = await self._check_client().get(
+                path, params={k: v for k, v in params.items() if v is not None}
+            )
             resp.raise_for_status()
             return resp.json()
 
@@ -443,6 +447,4 @@ except ImportError:
         """Async client requires httpx: pip install httpx"""
 
         def __init__(self, *args: Any, **kwargs: Any):
-            raise ImportError(
-                "CastorAsyncClient requires httpx. Install with: pip install httpx"
-            )
+            raise ImportError("CastorAsyncClient requires httpx. Install with: pip install httpx")

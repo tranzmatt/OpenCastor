@@ -47,7 +47,7 @@ class VoiceAssistantLoop:
         self._hotword = hotword
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._state = "idle"   # idle | waiting | listening | processing | speaking
+        self._state = "idle"  # idle | waiting | listening | processing | speaking
         self._stats = {
             "sessions": 0,
             "avg_stt_ms": 0.0,

@@ -139,8 +139,7 @@ class WorkspaceManager:
     def list(self) -> List[Dict[str, Any]]:
         """Return all workspaces (token_hash excluded), sorted by creation."""
         result = [
-            {k: v for k, v in ws.items() if k != "token_hash"}
-            for ws in self._workspaces.values()
+            {k: v for k, v in ws.items() if k != "token_hash"} for ws in self._workspaces.values()
         ]
         result.sort(key=lambda x: x.get("created_at", 0))
         return result

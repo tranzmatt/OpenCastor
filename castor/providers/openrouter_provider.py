@@ -47,10 +47,7 @@ class OpenRouterProvider(BaseProvider):
         if not api_key:
             raise ValueError("OPENROUTER_API_KEY not found in environment or config")
 
-        self.model_name = (
-            os.getenv("OPENROUTER_MODEL")
-            or config.get("model", _DEFAULT_MODEL)
-        )
+        self.model_name = os.getenv("OPENROUTER_MODEL") or config.get("model", _DEFAULT_MODEL)
 
         from openai import OpenAI
 

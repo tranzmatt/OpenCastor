@@ -37,7 +37,7 @@ _singleton_lock = threading.Lock()
 # Each sector: (name, min_angle_deg, max_angle_deg) — all values 0–360.
 # Front covers ±45° around 0°/360° (wraps around), others are contiguous ranges.
 _SECTORS = {
-    "front": (315.0, 45.0),    # wraps around 0°
+    "front": (315.0, 45.0),  # wraps around 0°
     "right": (45.0, 135.0),
     "rear": (135.0, 225.0),
     "left": (225.0, 315.0),
@@ -110,11 +110,13 @@ class LidarDriver:
             if 75 <= angle <= 105:
                 obstacle_dist = 400.0 + math.sin(math.radians((angle - 90) * 12)) * 30.0
                 dist = min(dist, obstacle_dist)
-            points.append({
-                "angle_deg": round(angle, 1),
-                "distance_mm": round(dist, 1),
-                "quality": 15,
-            })
+            points.append(
+                {
+                    "angle_deg": round(angle, 1),
+                    "distance_mm": round(dist, 1),
+                    "quality": 15,
+                }
+            )
         return points
 
     # ── Core scan ─────────────────────────────────────────────────────────────
@@ -137,11 +139,13 @@ class LidarDriver:
                 for _scan_no, scan_data in enumerate(self._lidar.iter_scans()):
                     for quality, angle, distance in scan_data:
                         if distance > 0:
-                            points.append({
-                                "angle_deg": round(float(angle), 1),
-                                "distance_mm": round(float(distance), 1),
-                                "quality": int(quality),
-                            })
+                            points.append(
+                                {
+                                    "angle_deg": round(float(angle), 1),
+                                    "distance_mm": round(float(distance), 1),
+                                    "quality": int(quality),
+                                }
+                            )
                     break  # one sweep is enough
                 self._scan_count += 1
                 self._last_scan = points

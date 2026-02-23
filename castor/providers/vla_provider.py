@@ -64,10 +64,10 @@ class VLAProvider(BaseProvider):
 
         if HAS_TRANSFORMERS:
             try:
-                logger.info("Loading VLA model %s on %s (may take a minute)…", model_id, _VLA_DEVICE)
-                self._processor = AutoProcessor.from_pretrained(
-                    model_id, trust_remote_code=True
+                logger.info(
+                    "Loading VLA model %s on %s (may take a minute)…", model_id, _VLA_DEVICE
                 )
+                self._processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
                 self._model = AutoModelForVision2Seq.from_pretrained(
                     model_id,
                     attn_implementation="eager",
@@ -107,9 +107,8 @@ class VLAProvider(BaseProvider):
                 action_vec = self._run_openvla(image_bytes, instruction)
                 latency_ms = round((time.monotonic() - t0) * 1000, 1)
                 action = self._vec_to_action(action_vec)
-                raw = (
-                    f"VLA action ({latency_ms} ms): "
-                    + ", ".join(f"{k}={v:.3f}" for k, v in action.items() if k != "type")
+                raw = f"VLA action ({latency_ms} ms): " + ", ".join(
+                    f"{k}={v:.3f}" for k, v in action.items() if k != "type"
                 )
                 return Thought(raw_text=raw, action=action)
             except Exception as exc:
@@ -154,7 +153,7 @@ class VLAProvider(BaseProvider):
         """Map a 7-DoF action vector to an OpenCastor action dict."""
         # OpenVLA output: [delta_x, delta_y, delta_z, delta_rx, delta_ry, delta_rz, gripper]
         if len(vec) >= 2:
-            linear = float(vec[0])   # forward/back
+            linear = float(vec[0])  # forward/back
             angular = float(vec[1])  # turn
         else:
             linear, angular = 0.0, 0.0

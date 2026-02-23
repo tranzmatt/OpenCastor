@@ -1050,6 +1050,7 @@ def cmd_fleet(args) -> None:
         # Proxy to gateway fleet API
         import json as _json
         import urllib.request
+
         gateway = getattr(args, "gateway", "http://127.0.0.1:8000")
         ruri = args.ruri
         try:
@@ -1062,12 +1063,15 @@ def cmd_fleet(args) -> None:
     if fleet_subcmd == "command":
         import json as _json
         import urllib.request
+
         gateway = getattr(args, "gateway", "http://127.0.0.1:8000")
         ruri = args.ruri
         payload = _json.dumps({"instruction": args.instruction}).encode()
         req = urllib.request.Request(
             f"{gateway}/api/fleet/{ruri}/command",
-            data=payload, headers={"Content-Type": "application/json"}, method="POST"
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
@@ -1077,6 +1081,7 @@ def cmd_fleet(args) -> None:
         return
 
     from castor.fleet import fleet_status
+
     fleet_status(timeout=float(getattr(args, "timeout", 5)))
 
 
@@ -2806,11 +2811,20 @@ def main() -> None:
     p_deploy.add_argument("host", help="Remote host (user@hostname or hostname)")
     p_deploy.add_argument("--config", default="robot.rcan.yaml", help="RCAN config to push")
     p_deploy.add_argument("--full", action="store_true", help="Also run pip install on remote")
-    p_deploy.add_argument("--status", action="store_true", dest="status", help="Show remote service status only")
-    p_deploy.add_argument("--dry-run", action="store_true", dest="dry_run", help="Preview without executing")
+    p_deploy.add_argument(
+        "--status", action="store_true", dest="status", help="Show remote service status only"
+    )
+    p_deploy.add_argument(
+        "--dry-run", action="store_true", dest="dry_run", help="Preview without executing"
+    )
     p_deploy.add_argument("--port", type=int, default=22, help="SSH port (default: 22)")
     p_deploy.add_argument("--key", default=None, help="SSH private key file path")
-    p_deploy.add_argument("--no-restart", action="store_true", dest="no_restart", help="Push config only, skip restart")
+    p_deploy.add_argument(
+        "--no-restart",
+        action="store_true",
+        dest="no_restart",
+        help="Push config only, skip restart",
+    )
 
     # castor agents
     p_agents = sub.add_parser("agents", help="Manage robot agents")

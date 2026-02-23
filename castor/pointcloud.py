@@ -69,9 +69,7 @@ class PointCloudCapture:
             try:
                 self._pipeline = self._build_pipeline()
                 self._device = dai.Device(self._pipeline)
-                self._depth_q = self._device.getOutputQueue(
-                    name="depth", maxSize=4, blocking=False
-                )
+                self._depth_q = self._device.getOutputQueue(name="depth", maxSize=4, blocking=False)
                 self._mode = "hardware"
                 # Try to read real intrinsics
                 try:
@@ -171,11 +169,15 @@ class PointCloudCapture:
         """Return point cloud as JSON-serializable dict."""
         pts = self.capture()
         points = pts.tolist()
-        bounds = {
-            "x": [float(pts[:, 0].min()), float(pts[:, 0].max())],
-            "y": [float(pts[:, 1].min()), float(pts[:, 1].max())],
-            "z": [float(pts[:, 2].min()), float(pts[:, 2].max())],
-        } if len(pts) > 0 else {}
+        bounds = (
+            {
+                "x": [float(pts[:, 0].min()), float(pts[:, 0].max())],
+                "y": [float(pts[:, 1].min()), float(pts[:, 1].max())],
+                "z": [float(pts[:, 2].min()), float(pts[:, 2].max())],
+            }
+            if len(pts) > 0
+            else {}
+        )
         return {
             "point_count": len(points),
             "points": points,
@@ -212,7 +214,8 @@ class PointCloudCapture:
                 "z": [round(float(pts[:, 2].min()), 3), round(float(pts[:, 2].max()), 3)],
             },
             "density_pts_per_m3": round(
-                len(pts) / max(
+                len(pts)
+                / max(
                     1e-6,
                     (pts[:, 0].max() - pts[:, 0].min())
                     * (pts[:, 1].max() - pts[:, 1].min())

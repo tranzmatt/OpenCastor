@@ -105,9 +105,7 @@ class ApiKeyManager:
         raw = secrets.token_hex(32)
         key_id = secrets.token_hex(8)
         hashed = _hash_key(raw)
-        expires_at = (
-            time.time() + expires_in_days * 86400 if expires_in_days is not None else None
-        )
+        expires_at = time.time() + expires_in_days * 86400 if expires_in_days is not None else None
 
         self._keys[key_id] = {
             "key_id": key_id,
@@ -153,9 +151,7 @@ class ApiKeyManager:
             d = {k: v for k, v in entry.items() if k != "hash"}
             expires_at = entry.get("expires_at")
             d["expired"] = bool(expires_at and now > expires_at)
-            d["expires_in_s"] = (
-                round(expires_at - now) if expires_at and not d["expired"] else None
-            )
+            d["expires_in_s"] = round(expires_at - now) if expires_at and not d["expired"] else None
             result.append(d)
         result.sort(key=lambda x: x.get("created_at", 0))
         return result

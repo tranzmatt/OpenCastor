@@ -86,7 +86,13 @@ class _CameraSource:
         if self._cap.isOpened():
             self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
             self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-            logger.info("Camera '%s' opened (index=%d, %dx%d)", self.cam_id, self.index, self.width, self.height)
+            logger.info(
+                "Camera '%s' opened (index=%d, %dx%d)",
+                self.cam_id,
+                self.index,
+                self.width,
+                self.height,
+            )
             return True
         logger.warning("Camera '%s' (index=%d) could not be opened", self.cam_id, self.index)
         return False
@@ -260,7 +266,5 @@ class CameraManager:
         """Encode a BGR numpy array to JPEG bytes."""
         if not HAS_CV2 or not HAS_NUMPY:
             return None
-        ok, buf = cv2.imencode(
-            ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self._jpeg_quality]
-        )
+        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self._jpeg_quality])
         return bytes(buf) if ok else None
