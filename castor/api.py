@@ -14,10 +14,10 @@ import asyncio
 import collections
 import hashlib
 import hmac
-import re as _re
 import logging
 import os
 import posixpath
+import re as _re
 import signal
 import threading
 import time

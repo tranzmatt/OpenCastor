@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>95,399 lines of code · 3,381 tests · Python 3.10–3.13</b><br/>
+  <b>95,399 lines of code · 3,387 tests · Python 3.10–3.13</b><br/>
   <i>Connect any AI model to any robot hardware through a single YAML config.</i>
 </p>
 
@@ -51,8 +51,12 @@ Supports **Linux, macOS (Apple Silicon & Intel), Windows 11, Raspberry Pi, Docke
 Installer flags: `--dry-run`, `--no-rpi`, `--skip-wizard`
 </details>
 
-## ✨ What's New in v2026.2.23.3
+## ✨ What's New in v2026.2.23.12
 
+- **Messaging channels now drive hardware** — fixed a silent VFS ACL bug where the `channel` principal was denied write access to `/dev/motor`, causing every WhatsApp/Telegram/Discord motor command to reply but never move the wheels
+- **Clean channel replies** — AI replies sent to messaging channels and TTS no longer include the raw JSON action block (`{"type": ...}`) the runtime uses internally
+- **WaypointNav ESC floor** — added `min_drive_s = 0.4 s` so RC ESCs have time to spool up on short-distance commands (configurable via `physics.min_drive_s`)
+- **neonize 0.3.14 audio** — voice messages on WhatsApp work again; uses `download_any()` API introduced in neonize 0.3.14
 - **OpenRouter provider** — one API key unlocks 100+ models (GPT-4.1, Claude, Gemini, Mistral, DeepSeek, LLaMA 3.3…)
 - **IMU driver** — MPU6050 / BNO055 / ICM-42688 accelerometer + gyroscope via smbus2, auto-detected
 - **2D LiDAR driver** — RPLidar A1/A2/C1/S2, 4-sector obstacle mapping, REST API

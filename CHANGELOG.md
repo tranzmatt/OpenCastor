@@ -5,6 +5,36 @@ All notable changes to OpenCastor are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) versioning: `YYYY.M.DD.PATCH`.
 
+## [2026.2.23.12] - 2026-02-23 🧹 Strip JSON from channel replies + import fix
+
+### Fixed
+- **`castor/api.py`** — Added `_strip_action_json()` helper that removes the inline JSON action block (`{"type": ...}`) from AI replies before sending to users via messaging channels or TTS. The system prompt instructs the brain to append JSON for runtime parsing; this function strips it so end users only receive the human-readable portion.
+- **`castor/api.py`** — Moved `import re as _re` to the correct alphabetical position in the import block (between `posixpath` and `signal`); fixes ruff **I001** import-sort violation.
+
+---
+
+## [2026.2.23.11] - 2026-02-23 🚗 Fix channel principal ACL — messaging channels now drive hardware
+
+### Fixed
+- **`castor/fs/permissions.py`** — The `channel` principal's ACL on `/dev/motor` was `"---"` (deny all), which silently blocked every WhatsApp / Telegram / Discord motor command from ever executing hardware. The `check_access()` function evaluates ACL before capabilities, so even though `channel` holds the `MOTOR_WRITE` capability, the path check returned False first. Fixed to `"rw-"` — the `required_caps=Cap.MOTOR_WRITE` gate remains the security control.
+- **`tests/test_fs.py`** — Updated `test_permission_enforcement` to assert that `channel` **can** write to `/dev/motor` (was incorrectly asserting the opposite).
+
+---
+
+## [2026.2.23.10] - 2026-02-23 ⏱️ WaypointNav minimum drive duration for RC ESCs
+
+### Fixed
+- **`castor/nav.py`** — RC car ESCs require ~150–400 ms to spool up before the wheels move. Short distances (e.g. 1 inch ≈ 0.0254 m at speed 0.6 ≈ 0.19 s) computed a drive duration below the ESC response floor, so the command completed before the motor responded. Added `min_drive_s = 0.4` floor so every DRIVE phase runs at least 400 ms. Configurable via `physics.min_drive_s` in the RCAN config.
+
+---
+
+## [2026.2.23.9] - 2026-02-23 🎤 neonize 0.3.14 audio transcription fix
+
+### Fixed
+- **`castor/channels/whatsapp_neonize.py`** — neonize 0.3.14 renamed `client.download_media_message(sub_msg)` to `client.download_any(Message)` where `Message` is the full protobuf object (not the audio sub-message). `_transcribe_audio_message()` now accepts an optional `full_msg` parameter and prefers `download_any(full_msg)` when available, falling back to `download_media_message(audio_msg)` for older neonize versions.
+
+---
+
 ## [2026.2.23.3] - 2026-02-23 🔧 CI lint & RCAN schema fixes
 
 ### Fixed
