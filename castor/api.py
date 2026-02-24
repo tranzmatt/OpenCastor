@@ -14,6 +14,7 @@ import asyncio
 import collections
 import hashlib
 import hmac
+import re as _re
 import logging
 import os
 import posixpath
@@ -2884,6 +2885,17 @@ def _speak_reply(text: str):
         pass
 
 
+def _strip_action_json(text: str) -> str:
+    """Remove the inline JSON action block from an AI reply before sending to users.
+
+    The AI appends a JSON object so the runtime can extract the action command.
+    This strips that block so users and TTS only hear the natural-language part.
+    Handles flat JSON objects (no nested braces) at the end of the text.
+    """
+    cleaned = _re.sub(r"\s*\{[^{}]*\}\s*$", "", text, flags=_re.DOTALL)
+    return cleaned.strip()
+
+
 # Map channel names to prompt surface types.
 # Governs tone/format injected into build_messaging_prompt().
 _CHANNEL_SURFACE: dict[str, str] = {
@@ -2968,10 +2980,13 @@ def _handle_channel_message(channel_name: str, chat_id: str, text: str) -> str:
         state.fs.context.push("brain", thought.raw_text[:200], metadata=thought.action)
         state.fs.proc.record_thought(thought.raw_text, thought.action)
 
-    # Speak the reply out loud
-    _speak_reply(thought.raw_text)
+    # Strip the JSON action block before speaking/sending — users only need the words
+    reply_text = _strip_action_json(thought.raw_text)
 
-    return thought.raw_text
+    # Speak the reply out loud
+    _speak_reply(reply_text)
+
+    return reply_text
 
 
 async def _start_channels():
