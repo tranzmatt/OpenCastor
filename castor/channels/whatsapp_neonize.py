@@ -320,7 +320,7 @@ class WhatsAppChannel(BaseChannel):
                         break
 
                 if audio_msg is not None:
-                    text = self._transcribe_audio_message(client, audio_msg) or ""
+                    text = self._transcribe_audio_message(client, audio_msg, msg) or ""
 
             if not text:
                 return
@@ -339,12 +339,13 @@ class WhatsAppChannel(BaseChannel):
         except Exception as e:
             self.logger.error(f"Error handling incoming message: {e}")
 
-    def _transcribe_audio_message(self, client, audio_msg) -> Optional[str]:
+    def _transcribe_audio_message(self, client, audio_msg, full_msg=None) -> Optional[str]:
         """Download and transcribe a WhatsApp audio/voice message.
 
         Args:
             client: neonize NewClient instance.
-            audio_msg: neonize audioMessage or voiceMessage protobuf object.
+            audio_msg: neonize audioMessage or voiceMessage protobuf sub-object.
+            full_msg: full message.Message proto (required for neonize >=0.3.14).
 
         Returns:
             Transcribed text, or None if unavailable.
@@ -356,8 +357,14 @@ class WhatsAppChannel(BaseChannel):
             return None
 
         try:
-            # neonize: client.download_media_message(audio_msg) → bytes
-            audio_bytes = client.download_media_message(audio_msg)
+            # neonize >=0.3.14: download_any(Message) replaces download_media_message(sub_msg)
+            if full_msg is not None and hasattr(client, "download_any"):
+                audio_bytes = client.download_any(full_msg)
+            elif hasattr(client, "download_media_message"):
+                audio_bytes = client.download_media_message(audio_msg)
+            else:
+                self.logger.warning("No suitable neonize download method found")
+                return None
             if not audio_bytes:
                 return None
 
