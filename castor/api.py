@@ -3683,8 +3683,10 @@ async def detection_latest():
     from castor.detection import get_detector
 
     det = get_detector()
-    if state.camera:
-        det.detect(state.camera.capture())
+    if state.camera and state.camera.is_available():
+        frame = state.camera.get_frame()
+        if frame:
+            det.detect(frame)
     return {"detections": det.latest, "latency_ms": round(det.latency_ms, 1), "mode": det.mode}
 
 
