@@ -3,6 +3,7 @@
 import os
 import sys
 import textwrap
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -65,6 +66,25 @@ class TestGenerateServiceFile:
     def test_memory_limit(self):
         content = generate_service_file("/tmp/robot.rcan.yaml")
         assert "MemoryMax=" in content
+
+    def test_hardened_profile_enabled_by_default(self, tmp_path):
+        config_path = tmp_path / "robot.rcan.yaml"
+        config_path.write_text("robot: {}\n", encoding="utf-8")
+
+        content = generate_service_file(str(config_path))
+
+        assert "NoNewPrivileges=true" in content
+        assert "ProtectSystem=strict" in content
+        assert "DevicePolicy=closed" in content
+
+    def test_permissive_profile_from_config(self, tmp_path):
+        config_path = tmp_path / "robot.rcan.yaml"
+        config_path.write_text("service:\n  security_profile: permissive\n", encoding="utf-8")
+
+        content = generate_service_file(str(config_path))
+
+        assert "NoNewPrivileges=true" not in content
+        assert "DevicePolicy=closed" not in content
 
 
 class TestDaemonStatus:
