@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+import yaml
+
 SERVICE_NAME = "castor-gateway"
 SERVICE_PATH = Path(f"/etc/systemd/system/{SERVICE_NAME}.service")
 
@@ -30,6 +32,7 @@ def generate_service_file(
     user: Optional[str] = None,
     venv_path: Optional[str] = None,
     working_dir: Optional[str] = None,
+    security_profile: Optional[str] = None,
 ) -> str:
     """Generate a systemd .service file for the OpenCastor gateway.
 
@@ -38,12 +41,57 @@ def generate_service_file(
         user:        System user to run the service as. Defaults to current user.
         venv_path:   Path to the Python venv. Auto-detected from sys.prefix if omitted.
         working_dir: Working directory for the service. Defaults to config file's parent.
+        security_profile: Service security profile. Supports ``hardened`` or
+                          ``permissive``. If omitted, reads
+                          ``service.security_profile`` from config.
     """
     user = user or os.environ.get("USER", "pi")
     venv_path = venv_path or sys.prefix
     config_abs = str(Path(config_path).resolve())
     working_dir = working_dir or str(Path(config_abs).parent)
     castor_bin = str(Path(venv_path) / "bin" / "castor")
+    security_profile = (security_profile or _get_security_profile(config_abs)).strip().lower()
+
+    if security_profile not in {"hardened", "permissive"}:
+        security_profile = "hardened"
+
+    hardened_block = ""
+    if security_profile == "hardened":
+        runtime_dir = str(Path(working_dir) / ".castor")
+        hardened_block = f"""
+
+# Hardened baseline (set service.security_profile: permissive to opt out)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+DevicePolicy=closed
+# Allow only explicitly required robot devices.
+DeviceAllow=/dev/null rw
+DeviceAllow=/dev/zero rw
+DeviceAllow=/dev/full rw
+DeviceAllow=/dev/random rw
+DeviceAllow=/dev/urandom rw
+DeviceAllow=/dev/tty rw
+DeviceAllow=/dev/ttyAMA0 rw
+DeviceAllow=/dev/ttyS0 rw
+DeviceAllow=/dev/ttyUSB0 rw
+DeviceAllow=/dev/ttyACM0 rw
+DeviceAllow=/dev/i2c-1 rw
+DeviceAllow=/dev/spidev0.0 rw
+DeviceAllow=/dev/spidev0.1 rw
+DeviceAllow=/dev/gpiochip0 rw
+DeviceAllow=/dev/video0 rw
+ReadWritePaths={runtime_dir}
+"""
 
     return f"""\
 [Unit]
@@ -65,11 +113,24 @@ StandardError=journal
 SyslogIdentifier={SERVICE_NAME}
 
 # Limit memory so the robot doesn't OOM the Pi
-MemoryMax=1G
+MemoryMax=1G{hardened_block}
 
 [Install]
 WantedBy=multi-user.target
 """
+
+
+def _get_security_profile(config_path: str) -> str:
+    """Read service.security_profile from config, defaulting to hardened."""
+    try:
+        with open(config_path, encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+    except (OSError, yaml.YAMLError):
+        return "hardened"
+
+    service = data.get("service") if isinstance(data, dict) else None
+    profile = service.get("security_profile") if isinstance(service, dict) else None
+    return str(profile) if profile else "hardened"
 
 
 # ── Install / remove ──────────────────────────────────────────────────────────
