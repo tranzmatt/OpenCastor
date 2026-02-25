@@ -122,13 +122,17 @@ def get_registry() -> PluginRegistry:
     return _registry
 
 
-def _sha256_file(filepath: str) -> str:
-    """Return the hex-encoded SHA-256 digest of a file."""
-    h = hashlib.sha256()
+def _sha256_file(filepath: str, *, normalize_newlines: bool = False) -> str:
+    """Return the hex-encoded SHA-256 digest of a file.
+
+    When ``normalize_newlines`` is True, ``CRLF`` and ``CR`` are normalized to
+    ``LF`` before hashing. This keeps manifest hashes stable across platforms.
+    """
     with open(filepath, "rb") as fh:
-        for chunk in iter(lambda: fh.read(65536), b""):
-            h.update(chunk)
-    return h.hexdigest()
+        data = fh.read()
+    if normalize_newlines:
+        data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def _validate_manifest(filepath: str) -> dict | None:
@@ -172,6 +176,9 @@ def _validate_manifest(filepath: str) -> dict | None:
     if "sha256" in manifest:
         actual = _sha256_file(filepath)
         if actual != manifest["sha256"]:
+            normalized = _sha256_file(filepath, normalize_newlines=True)
+            if normalized == manifest["sha256"]:
+                return manifest
             logger.warning(
                 "Plugin '%s' SHA-256 mismatch (expected %s, got %s). Skipping.",
                 os.path.basename(filepath),

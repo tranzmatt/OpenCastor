@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>95,399 lines of code · 3,387 tests · Python 3.10–3.13</b><br/>
+  <b>99,547 lines of Python · 3,431 tests · Python 3.10–3.13</b><br/>
   <i>Connect any AI model to any robot hardware through a single YAML config.</i>
 </p>
 
@@ -53,6 +53,7 @@ Installer flags: `--dry-run`, `--no-rpi`, `--skip-wizard`
 
 ## ✨ What's New in v2026.2.23.12
 
+- **Stability pass (2026-02-25)** — full-suite hardening complete: 3,431 tests passing; fixed cross-platform daemon path rendering, JWT fallback edge cases, plugin SHA newline normalization, and async warning cleanup in Teams/WhatsApp channels
 - **Messaging channels now drive hardware** — fixed a silent VFS ACL bug where the `channel` principal was denied write access to `/dev/motor`, causing every WhatsApp/Telegram/Discord motor command to reply but never move the wheels
 - **Clean channel replies** — AI replies sent to messaging channels and TTS no longer include the raw JSON action block (`{"type": ...}`) the runtime uses internally
 - **WaypointNav ESC floor** — added `min_drive_s = 0.4 s` so RC ESCs have time to spool up on short-distance commands (configurable via `physics.min_drive_s`)

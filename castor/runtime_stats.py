@@ -15,6 +15,7 @@ Usage (from providers / main loop):
 """
 
 import json
+import locale
 import os
 import threading
 import time
@@ -84,7 +85,11 @@ def get_stats() -> dict:
 def get_status_bar_string() -> str:
     """Return the compact one-liner for TUI / status bar display."""
     try:
-        with open(_STATUS_BAR_PATH) as f:
+        with open(
+            _STATUS_BAR_PATH,
+            encoding=locale.getpreferredencoding(False) or "utf-8",
+            errors="replace",
+        ) as f:
             return f.read().strip()
     except Exception:
         return " ⏱ 0s │ no data"
@@ -155,7 +160,7 @@ def _flush() -> None:
     """Write stats to JSON + status bar text file. Never raises."""
     try:
         os.makedirs(os.path.dirname(_STATS_PATH), exist_ok=True)
-        with open(_STATS_PATH, "w") as f:
+        with open(_STATS_PATH, "w", encoding="utf-8") as f:
             json.dump(_stats, f)
     except Exception:
         pass
@@ -187,7 +192,12 @@ def _flush() -> None:
 
         bar = "  │  ".join(parts)
 
-        with open(_STATUS_BAR_PATH, "w") as f:
+        with open(
+            _STATUS_BAR_PATH,
+            "w",
+            encoding=locale.getpreferredencoding(False) or "utf-8",
+            errors="replace",
+        ) as f:
             f.write(f" {bar} ")
     except Exception:
         pass

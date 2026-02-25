@@ -334,7 +334,7 @@ class WhatsAppChannel(BaseChannel):
 
             # ── Build chat_id and dispatch ────────────────────────────────
             chat_id = f"{chat_user}@{chat_server}"
-            self._dispatch(self._process_and_reply(client, chat, chat_id, text))
+            self._dispatch(self._process_and_reply, client, chat, chat_id, text)
 
         except Exception as e:
             self.logger.error(f"Error handling incoming message: {e}")
@@ -428,13 +428,16 @@ class WhatsAppChannel(BaseChannel):
         except Exception as e:
             self.logger.error(f"WhatsApp sync send failed: {e}")
 
-    def _dispatch(self, coro) -> None:
+    def _dispatch(self, coro_fn, *args) -> None:
         """Schedule a coroutine on the gateway event loop (thread-safe).
 
-        Extracted as a method so tests can mock it without touching asyncio.
+        Accept a coroutine function + args (instead of a pre-created coroutine)
+        so callers don't create orphaned coroutine objects when dispatch is
+        mocked in unit tests.
         """
         if self._loop is None:
             return
+        coro = coro_fn(*args)
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         try:
             future.result(timeout=30)

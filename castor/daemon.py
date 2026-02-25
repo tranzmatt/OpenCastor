@@ -15,7 +15,7 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Optional
 
 import yaml
@@ -23,6 +23,14 @@ import yaml
 SERVICE_NAME = "castor-gateway"
 SERVICE_PATH = Path(f"/etc/systemd/system/{SERVICE_NAME}.service")
 SECURITY_INSTALL_PATH = Path("/etc/opencastor/security")
+
+
+def _systemd_path(path_value: str) -> str:
+    """Render a path in POSIX form for systemd unit files."""
+    raw = str(path_value or "")
+    if raw.startswith("/"):
+        return raw.replace("\\", "/")
+    return str(Path(raw).resolve()).replace("\\", "/")
 
 
 # ── Service file generation ────────────────────────────────────────────────────
@@ -48,9 +56,13 @@ def generate_service_file(
     """
     user = user or os.environ.get("USER", "pi")
     venv_path = venv_path or sys.prefix
-    config_abs = str(Path(config_path).resolve())
-    working_dir = working_dir or str(Path(config_abs).parent)
-    castor_bin = str(Path(venv_path) / "bin" / "castor")
+    config_abs = _systemd_path(config_path)
+    if working_dir is None:
+        working_dir = str(PurePosixPath(config_abs).parent)
+    else:
+        working_dir = _systemd_path(working_dir)
+    venv_root = _systemd_path(venv_path).rstrip("/")
+    castor_bin = f"{venv_root}/bin/castor"
     security_profile = (security_profile or _get_security_profile(config_abs)).strip().lower()
 
     if security_profile not in {"hardened", "permissive"}:
@@ -58,7 +70,7 @@ def generate_service_file(
 
     hardened_block = ""
     if security_profile == "hardened":
-        runtime_dir = str(Path(working_dir) / ".castor")
+        runtime_dir = f"{working_dir.rstrip('/')}/.castor"
         hardened_block = f"""
 
 # Hardened baseline (set service.security_profile: permissive to opt out)

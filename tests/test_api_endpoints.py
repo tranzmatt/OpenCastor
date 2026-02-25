@@ -345,7 +345,7 @@ class TestCommandEndpoint:
         assert api_mod.state.last_thought["raw_text"] == "done"
 
     def test_command_with_image_base64(self, client, api_mod):
-        api_mod.state.brain = object()
+        api_mod.state.brain = _make_mock_brain("vision reply", {"type": "wait", "duration_ms": 1})
         img_b64 = base64.b64encode(b"\x89PNG fake image").decode()
         resp = client.post(
             "/api/command",

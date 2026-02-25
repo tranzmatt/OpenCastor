@@ -5,6 +5,27 @@ All notable changes to OpenCastor are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [CalVer](https://calver.org/) versioning: `YYYY.M.DD.PATCH`.
 
+## [Unreleased] - 2026-02-25 🔧 Stability + Docs/Website Refresh
+
+### Fixed
+- **Auth/JWT behavior consistency** — token issuance paths now reject ephemeral JWT fallback secrets for admin token issuance and CLI token generation unless explicitly enabled.
+- **CLI compatibility** — `cmd_token` now tolerates missing optional argparse attributes (`rotate`, `kid`, etc.) in older/tested invocation shapes.
+- **Daemon service generation (cross-platform)** — systemd unit rendering now normalizes paths to POSIX format even when generated on Windows hosts.
+- **Plugin integrity checks** — plugin manifest SHA-256 validation now supports newline-normalized hashes to avoid false mismatches across CRLF/LF environments.
+- **Runtime stats reliability on Windows** — status bar persistence/reads now use locale-safe encoding handling to prevent decode errors.
+- **Swarm backwards-compat payloads** — `fleet_status()` and `SwarmPeer.to_dict()` now preserve older payload shapes unless new health/telemetry fields are actually needed.
+- **Wizard model selection stability** — dynamic OpenAI model fetch retains newest-first semantics while stabilizing top-menu UX and filtering non-chat variants.
+- **Import-cycle hardening** — `castor.fs` now lazily resolves `SafetyLayer` to avoid circular import failures between FS and RCAN RBAC modules.
+- **Channel async warnings** — Teams and WhatsApp channel dispatch/send paths were adjusted to prevent unawaited coroutine runtime warnings in test and mock-heavy paths.
+
+### Documentation / Website
+- Updated README and website marketing stats/version surfaces to match the current tested state.
+- Synchronized version labels across `site/index.html`, `site/docs.html`, and `site/about.html`.
+- Updated community/Discord call-to-action in the hub page from placeholder text to a live link.
+
+### Validation
+- Full suite executed locally after these changes: **3431 passed, 7 skipped, 0 failed**.
+
 ## [2026.2.23.12] - 2026-02-23 🧹 Strip JSON from channel replies + import fix
 
 ### Fixed

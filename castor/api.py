@@ -1008,8 +1008,11 @@ class TokenRequest(BaseModel):
 @app.post("/api/auth/token", dependencies=[Depends(verify_token)])
 async def issue_token(req: TokenRequest):
     """Issue a JWT token (requires OPENCASTOR_JWT_SECRET)."""
-    bundle = get_jwt_secret_provider().get_bundle()
-    if not bundle.active.secret:
+    provider = get_jwt_secret_provider()
+    # Re-read env/file-backed keys so runtime config changes are reflected.
+    provider.invalidate()
+    bundle = provider.get_bundle()
+    if not bundle.active.secret or bundle.source == "ephemeral":
         raise HTTPException(
             status_code=501,
             detail="JWT not configured. Set OPENCASTOR_JWT_SECRET.",

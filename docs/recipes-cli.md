@@ -242,8 +242,8 @@ castor restore --backup 2026-02-21T14:30:00
 castor update-check
 
 # Output:
-# Current: v2026.2.21.3
-# Latest:  v2026.2.21.3  ✅  Up to date
+# Current: v2026.2.23.12
+# Latest:  v2026.2.23.12  ✅  Up to date
 ```
 
 ## Community Hub

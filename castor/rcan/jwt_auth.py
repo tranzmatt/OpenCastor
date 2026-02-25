@@ -54,17 +54,29 @@ class RCANTokenManager:
         issuer: Optional[str] = None,
         algorithm: str = "HS256",
     ):
-        self._static_secret = secret
+        self._explicit_secret_supplied = secret is not None
+        self._static_secret = secret or None
         self.issuer = issuer or "rcan://opencastor.unknown.00000000"
         self.algorithm = algorithm
 
-        if not self._static_secret and not get_jwt_secret_provider().get_bundle().active.secret:
+        if not self._key_candidates():
             logger.debug("JWT secret not configured -- token operations will fail")
 
+    @staticmethod
+    def _allow_ephemeral_secret() -> bool:
+        value = os.getenv("OPENCASTOR_ALLOW_EPHEMERAL_JWT", "").strip().lower()
+        return value in {"1", "true", "yes", "on"}
+
     def _key_candidates(self):
-        if self._static_secret:
+        if self._explicit_secret_supplied:
+            if not self._static_secret:
+                return []
             return [(os.getenv("OPENCASTOR_JWT_KID", "static"), self._static_secret)]
+
         bundle = get_jwt_secret_provider().get_bundle()
+        if bundle.source == "ephemeral" and not self._allow_ephemeral_secret():
+            return []
+
         candidates = [(bundle.active.kid, bundle.active.secret)]
         if bundle.previous:
             candidates.append((bundle.previous.kid, bundle.previous.secret))

@@ -82,7 +82,7 @@ class SwarmPeer:
         self.last_seen = time.time()
 
     def to_dict(self) -> dict:
-        return {
+        payload = {
             "robot_id": self.robot_id,
             "robot_name": self.robot_name,
             "host": self.host,
@@ -90,9 +90,12 @@ class SwarmPeer:
             "capabilities": list(self.capabilities),
             "last_seen": self.last_seen,
             "load_score": self.load_score,
-            "metrics": dict(self.metrics),
-            "status": self.status,
         }
+        if self.metrics:
+            payload["metrics"] = dict(self.metrics)
+        if self.status != "ready":
+            payload["status"] = self.status
+        return payload
 
     @classmethod
     def from_dict(cls, d: dict) -> SwarmPeer:

@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenCastor is a universal runtime for embodied AI (~270 Python files, 125+ test files, 3381 tests).
+OpenCastor is a universal runtime for embodied AI (~270 Python files, 140+ test files, 3431 tests).
 
 ## Full Repository Tree
 
@@ -252,7 +252,7 @@ OpenCastor/
 │       ├── package.json
 │       └── tsconfig.json
 │
-├── tests/                            # 125+ test files, 3381 tests (0 failures)
+├── tests/                            # 140+ test files, 3431 tests (0 failures)
 │   ├── test_api_endpoints.py         # FastAPI gateway (133 tests)
 │   ├── test_config_validation.py     # Config validation
 │   ├── test_offline_fallback.py      # OfflineFallbackManager

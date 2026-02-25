@@ -77,17 +77,26 @@ class TeamsChannel(BaseChannel):
             "summary": text[:72],
             "sections": [{"activityText": text}],
         }
+
+        async def _check_response(resp) -> None:
+            if resp.status not in (200, 202):
+                body = await resp.text()
+                logger.error("Teams webhook HTTP %s: %s", resp.status, body[:200])
+
         try:
             async with aiohttp.ClientSession() as sess:
-                async with sess.post(
+                post_result = sess.post(
                     self._webhook_url,
                     json=payload,
                     headers={"Content-Type": "application/json"},
                     timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status not in (200, 202):
-                        body = await resp.text()
-                        logger.error("Teams webhook HTTP %s: %s", resp.status, body[:200])
+                )
+                if hasattr(post_result, "__aenter__"):
+                    async with post_result as resp:
+                        await _check_response(resp)
+                else:
+                    resp = await post_result
+                    await _check_response(resp)
         except Exception as exc:
             logger.error("Teams send_message error: %s", exc)
 

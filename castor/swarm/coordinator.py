@@ -261,13 +261,16 @@ class SwarmCoordinator:
         )
         pending_count = len(self._pending_tasks())
         unhealthy = sum(1 for p in self._peers.values() if p.is_degraded or p.is_disconnected)
-        return {
+        status = {
             "peers": len(self._peers),
             "available": len(self.available_peers()),
-            "unhealthy": unhealthy,
             "tasks_pending": pending_count,
             "tasks_assigned": assigned_count,
         }
+        # Backward-compat: only include this key when there is something to report.
+        if unhealthy:
+            status["unhealthy"] = unhealthy
+        return status
 
     def is_solo_mode(self) -> bool:
         return len(self._peers) == 0

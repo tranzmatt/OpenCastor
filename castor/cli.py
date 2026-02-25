@@ -241,20 +241,24 @@ def cmd_token(args) -> None:
     import os
 
     provider = get_jwt_secret_provider()
-    if args.rotate:
-        bundle = provider.rotate(new_secret=args.new_secret, new_kid=args.kid)
+    provider.invalidate()
+    if getattr(args, "rotate", False):
+        bundle = provider.rotate(
+            new_secret=getattr(args, "new_secret", None),
+            new_kid=getattr(args, "kid", None),
+        )
         print("\n  JWT key rotated\n")
         print(f"  active_kid:   {bundle.active.kid}")
         print(f"  previous_kid: {bundle.previous.kid if bundle.previous else 'none'}\n")
         return
 
-    if args.kid:
+    if getattr(args, "kid", None):
         os.environ["OPENCASTOR_JWT_KID"] = args.kid
         provider.invalidate()
 
     bundle = provider.get_bundle()
     jwt_secret = bundle.active.secret
-    if not jwt_secret:
+    if not jwt_secret or bundle.source == "ephemeral":
         print("Error: OPENCASTOR_JWT_SECRET is not set in environment or .env file.")
         print("Generate one with: openssl rand -hex 32")
         raise SystemExit(1)
@@ -451,8 +455,7 @@ def cmd_upgrade(args) -> None:
 def cmd_install_service(args) -> None:
     """Generate a systemd service unit file for OpenCastor."""
     if sys.platform != "linux":
-        print("\n  install-service is only available on Linux (systemd).\n")
-        return
+        print("\n  Warning: generating a systemd unit from a non-Linux host.\n")
     import getpass
 
     user = getpass.getuser()

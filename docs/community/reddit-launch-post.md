@@ -8,12 +8,12 @@
 
 ## Title Options
 
-1. `I built an open-source framework that gives any robot an AI brain — tiered architecture, 8 providers, self-improving loop`
-2. `Built OpenCastor: an open-source runtime for robot AI — runs on Pi 5 + Hailo-8 + OAK-D, 8 providers, self-improving`
-3. `Show HN-style: OpenCastor — give any robot a tiered AI brain, hot-swap providers, 2K+ tests`
+1. `I built an open-source framework that gives any robot an AI brain — tiered architecture, 12+ providers, self-improving loop`
+2. `Built OpenCastor: an open-source runtime for robot AI — runs on Pi 5 + Hailo-8 + OAK-D, 12+ providers, self-improving`
+3. `Show HN-style: OpenCastor — give any robot a tiered AI brain, hot-swap providers, 3K+ tests`
 
 **Recommended title:**
-> I built an open-source framework to give any robot a tiered AI brain — runs on Pi 5 + Hailo-8 + OAK-D, 8 AI providers, self-improving
+> I built an open-source framework to give any robot a tiered AI brain — runs on Pi 5 + Hailo-8 + OAK-D, 12+ AI providers, self-improving
 
 ---
 
@@ -83,9 +83,9 @@ castor hub install picar-home-patrol-e7f3a1
 And you get a tested config for a PiCar-X home patrol bot. I've seeded 7 recipes — home patrol, farm scout, classroom assistant, warehouse scanner, etc. The goal is a community library of working robot configs.
 
 **Numbers:**
-- 49K+ lines of code
-- 2,009 tests
-- 8 AI providers (Anthropic, Google, OpenAI, HuggingFace, Ollama, llama.cpp, MLX, Claude OAuth)
+- 99K+ lines of Python
+- 3,431 tests
+- 12+ AI providers (Anthropic, Google, OpenAI, HuggingFace, Ollama, llama.cpp, MLX, Claude OAuth, OpenRouter, Groq, Vertex AI, VLA)
 - Primary brain is free forever (HuggingFace free inference API or local models)
 
 **Quick start:**
@@ -117,7 +117,7 @@ Happy to answer questions about the architecture, hardware choices, or anything 
 ## Key talking points to prepare for comments
 
 - "Why not just use ROS?" — OpenCastor is application-level, not low-level robotics middleware. Think of it as the "brain" layer that sits on top of whatever motor control you have. ROS handles the bottom layers; OpenCastor handles AI decisions.
-- "Is this production-ready?" — Tested on real hardware, 2K+ tests, used in my personal robots daily. Not battle-hardened for industrial deployment yet. Great for makers and researchers.
+- "Is this production-ready?" — Tested on real hardware, 3K+ tests, used in my personal robots daily. Not battle-hardened for industrial deployment yet. Great for makers and researchers.
 - "What's the Hailo-8 setup like?" — Hailo provides the HailoRT runtime. OpenCastor wraps it with a clean vision pipeline. The main gotcha is that you need the right .hef model file for Hailo — we ship one for YOLOv8.
 - "Self-improving loop safety?" — Every patch requires explicit work authorization, goes through automated QA, and can be rolled back. There's a tamper-evident audit log. Nothing applies without human-readable approval.
 - "Does it work offline?" — Yes. Ollama + llama.cpp = fully local, no internet required. The fast brain can run entirely on-device.

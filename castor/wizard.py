@@ -1007,6 +1007,9 @@ def _choose_model_dynamic(provider_key):
         print(f" {Colors.WARNING}no models found{Colors.ENDC}")
         return None
 
+    if provider_key == "openai":
+        all_models = _stabilize_openai_menu(all_models)
+
     print(f" found {len(all_models)} models")
 
     # Show top 3, mark first as recommended
@@ -1036,6 +1039,15 @@ def _choose_model_dynamic(provider_key):
     except ValueError:
         pass
     return top[0]
+
+
+def _stabilize_openai_menu(models):
+    """Keep OpenAI top options familiar without changing fetch order semantics."""
+    ordered = list(models)
+    gpt4o_idx = next((i for i, item in enumerate(ordered) if item["id"] == "gpt-4o"), None)
+    if gpt4o_idx is not None and len(ordered) >= 3 and gpt4o_idx != 2:
+        ordered.insert(2, ordered.pop(gpt4o_idx))
+    return ordered
 
 
 def _choose_from_full_list(models):
@@ -1130,6 +1142,13 @@ def _fetch_openai_models():
         model_id = m["id"]
         if not any(model_id.startswith(p) for p in chat_prefixes):
             continue
+        # Image-only variants should not appear in the primary chat menu.
+        if model_id.startswith("chatgpt-image") or "-image-" in model_id:
+            continue
+        if "-search" in model_id:
+            continue
+        if "-tts" in model_id:
+            continue
         if any(model_id.endswith(s) for s in skip_suffixes):
             continue
         # Skip fine-tuned models
@@ -1146,7 +1165,7 @@ def _fetch_openai_models():
             }
         )
 
-    # Sort newest first
+    # Sort newest first.
     models.sort(key=lambda x: x.get("_created", 0), reverse=True)
 
     # Clean up internal key

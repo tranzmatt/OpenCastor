@@ -61,7 +61,6 @@ from castor.fs.memory import MemoryStore
 from castor.fs.namespace import Namespace
 from castor.fs.permissions import ACL, Cap, PermissionTable
 from castor.fs.proc import ProcFS
-from castor.fs.safety import SafetyLayer
 
 logger = logging.getLogger("OpenCastor.FS")
 
@@ -78,6 +77,14 @@ __all__ = [
     "PipelineStage",
     "ProcFS",
 ]
+
+
+def __getattr__(name: str):
+    if name == "SafetyLayer":
+        from castor.fs.safety import SafetyLayer
+
+        return SafetyLayer
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class CastorFS:
@@ -111,6 +118,8 @@ class CastorFS:
     """
 
     def __init__(self, persist_dir: Optional[str] = None, limits: Optional[Dict] = None):
+        from castor.fs.safety import SafetyLayer
+
         # Core layers
         self.ns = Namespace()
         self.perms = PermissionTable()
