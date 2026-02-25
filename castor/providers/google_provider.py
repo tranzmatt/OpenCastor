@@ -40,7 +40,13 @@ class GoogleProvider(BaseProvider):
 
     def __init__(self, config):
         super().__init__(config)
-        import google.generativeai as genai
+        try:
+            import google.generativeai as genai
+        except ImportError as exc:
+            raise ImportError(
+                "Google provider requires optional dependency 'google-generativeai'. "
+                "Install with: pip install google-generativeai"
+            ) from exc
 
         api_key = os.getenv("GOOGLE_API_KEY") or config.get("api_key")
         if not api_key:
@@ -73,7 +79,10 @@ class GoogleProvider(BaseProvider):
 
     def health_check(self) -> dict:
         """Cheap health probe: list models (no inference cost)."""
-        import google.generativeai as genai
+        try:
+            import google.generativeai as genai
+        except ImportError as exc:
+            return {"ok": False, "latency_ms": 0.0, "error": str(exc)}
 
         t0 = time.time()
         try:

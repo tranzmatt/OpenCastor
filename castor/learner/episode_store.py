@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-import fcntl
 import json
 import time
 from pathlib import Path
 from typing import Optional
+
+try:
+    import fcntl  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover - Windows fallback
+    fcntl = None
 
 from .episode import Episode
 
@@ -25,19 +29,19 @@ class EpisodeStore:
 
     def _write_locked(self, path: Path, data: dict) -> None:
         with open(path, "w") as f:
-            fcntl.flock(f, fcntl.LOCK_EX)
+            self._lock(f, shared=False)
             try:
                 json.dump(data, f, indent=2)
             finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+                self._unlock(f)
 
     def _read_locked(self, path: Path) -> dict:
         with open(path) as f:
-            fcntl.flock(f, fcntl.LOCK_SH)
+            self._lock(f, shared=True)
             try:
                 return json.load(f)
             finally:
-                fcntl.flock(f, fcntl.LOCK_UN)
+                self._unlock(f)
 
     def save(self, episode: Episode) -> None:
         """Save an episode to disk."""
@@ -87,3 +91,16 @@ class EpisodeStore:
             except (json.JSONDecodeError, OSError):
                 continue
         return episodes
+
+    def _lock(self, file_obj, *, shared: bool) -> None:
+        """Best-effort file lock across platforms."""
+        if fcntl is None:
+            # Windows fallback: keep behavior functional for local dev/tests.
+            return
+        mode = fcntl.LOCK_SH if shared else fcntl.LOCK_EX
+        fcntl.flock(file_obj, mode)
+
+    def _unlock(self, file_obj) -> None:
+        if fcntl is None:
+            return
+        fcntl.flock(file_obj, fcntl.LOCK_UN)

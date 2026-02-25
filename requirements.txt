@@ -1,6 +1,5 @@
 # The Brain (AI Providers)
 anthropic>=0.40.0
-google-generativeai>=0.4.0
 openai>=1.0.0
 
 # The Body (Hardware)
@@ -45,3 +44,4 @@ rich>=13.0.0
 # discord.py>=2.3.0          # Discord
 # slack-bolt>=1.18.0         # Slack
 # dynamixel-sdk>=3.7.31      # Dynamixel servos
+# google-generativeai>=0.4.0 # Gemini provider (pip install google-generativeai)
