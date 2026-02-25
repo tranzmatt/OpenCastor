@@ -47,7 +47,15 @@ jobs:
             }
 
             const pypiData = await pypiResponse.json();
-            const pypiVersion = pypiData?.info?.version || "";
+            const releaseEntries = Object.entries(pypiData?.releases || {});
+            const publishedVersions = releaseEntries
+              .filter(([_, files]) => Array.isArray(files) && files.some((f) => !f.yanked))
+              .map(([version]) => version)
+              .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+            const pypiVersion =
+              publishedVersions[publishedVersions.length - 1] ||
+              pypiData?.info?.version ||
+              "";
             if (!pypiVersion) {
               core.setFailed("PyPI metadata did not include a package version.");
               return;

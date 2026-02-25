@@ -232,3 +232,15 @@ jobs:
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
+
+      - name: Publish mode summary
+        if: always()
+        run: |
+          if [ "${{ steps.publish_oidc.outcome }}" = "success" ]; then
+            echo "### PyPI publish mode: Trusted Publisher (OIDC)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### PyPI publish mode: API token fallback" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "OIDC trusted publishing failed for this run. Configure a matching trusted publisher at:" >> "$GITHUB_STEP_SUMMARY"
+            echo "https://pypi.org/manage/project/opencastor/settings/publishing/?provider=github&owner=craigm26&repository=OpenCastor&workflow_filename=release.yml" >> "$GITHUB_STEP_SUMMARY"
+          fi
