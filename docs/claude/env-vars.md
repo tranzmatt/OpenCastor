@@ -123,7 +123,7 @@ Copy `.env.example` to `.env` and fill in what you need.
 | Extra | Packages | Use Case |
 |-------|---------|---------|
 | `rpi` | adafruit-circuitpython-pca9685, picamera2, neonize | Raspberry Pi full stack |
-| `apple` | `apple-fm-sdk @ git+https://github.com/apple/python-apple-fm-sdk.git@3204b7ee892131a5d2c940d95caaabc90b4a40c9` (darwin only) | Apple Foundation Models integration |
+| `apple` | *(installed separately on macOS)* | Apple Foundation Models integration. Install with `pip install "git+https://github.com/apple/python-apple-fm-sdk.git@3204b7ee892131a5d2c940d95caaabc90b4a40c9"` |
 | `whatsapp` | `neonize==0.3.13.post0` | WhatsApp QR code scan |
 | `whatsapp-twilio` | `twilio` | WhatsApp via Twilio (legacy) |
 | `telegram` | `python-telegram-bot>=21.0` | Telegram Bot |

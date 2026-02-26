@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "opencastor"
-version = "2026.2.26.0"
+version = "2026.2.26.1"
 description = "The Universal Runtime for Embodied AI"
 readme = "README.md"
 license = "Apache-2.0"
@@ -96,7 +96,8 @@ onnx = ["onnxruntime>=1.17.0"]
 onnx-gpu = ["onnxruntime-gpu>=1.17.0"]
 gestures = ["mediapipe>=0.10.0"]
 apple = [
-    "apple-fm-sdk @ git+https://github.com/apple/python-apple-fm-sdk.git@3204b7ee892131a5d2c940d95caaabc90b4a40c9 ; sys_platform == 'darwin'",
+    # PyPI rejects direct URL dependencies in project metadata.
+    # Apple SDK install is handled by setup flow/installer with explicit consent.
 ]
 simulation = []  # Gazebo uses ROS2/rclpy; Webots via REST — no extra pip deps
 all = [

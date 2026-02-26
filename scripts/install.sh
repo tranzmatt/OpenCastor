@@ -3,9 +3,11 @@
 # Supports: macOS, Debian/Ubuntu, Fedora/RHEL, Arch, Alpine, Raspberry Pi
 set -euo pipefail
 
-VERSION="2026.2.26.0"
+VERSION="2026.2.26.1"
 REPO_URL="https://github.com/craigm26/OpenCastor.git"
 INSTALL_DIR="${OPENCASTOR_DIR:-$HOME/opencastor}"
+APPLE_SDK_GIT_REF="3204b7ee892131a5d2c940d95caaabc90b4a40c9"
+APPLE_SDK_GIT_URL="git+https://github.com/apple/python-apple-fm-sdk.git@${APPLE_SDK_GIT_REF}"
 
 # ── Flags ──────────────────────────────────────────────
 DRY_RUN=false
@@ -283,14 +285,17 @@ if [ "$DRY_RUN" = false ]; then
     }
   else
     if [ "$OS" = "macos" ] && [ "$WITH_APPLE_SDK" = true ]; then
-      pip install --quiet -e ".[core,apple]" 2>/dev/null || pip install --quiet -e "."
+      pip install --quiet -e ".[core]" 2>/dev/null || pip install --quiet -e "."
+      if ! pip install --quiet "${APPLE_SDK_GIT_URL}" 2>/dev/null; then
+        warn "Apple SDK install failed. You can continue setup and install it later if needed."
+      fi
     else
       pip install --quiet -e ".[core]" 2>/dev/null || pip install --quiet -e "."
     fi
   fi
   if [ "$OS" = "macos" ] && [ "$WITH_APPLE_SDK" = false ]; then
     info "Apple Foundation Models SDK is optional."
-    info "Install later with: pip install -e '.[apple]'"
+    info "Install later with: pip install \"${APPLE_SDK_GIT_URL}\""
   fi
   ok "Python packages installed"
 else

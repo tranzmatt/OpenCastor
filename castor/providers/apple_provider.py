@@ -14,6 +14,11 @@ from .base import BaseProvider, Thought
 
 logger = logging.getLogger("OpenCastor.Apple")
 
+APPLE_SDK_GIT_REF = "3204b7ee892131a5d2c940d95caaabc90b4a40c9"
+APPLE_SDK_INSTALL_CMD = (
+    f'pip install "git+https://github.com/apple/python-apple-fm-sdk.git@{APPLE_SDK_GIT_REF}"'
+)
+
 
 _PROFILE_DEFAULTS: Dict[str, tuple[str, str]] = {
     "apple-balanced": ("GENERAL", "DEFAULT"),
@@ -39,8 +44,7 @@ class AppleProvider(BaseProvider):
             return sdk
         except Exception as exc:
             raise ImportError(
-                "Apple provider requires apple-fm-sdk. "
-                "Install extra with: pip install -e '.[apple]'"
+                f"Apple provider requires apple-fm-sdk. Install with: {APPLE_SDK_INSTALL_CMD}"
             ) from exc
 
     def _resolve_profile_id(self, config: Dict[str, Any]) -> str:

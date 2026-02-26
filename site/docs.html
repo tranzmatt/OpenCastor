@@ -155,7 +155,7 @@
       <p class="section-label reveal">Documentation</p>
       <h1 class="reveal reveal-d1">From zero to robot<br>in five minutes.</h1>
       <p class="reveal reveal-d2">Everything you need to install, configure, and deploy your first AI-powered robot.
-        v2026.2.26.0</p>
+        v2026.2.26.1</p>
     </section>
 
     <!-- Table of Contents -->
@@ -220,7 +220,8 @@
                 <div class="code-body">irm opencastor.com/install.ps1 | iex</div>
               </div>
               <p style="font-size:0.875rem;color:var(--text-secondary);margin-top:8px">Optional on macOS: preinstall
-                Apple SDK support with <code style="padding:2px 5px;font-size:0.8125rem">pip install "opencastor[apple]"</code>.
+                Apple SDK support with <code style="padding:2px 5px;font-size:0.8125rem">pip install "git+https://github.com/apple/python-apple-fm-sdk.git@3204b7ee892131a5d2c940d95caaabc90b4a40c9"</code>
+                or install via <code style="padding:2px 5px;font-size:0.8125rem">curl -sL opencastor.com/install | bash -s -- --with-apple-sdk</code>.
                 Setup can also install it later with your consent.</p>
             </div>
           </div>
