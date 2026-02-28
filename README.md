@@ -229,6 +229,170 @@ castor approvals             # View/approve dangerous commands
 castor privacy --config r.yaml  # Show sensor access policy
 ```
 
+## 🔐 Quantum Commitment Audit Trail
+
+OpenCastor integrates with [QuantumLink-Sim](https://github.com/craigm26/Quantum-link-Sim) to provide **cryptographically verifiable audit trails** for every robot action. Every RCAN event can be sealed into a QKD-keyed commitment chain — making tampering detectable even if the log file itself is modified.
+
+### Why This Matters
+
+Standard audit logs are hash-chained (SHA-256 of previous entry). That's tamper-*evident* — you can detect changes — but not tamper-*proof*: anyone with write access to the log file can recompute valid SHA-256 hashes and forge the chain without a trace.
+
+OpenCastor's quantum commitment layer adds a **keyed HMAC chain** backed by cryptographic keys derived from BB84 Quantum Key Distribution simulation. Without the session-bound chain secret, forging the chain is computationally infeasible — and in hybrid mode, requires simultaneously breaking both a classical HKDF key and eavesdropping on the BB84 channel.
+
+This matters in the context of autonomous robots operating in safety-critical environments: the audit trail is your forensic record. It needs to be trustworthy.
+
+### Key Modes
+
+| Mode | Key Source | Security Model | Commit Latency |
+|---|---|---|---|
+| `classical` | `HKDF(os.urandom(32), SHA-256)` | Computational — breaks only if HKDF/AES is broken | < 0.05 ms |
+| `quantum` | BB84 QKD simulation → HKDF expand | Information-theoretic — eavesdropping detectable via QBER | < 0.15 ms (warm pool) |
+| `hybrid` *(recommended)* | `XOR(classical_key, quantum_key)` | Adversary must break **both** simultaneously | < 0.20 ms (warm pool) |
+
+**Hybrid is the default.** An attacker needs to compromise the classical HKDF key **and** eavesdrop the quantum channel simultaneously — a significantly harder problem than either alone.
+
+### How It Works
+
+```
+RCAN Action (motor_command, nav, etc.)
+         │
+         ▼
+  AuditLog.log()          ← SHA-256 hash chain (tamper-evident)
+         │
+         ▼
+  CommitmentEngine.commit()
+    │
+    ├── Serialize payload → JSON (sorted keys)
+    ├── SHA3-256 hash (quantum-resistant content address)
+    ├── Derive key:
+    │    ├── CLASSICAL: HKDF(os.urandom(32))
+    │    ├── QUANTUM:   BB84 key from QKDKeyPool → HKDF expand to 32 bytes
+    │    └── HYBRID:    XOR(classical_key, quantum_key)
+    ├── AES-256-GCM encrypt (AAD = payload_hash)
+    ├── HMAC-SHA256(chain_secret, prev_hash || payload_hash) → chain_hash
+    └── CommitmentRecord → appended to in-memory chain + JSONL file
+```
+
+Each audit log entry gains three fields:
+```json
+{
+  "ts": "2026-02-27T19:35:46",
+  "event": "motor_command",
+  "source": "brain",
+  "action_type": "move",
+  "commitment_id": "a1b2c3d4-...",
+  "commitment_mode": "hybrid",
+  "commitment_qber": 0.0021,
+  "commitment_secure": true,
+  "prev_hash": "sha256-of-previous-entry"
+}
+```
+
+### Configuration
+
+```yaml
+# In your RCAN config (e.g. bob.rcan.yaml)
+security:
+  commitment:
+    enabled: true
+    mode: hybrid                              # classical | quantum | hybrid
+    pool_size: 32                             # pre-generated QKD keys in memory
+    n_qkd_bits: 512                           # raw BB84 qubits per key generation run
+    qber_threshold: 0.11                      # max QBER (>11% = likely eavesdropping)
+    use_qiskit: false                         # Qiskit circuit backend (set true for max fidelity)
+    storage_path: .opencastor-commitments.jsonl
+    export_secret_path: .opencastor-chain-secret.hex
+```
+
+### QKD Key Pool
+
+BB84 key generation takes ~8–15ms per key on a Raspberry Pi 5. To prevent this from blocking the audit hot path, OpenCastor maintains a **QKDKeyPool** — a background thread that pre-generates and buffers up to N quantum-derived keys:
+
+```
+Background thread (10ms poll interval)
+  └── BB84Protocol(n_bits=512).run()
+        └── sift → error correct → privacy amplify → HKDF expand → 32 bytes
+              └── enqueue to pool (bounded, ~32 slots)
+
+Audit hot path (< 0.2ms with warm pool):
+  └── pool.get()  →  AES-256-GCM encrypt  →  HMAC chain step  →  append
+```
+
+If the pool runs dry (e.g., high-frequency audit events exhaust it), it falls back to live BB84 (~10ms) or classical HKDF (< 0.05ms) depending on configuration.
+
+### BB84 Quantum Bit Error Rate (QBER)
+
+The QBER measures the error rate on the quantum channel. In an ideal BB84 run with no noise or eavesdropping, QBER = 0. OpenCastor rejects keys with QBER > 11% — the theoretical threshold above which Eve's interception is detectable:
+
+```
+QBER = 0.0%      Ideal — no noise, no eavesdropper
+QBER < 11%       Acceptable — minor channel noise, key used
+QBER 11–25%      Suspect — possible eavesdropper, key rejected
+QBER > 25%       Definite — Eve present (theoretical maximum for BB84 intercept-resend)
+```
+
+The QBER of every quantum key used is recorded in the commitment record (`commitment_qber` field), giving you a per-action eavesdropping signal in the audit log.
+
+### Qiskit Backend
+
+For maximum fidelity, enable the Qiskit quantum circuit backend:
+
+```bash
+pip install "quantumlink-sim[quantum]"  # adds qiskit + qiskit-aer
+```
+
+```yaml
+security:
+  commitment:
+    use_qiskit: true   # real quantum circuit simulation (StatevectorSampler)
+```
+
+The Qiskit backend uses actual quantum gate operations (`H`, `X`, measurement) rather than numpy random arrays. Key generation takes ~50–200ms per key but provides the highest-fidelity simulation of real QKD hardware. Falls back to numpy BB84 automatically if Qiskit is unavailable.
+
+### CLI: Verify, Inspect, Export
+
+```bash
+# Verify the HMAC commitment chain (separate from SHA-256 audit hash chain)
+castor commit verify
+# → ✅ Chain intact — 1,247 records verified. Head: a3f9b21c...
+
+# Pool and chain statistics
+castor commit stats
+# → {"mode": "hybrid", "chain_length": 1247, "pool": {"pool_size_current": 28, ...}}
+
+# Export all commitment records as JSONL
+castor commit export > audit-chain-2026-02-27.jsonl
+
+# Prove a specific action was committed (shareable without the encryption key)
+castor commit proof a1b2c3d4-e5f6-7890-abcd-ef1234567890
+# → {"record": {...}, "chain_position": 42, "preceding_hash": "..."}
+```
+
+The proof bundle contains everything needed to verify a commitment record's existence and chain position without revealing the encryption key — suitable for sharing with auditors, regulators, or legal proceedings.
+
+### Cross-Session Verification
+
+The chain secret is saved to `.opencastor-chain-secret.hex` on first run. Store this separately from the JSONL commitment file. Together, they enable offline chain verification on any machine:
+
+```python
+from quantumlink_sim.commitment import CommitmentEngine
+
+secret = bytes.fromhex(open(".opencastor-chain-secret.hex").read())
+engine = CommitmentEngine(chain_secret=secret, storage_path="commitments.jsonl")
+ok, broken = engine.verify_chain()
+```
+
+### Installation
+
+```bash
+pip install quantumlink-sim          # core (numpy BB84 + commitment engine)
+pip install "quantumlink-sim[quantum]"  # + Qiskit circuit backend
+```
+
+QuantumLink-Sim is an optional dependency — OpenCastor's audit log works without it (falls back to SHA-256 hash chain only). With it, every audit entry gains the full cryptographic commitment layer.
+
+---
+
 ## 📦 Quick Start
 
 ## 🧩 Agent Skills
