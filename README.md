@@ -51,6 +51,15 @@ Supports **Linux, macOS (Apple Silicon & Intel), Windows 11, Raspberry Pi, Docke
 Installer flags: `--dry-run`, `--no-rpi`, `--skip-wizard`
 </details>
 
+## ✨ What's New in v2026.2.27.0
+
+- **Quantum Commitment Audit Trail** — every RCAN action is now optionally sealed into a cryptographic commitment chain via [QuantumLink-Sim](https://github.com/craigm26/Quantum-link-Sim). Three key modes: `classical` (HKDF-SHA256), `quantum` (BB84 QKD-derived), and `hybrid` (XOR of both — requires breaking both channels). Configurable under `security.commitment` in RCAN YAML.
+- **ESC reverse-arming** — PCA9685 driver now detects forward→reverse transitions and sends a configurable neutral pulse (`esc_arm_neutral_ms`, default 200ms) before engaging reverse, preventing ESC lockout on RC motor controllers. Configurable: `esc_reverse_arming`, `esc_arm_neutral_ms`, `esc_double_tap_reverse`.
+- **QKDKeyPool** — background BB84 key-generation thread keeps a pre-warmed pool of quantum-derived keys so audit commit latency stays below 0.2ms on the hot path (vs ~10ms for live BB84).
+- **HMAC chain integrity** — audit chain now uses HMAC-SHA256 keyed with a session-bound chain secret instead of raw SHA-256, preventing offline chain forgery even with full log file access.
+- **`castor commit` CLI** — new subcommand: `verify`, `stats`, `export`, `proof <id>` for inspecting and verifying the quantum commitment chain.
+- **3,441 tests passing** (29 skipped due to optional provider deps: `openai`, `groq` — not installed on Pi).
+
 ## ✨ What's New in v2026.2.26.3
 
 - **Google setup reliability hardening (2026-02-26)** — setup preflight now reports Google model fallback usage accurately, model availability probing only runs when `GOOGLE_API_KEY` is present, and Google auth guidance now clearly distinguishes optional ADC setup from required Gemini API-key model calls
