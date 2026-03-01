@@ -96,3 +96,59 @@ def test_env_var_override(tmp_path, monkeypatch):
     mem = EpisodeMemory()
     mem.log_episode(instruction="env test", action={})
     assert mem.count() == 1
+
+
+# ===========================================================================
+# Issue #267/#226 — Multi-modal memory (image_blob)
+# ===========================================================================
+
+
+class TestMultiModalMemory:
+    def _make_mem(self, tmp_path):
+        from castor.memory import EpisodeMemory
+
+        return EpisodeMemory(db_path=str(tmp_path / "mm.db"))
+
+    def test_log_episode_without_image_has_no_image(self, tmp_path):
+        mem = self._make_mem(tmp_path)
+        mem.log_episode(instruction="cmd", action={"type": "stop"})
+        rows = mem.query_recent(limit=1)
+        assert rows[0]["has_image"] is False
+
+    def test_log_episode_with_image_stores_blob(self, tmp_path):
+        mem = self._make_mem(tmp_path)
+        # Minimal JPEG header bytes (won't decode with cv2 but stored as-is)
+        fake_jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 20
+        mem.log_episode(instruction="photo", action={}, image_bytes=fake_jpeg)
+        rows = mem.query_recent(limit=1)
+        assert rows[0]["has_image"] is True
+
+    def test_get_episode_image_returns_bytes(self, tmp_path):
+        mem = self._make_mem(tmp_path)
+        fake_jpeg = b"\xff\xd8\xff" + b"\xab" * 50
+        mem.log_episode(instruction="snap", action={}, image_bytes=fake_jpeg)
+        ep_id = mem.query_recent(limit=1)[0]["id"]
+        blob = mem.get_episode_image(ep_id)
+        assert blob is not None
+        assert isinstance(blob, bytes)
+        assert len(blob) > 0
+
+    def test_get_episode_image_missing_returns_none(self, tmp_path):
+        mem = self._make_mem(tmp_path)
+        result = mem.get_episode_image(99999)
+        assert result is None
+
+    def test_episodes_with_images_lists_only_image_episodes(self, tmp_path):
+        mem = self._make_mem(tmp_path)
+        mem.log_episode(instruction="no_img", action={})
+        fake_jpeg = b"\xff\xd8" + b"\x00" * 10
+        mem.log_episode(instruction="has_img", action={}, image_bytes=fake_jpeg)
+        imgs = mem.episodes_with_images(limit=10)
+        assert len(imgs) == 1
+        assert imgs[0]["has_image"] is True
+        assert imgs[0]["instruction"] == "has_img"
+
+    def test_episodes_with_images_empty_when_none(self, tmp_path):
+        mem = self._make_mem(tmp_path)
+        mem.log_episode(instruction="cmd", action={})
+        assert mem.episodes_with_images() == []

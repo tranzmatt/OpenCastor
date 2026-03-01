@@ -21,6 +21,12 @@ Usage::
     )
     episodes = mem.query_recent(limit=10)
     mem.export_jsonl("/tmp/episodes.jsonl")
+
+Multi-modal memory (issue #267/#226):
+    image_bytes can be passed to log_episode(); stored as a JPEG thumbnail
+    (resized to 320x240 when cv2 is available, otherwise raw bytes).
+    Retrieve via get_episode_image(ep_id) or list episodes that have images
+    via episodes_with_images().
 """
 
 from __future__ import annotations
@@ -91,7 +97,7 @@ class EpisodeMemory:
             con.close()
 
     def _init_db(self) -> None:
-        """Create the episodes table if it does not exist."""
+        """Create the episodes table if it does not exist, and migrate schema."""
         ddl = """
         CREATE TABLE IF NOT EXISTS episodes (
             id           TEXT PRIMARY KEY,
@@ -108,8 +114,40 @@ class EpisodeMemory:
         """
         with self._conn() as con:
             con.executescript(ddl)
+            # Migration: add image_blob column for multi-modal memory (#267/#226).
+            # Silently ignored when the column already exists.
+            try:
+                con.execute("ALTER TABLE episodes ADD COLUMN image_blob BLOB DEFAULT NULL")
+            except Exception:
+                pass  # Column already exists
 
     # ── Write ─────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _make_thumbnail(image_bytes: bytes) -> Optional[bytes]:
+        """Resize *image_bytes* JPEG to 320×240 thumbnail using cv2 if available.
+
+        Falls back to returning the raw bytes unchanged when cv2 is not
+        installed or decoding fails.  Returns ``None`` when *image_bytes* is
+        empty or ``None``.
+        """
+        if not image_bytes:
+            return None
+        try:
+            import cv2
+            import numpy as np
+
+            buf = np.frombuffer(image_bytes, dtype=np.uint8)
+            img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+            if img is None:
+                return image_bytes
+            thumb = cv2.resize(img, (320, 240), interpolation=cv2.INTER_AREA)
+            ok, encoded = cv2.imencode(".jpg", thumb, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            if ok:
+                return encoded.tobytes()
+            return image_bytes
+        except Exception:
+            return image_bytes
 
     def log_episode(
         self,
@@ -120,18 +158,33 @@ class EpisodeMemory:
         image_hash: str = "",
         outcome: str = "ok",
         source: str = "loop",
+        image_bytes: Optional[bytes] = None,
     ) -> str:
-        """Insert a new episode.  Returns the generated episode UUID."""
+        """Insert a new episode.  Returns the generated episode UUID.
+
+        Args:
+            instruction:  Natural-language instruction sent to the brain.
+            raw_thought:  Raw text output from the LLM.
+            action:       Parsed action dict (serialised to JSON).
+            latency_ms:   Round-trip latency for the brain call.
+            image_hash:   Short SHA-256 hex digest of the source frame.
+            outcome:      Freeform outcome label (default ``"ok"``).
+            source:       Origin of the episode (``"loop"``, ``"api"``, …).
+            image_bytes:  Raw JPEG bytes of the camera frame.  When provided
+                          a 320×240 thumbnail is stored in ``image_blob``
+                          (requires *opencv-python*; falls back to raw bytes).
+        """
         ep_id = str(uuid.uuid4())
         action_json = json.dumps(action) if action else None
         ts = time.time()
+        thumbnail: Optional[bytes] = self._make_thumbnail(image_bytes) if image_bytes else None
         with self._conn() as con:
             con.execute(
                 """
                 INSERT INTO episodes
                     (id, ts, instruction, raw_thought, action_json,
-                     latency_ms, image_hash, outcome, source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     latency_ms, image_hash, outcome, source, image_blob)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     ep_id,
@@ -143,6 +196,7 @@ class EpisodeMemory:
                     image_hash,
                     outcome,
                     source,
+                    thumbnail,
                 ),
             )
         self._evict_if_needed()
@@ -210,6 +264,68 @@ class EpisodeMemory:
             row = con.execute("SELECT * FROM episodes WHERE id = ?", (ep_id,)).fetchone()
         return self._row_to_dict(row) if row else None
 
+    def get_episode_image(self, episode_id: int) -> Optional[bytes]:
+        """Return the stored JPEG thumbnail bytes for *episode_id*, or ``None``.
+
+        Args:
+            episode_id: The integer or UUID string of the episode row.
+
+        Returns:
+            Raw JPEG bytes when an image was stored, otherwise ``None``.
+        """
+        with self._conn() as con:
+            row = con.execute(
+                "SELECT image_blob FROM episodes WHERE id = ?", (episode_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        return row["image_blob"]
+
+    def episodes_with_images(self, limit: int = 20) -> List[Dict]:
+        """Return recent episodes that have a stored image thumbnail.
+
+        Each dict contains ``{id, ts, instruction, action_type, has_image}``
+        but does *not* include the raw blob bytes (use
+        :meth:`get_episode_image` to fetch those).
+
+        Args:
+            limit: Maximum number of episodes to return (capped at 500).
+
+        Returns:
+            List of dicts ordered newest-first.
+        """
+        limit = min(max(1, limit), 500)
+        with self._conn() as con:
+            rows = con.execute(
+                """
+                SELECT id, ts, instruction, action_json
+                FROM   episodes
+                WHERE  image_blob IS NOT NULL
+                ORDER  BY ts DESC
+                LIMIT  ?
+                """,
+                (limit,),
+            ).fetchall()
+
+        result: List[Dict] = []
+        for row in rows:
+            action_type = ""
+            if row["action_json"]:
+                try:
+                    action_type = json.loads(row["action_json"]).get("type", "")
+                except Exception:
+                    pass
+            result.append(
+                {
+                    "id": row["id"],
+                    "ts": row["ts"],
+                    "instruction": row["instruction"],
+                    "action_type": action_type,
+                    "has_image": True,
+                }
+            )
+        return result
+
     def count(self) -> int:
         """Return the total number of stored episodes."""
         with self._conn() as con:
@@ -264,6 +380,8 @@ class EpisodeMemory:
         else:
             d["action"] = None
         del d["action_json"]
+        # Replace raw blob with a boolean flag so JSON export stays clean.
+        d["has_image"] = d.pop("image_blob", None) is not None
         return d
 
     @staticmethod

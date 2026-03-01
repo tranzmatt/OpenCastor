@@ -3251,6 +3251,146 @@ async def finetune_stats():
     return EpisodeFinetuneExporter().stats()
 
 
+class _FinetuneUploadRequest(BaseModel):
+    repo_id: str
+    token: Optional[str] = None
+    fmt: str = "chatml"
+    limit: int = 1000
+    private: bool = True
+
+
+@app.post("/api/finetune/upload", dependencies=[Depends(verify_token)])
+async def finetune_upload(req: _FinetuneUploadRequest):
+    """POST /api/finetune/upload — Upload episode dataset to HuggingFace Hub.
+
+    Body: {repo_id, token?, fmt?, limit?, private?}
+    Returns: {ok, url, records, repo_id}
+    """
+    from castor.finetune import EpisodeFinetuneExporter
+
+    if req.fmt not in ("chatml", "alpaca", "sharegpt", "jsonl"):
+        raise HTTPException(status_code=422, detail=f"Unknown format '{req.fmt}'")
+
+    exporter = EpisodeFinetuneExporter()
+    try:
+        result = await asyncio.to_thread(
+            exporter.upload_to_hub,
+            req.repo_id,
+            token=req.token,
+            fmt=req.fmt,  # type: ignore[arg-type]
+            limit=req.limit,
+            private=req.private,
+        )
+    except (ImportError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Memory image endpoints (multi-modal memory #267/#226)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/memory/episodes/{episode_id}/image", dependencies=[Depends(verify_token)])
+async def memory_episode_image(episode_id: int):
+    """GET /api/memory/episodes/{id}/image — Return stored thumbnail JPEG for an episode."""
+    mem = state.memory if hasattr(state, "memory") and state.memory else None
+    if mem is None:
+        from castor.memory import EpisodeMemory
+
+        mem = EpisodeMemory()
+    img = await asyncio.to_thread(mem.get_episode_image, episode_id)
+    if img is None:
+        raise HTTPException(status_code=404, detail="No image for this episode")
+    from fastapi.responses import Response
+
+    return Response(content=img, media_type="image/jpeg")
+
+
+@app.get("/api/memory/images", dependencies=[Depends(verify_token)])
+async def memory_episodes_with_images(limit: int = 20):
+    """GET /api/memory/images — List episodes that have stored thumbnail images."""
+    mem = state.memory if hasattr(state, "memory") and state.memory else None
+    if mem is None:
+        from castor.memory import EpisodeMemory
+
+        mem = EpisodeMemory()
+    episodes = await asyncio.to_thread(mem.episodes_with_images, limit)
+    return {"episodes": episodes, "count": len(episodes)}
+
+
+# ---------------------------------------------------------------------------
+# Thermal camera endpoints (AMG8833 #263/#222)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/thermal/frame", dependencies=[Depends(verify_token)])
+async def thermal_frame():
+    """GET /api/thermal/frame — Return 8x8 thermal pixel array from AMG8833."""
+    from castor.drivers.thermal_driver import get_thermal
+
+    thermal = get_thermal()
+    pixels = await asyncio.to_thread(thermal.capture)
+    grid = [pixels[r * 8 : (r + 1) * 8] for r in range(8)]
+    return {"pixels": pixels, "grid": grid, "mode": thermal._mode}
+
+
+@app.get("/api/thermal/hotspot", dependencies=[Depends(verify_token)])
+async def thermal_hotspot():
+    """GET /api/thermal/hotspot — Return hottest pixel location and temperature."""
+    from castor.drivers.thermal_driver import get_thermal
+
+    thermal = get_thermal()
+    hotspot = await asyncio.to_thread(thermal.get_hotspot)
+    return hotspot
+
+
+@app.get("/api/thermal/health", dependencies=[Depends(verify_token)])
+async def thermal_health():
+    """GET /api/thermal/health — Return AMG8833 driver health status."""
+    from castor.drivers.thermal_driver import get_thermal
+
+    thermal = get_thermal()
+    return thermal.health_check()
+
+
+# ---------------------------------------------------------------------------
+# Benchmark persistence endpoints (#257)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/benchmark/results", dependencies=[Depends(verify_token)])
+async def benchmark_results(limit: int = 50):
+    """GET /api/benchmark/results — Return persisted benchmark history.
+
+    Returns the most recent ``limit`` benchmark runs from ``~/.castor/benchmarks.jsonl``.
+    """
+    import json as _json
+    import pathlib
+
+    bench_path = pathlib.Path.home() / ".castor" / "benchmarks.jsonl"
+    if not bench_path.exists():
+        return {"results": [], "count": 0}
+
+    runs: list = []
+    try:
+        lines = bench_path.read_text(encoding="utf-8").splitlines()
+        for line in reversed(lines):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                runs.append(_json.loads(line))
+            except _json.JSONDecodeError:
+                continue
+            if len(runs) >= limit:
+                break
+    except OSError:
+        return {"results": [], "count": 0}
+
+    return {"results": runs, "count": len(runs)}
+
+
 # ---------------------------------------------------------------------------
 # Webhook endpoints for messaging channels
 # ---------------------------------------------------------------------------

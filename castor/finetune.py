@@ -196,6 +196,82 @@ class EpisodeFinetuneExporter:
             "formats": list(_CONVERTERS.keys()),
         }
 
+    def upload_to_hub(
+        self,
+        repo_id: str,
+        *,
+        token: Optional[str] = None,
+        fmt: ExportFormat = "chatml",
+        limit: int = 1000,
+        private: bool = True,
+        commit_message: str = "Upload OpenCastor fine-tuning dataset",
+    ) -> Dict[str, Any]:
+        """Upload the episode dataset to a HuggingFace Hub repository.
+
+        Requires ``huggingface-hub`` (already a core dependency).
+
+        Args:
+            repo_id:        ``"username/dataset-name"`` on HuggingFace Hub.
+            token:          HF access token.  Falls back to ``HF_TOKEN`` env var.
+            fmt:            Export format (chatml, alpaca, sharegpt, jsonl).
+            limit:          Max episodes to export.
+            private:        Create the repo as private (default True).
+            commit_message: HF commit message.
+
+        Returns:
+            ``{"ok": True, "url": str, "records": int, "repo_id": str}``
+
+        Raises:
+            ImportError: if ``huggingface_hub`` is not installed.
+            RuntimeError: on upload failure.
+        """
+        import os
+        import tempfile
+
+        try:
+            from huggingface_hub import HfApi
+        except ImportError as exc:
+            raise ImportError("huggingface-hub is required: pip install huggingface-hub") from exc
+
+        resolved_token = token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
+        api = HfApi(token=resolved_token)
+
+        # Create repo if it doesn't exist
+        try:
+            api.create_repo(repo_id=repo_id, repo_type="dataset", private=private, exist_ok=True)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to create HuggingFace repo '{repo_id}': {exc}") from exc
+
+        # Export to temp file
+        with tempfile.NamedTemporaryFile(
+            suffix=f".{fmt}.jsonl", mode="w", delete=False, encoding="utf-8"
+        ) as tmp:
+            tmp_path = tmp.name
+            count = 0
+            for record in self.iter_records(fmt=fmt, limit=limit):
+                tmp.write(json.dumps(record, ensure_ascii=False) + "\n")
+                count += 1
+
+        try:
+            api.upload_file(
+                path_or_fileobj=tmp_path,
+                path_in_repo=f"train.{fmt}.jsonl",
+                repo_id=repo_id,
+                repo_type="dataset",
+                commit_message=commit_message,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"HuggingFace upload failed: {exc}") from exc
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+        url = f"https://huggingface.co/datasets/{repo_id}"
+        logger.info("Uploaded %d records to %s (%s)", count, url, fmt)
+        return {"ok": True, "url": url, "records": count, "repo_id": repo_id}
+
 
 def export_episodes(
     memory: Any,

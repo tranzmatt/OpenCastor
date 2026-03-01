@@ -78,6 +78,7 @@ class BehaviorRunner:
             "command": self._step_think,  # alias for think
             "nav_mission": self._step_nav_mission,
             "parallel": self._step_parallel,
+            "loop": self._step_loop,
         }
 
     # ------------------------------------------------------------------
@@ -399,3 +400,65 @@ class BehaviorRunner:
             )
         else:
             logger.info("parallel step: all inner steps completed")
+
+    def _step_loop(self, step: dict) -> None:
+        """Repeat a sequence of inner steps N times or indefinitely.
+
+        Parameters
+        ----------
+        step:
+            The step dict.  Must contain a ``steps`` key with a list of inner
+            step dicts.  May contain ``count`` (int, default 1).  A ``count``
+            of ``-1`` means loop indefinitely until :meth:`stop` is called.
+
+        Example step::
+
+            - type: loop
+              count: 3
+              steps:
+                - type: wait
+                  seconds: 0.5
+                - type: speak
+                  text: "Beep"
+
+            - type: loop
+              count: -1
+              steps:
+                - type: wait
+                  seconds: 1.0
+        """
+        inner_steps = step.get("steps")
+        if not inner_steps:
+            logger.warning("loop step: 'steps' is missing or empty — skipping")
+            return
+
+        count = int(step.get("count", 1))
+        logger.info(
+            "loop step: starting loop count=%s with %d inner step(s)",
+            "indefinite" if count == -1 else count,
+            len(inner_steps),
+        )
+
+        iteration = 1
+        while True:
+            if not self._running:
+                break
+            if count != -1 and iteration > count:
+                break
+
+            for inner_step in inner_steps:
+                if not self._running:
+                    break
+                step_type = inner_step.get("type", "")
+                handler = self._step_handlers.get(step_type)
+                if handler is None:
+                    logger.warning("loop step: unknown inner step type '%s' — skipping", step_type)
+                    continue
+                try:
+                    handler(inner_step)
+                except Exception as exc:
+                    logger.warning("loop step: inner step '%s' raised: %s", step_type, exc)
+
+            iteration += 1
+
+        logger.info("loop step: done after %d iteration(s)", iteration - 1)

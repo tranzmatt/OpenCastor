@@ -373,3 +373,96 @@ class TestBehaviorParallelStep:
         """'parallel' should be in the step_handlers dispatch table."""
         runner = self._make_runner()
         assert "parallel" in runner._step_handlers
+
+
+# ===========================================================================
+# Issue #259 — BehaviorRunner loop step
+# ===========================================================================
+
+
+class TestBehaviorLoopStep:
+    def _make_runner(self):
+        from castor.behaviors import BehaviorRunner
+
+        return BehaviorRunner(driver=None, brain=None, speaker=None, config={})
+
+    def test_loop_registered_in_handlers(self):
+        """'loop' should be in the step_handlers dispatch table."""
+        runner = self._make_runner()
+        assert "loop" in runner._step_handlers
+
+    def test_loop_runs_inner_steps_n_times(self):
+        """loop count=3 should execute all inner steps 3 times."""
+        results = []
+
+        runner = self._make_runner()
+
+        def recording_wait(step):
+            results.append(1)
+
+        runner._step_handlers["wait"] = recording_wait
+
+        behavior = {
+            "name": "loop_test",
+            "steps": [
+                {
+                    "type": "loop",
+                    "count": 3,
+                    "steps": [{"type": "wait", "seconds": 0.0}],
+                }
+            ],
+        }
+        runner.run(behavior)
+        assert len(results) == 3
+
+    def test_loop_count_zero_does_not_execute(self):
+        """loop count=0 should execute inner steps 0 times."""
+        results = []
+        runner = self._make_runner()
+
+        def recording_wait(step):
+            results.append(1)
+
+        runner._step_handlers["wait"] = recording_wait
+        behavior = {
+            "name": "loop_zero",
+            "steps": [{"type": "loop", "count": 0, "steps": [{"type": "wait", "seconds": 0.0}]}],
+        }
+        runner.run(behavior)
+        assert len(results) == 0
+
+    def test_loop_empty_steps_warns(self, caplog):
+        """Empty inner steps list should log a warning."""
+        import logging
+
+        runner = self._make_runner()
+        with caplog.at_level(logging.WARNING, logger="OpenCastor.Behaviors"):
+            behavior = {"name": "empty_loop", "steps": [{"type": "loop", "count": 1, "steps": []}]}
+            runner.run(behavior)
+        assert any("loop" in r.message.lower() for r in caplog.records)
+
+    def test_loop_stop_breaks_infinite(self):
+        """stop() should break an infinite loop (count=-1)."""
+        import threading
+        import time
+
+        runner = self._make_runner()
+        call_counts = []
+
+        def slow_wait(step):
+            call_counts.append(1)
+            time.sleep(0.05)
+
+        runner._step_handlers["wait"] = slow_wait
+        behavior = {
+            "name": "infinite_loop",
+            "steps": [{"type": "loop", "count": -1, "steps": [{"type": "wait"}]}],
+        }
+
+        t = threading.Thread(target=runner.run, args=(behavior,), daemon=True)
+        t.start()
+        time.sleep(0.15)
+        runner.stop()
+        t.join(timeout=2.0)
+        assert runner.is_running is False
+        assert len(call_counts) < 20

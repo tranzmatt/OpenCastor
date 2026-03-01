@@ -277,3 +277,83 @@ def test_api_finetune_export_content_disposition(api_client, mock_exporter):
     resp = api_client.get("/api/finetune/export?format=sharegpt")
     assert "attachment" in resp.headers.get("content-disposition", "")
     assert "sharegpt" in resp.headers.get("content-disposition", "")
+
+
+# ===========================================================================
+# Issue #216 — HuggingFace Hub upload
+# ===========================================================================
+
+
+class TestFinetuneHubUpload:
+    def _make_exporter(self, tmp_path):
+        from castor.finetune import EpisodeFinetuneExporter
+        from castor.memory import EpisodeMemory
+
+        mem = EpisodeMemory(db_path=str(tmp_path / "upload.db"))
+        mem.log_episode(
+            instruction="go forward",
+            raw_thought='{"type": "move"}',
+            action={"type": "move"},
+        )
+        return EpisodeFinetuneExporter(mem)
+
+    def test_upload_to_hub_returns_ok_dict(self, tmp_path):
+        """upload_to_hub() should return {ok, url, records, repo_id}."""
+        from unittest.mock import MagicMock, patch
+
+        exporter = self._make_exporter(tmp_path)
+        mock_api = MagicMock()
+        mock_api.create_repo.return_value = None
+        mock_api.upload_file.return_value = None
+
+        with patch("huggingface_hub.HfApi", return_value=mock_api):
+            result = exporter.upload_to_hub("testuser/test-dataset", token="faketoken")
+
+        assert result["ok"] is True
+        assert "url" in result
+        assert result["records"] >= 1
+        assert result["repo_id"] == "testuser/test-dataset"
+        assert "huggingface.co" in result["url"]
+
+    def test_upload_to_hub_calls_create_repo(self, tmp_path):
+        """upload_to_hub() should call HfApi.create_repo with correct args."""
+        from unittest.mock import MagicMock, patch
+
+        exporter = self._make_exporter(tmp_path)
+        mock_api = MagicMock()
+
+        with patch("huggingface_hub.HfApi", return_value=mock_api):
+            exporter.upload_to_hub("testuser/my-dataset", private=False)
+
+        mock_api.create_repo.assert_called_once_with(
+            repo_id="testuser/my-dataset",
+            repo_type="dataset",
+            private=False,
+            exist_ok=True,
+        )
+
+    def test_upload_to_hub_raises_without_huggingface_hub(self, tmp_path):
+        """upload_to_hub() should raise ImportError if huggingface_hub is missing."""
+        import builtins
+        from unittest.mock import patch
+
+        exporter = self._make_exporter(tmp_path)
+        real_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name == "huggingface_hub":
+                raise ImportError("No module named 'huggingface_hub'")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            with pytest.raises(ImportError, match="huggingface-hub"):
+                exporter.upload_to_hub("testuser/ds")
+
+
+def test_api_finetune_upload_invalid_format(api_client):
+    """POST /api/finetune/upload with invalid format should return 422."""
+    resp = api_client.post(
+        "/api/finetune/upload",
+        json={"repo_id": "user/ds", "fmt": "parquet"},
+    )
+    assert resp.status_code == 422

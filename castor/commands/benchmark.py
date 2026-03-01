@@ -351,6 +351,9 @@ def cmd_provider_benchmark(
     # Print table
     print_benchmark_table(results)
 
+    # Persist results to ~/.castor/benchmarks.jsonl (one run per line)
+    _persist_benchmark_results(results)
+
     # Optionally write JSON
     if output:
         try:
@@ -359,3 +362,24 @@ def cmd_provider_benchmark(
             print(f"  Results saved to: {output}\n")
         except Exception as exc:
             logger.error("Could not write output file %s: %s", output, exc)
+
+
+def _persist_benchmark_results(results: List[dict]) -> None:
+    """Append benchmark results as a single JSONL entry to ~/.castor/benchmarks.jsonl."""
+    import pathlib
+    import time
+
+    bench_dir = pathlib.Path.home() / ".castor"
+    bench_dir.mkdir(parents=True, exist_ok=True)
+    bench_path = bench_dir / "benchmarks.jsonl"
+
+    record = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "results": results,
+    }
+    try:
+        with bench_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        logger.debug("Benchmark results persisted to %s", bench_path)
+    except OSError as exc:
+        logger.warning("Could not persist benchmark results: %s", exc)

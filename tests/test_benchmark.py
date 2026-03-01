@@ -263,3 +263,75 @@ class TestCostTable:
         from castor.commands.benchmark import _est_cost_per_1k
 
         assert _est_cost_per_1k("fakecloud", "some-model") == 0.0
+
+
+# ===========================================================================
+# Issue #257 — Benchmark persistence
+# ===========================================================================
+
+
+class TestBenchmarkPersistence:
+    def test_persist_creates_file(self, tmp_path, monkeypatch):
+        """_persist_benchmark_results should create benchmarks.jsonl."""
+        from castor.commands.benchmark import _persist_benchmark_results
+
+        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        _persist_benchmark_results([{"provider": "google", "model": "gemini", "status": "ok"}])
+        bench_path = tmp_path / ".castor" / "benchmarks.jsonl"
+        assert bench_path.exists()
+        lines = [l for l in bench_path.read_text().splitlines() if l.strip()]
+        assert len(lines) == 1
+        data = json.loads(lines[0])
+        assert "timestamp" in data
+        assert "results" in data
+
+    def test_persist_appends_on_second_call(self, tmp_path, monkeypatch):
+        """Each call should append a new line, not overwrite."""
+        from castor.commands.benchmark import _persist_benchmark_results
+
+        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        _persist_benchmark_results([{"provider": "p1"}])
+        _persist_benchmark_results([{"provider": "p2"}])
+        bench_path = tmp_path / ".castor" / "benchmarks.jsonl"
+        lines = [l for l in bench_path.read_text().splitlines() if l.strip()]
+        assert len(lines) == 2
+
+    def test_api_benchmark_results_empty(self, tmp_path, monkeypatch):
+        """GET /api/benchmark/results returns empty list when no file exists."""
+        import pathlib
+        from fastapi.testclient import TestClient
+        from castor.api import app
+
+        monkeypatch.setattr(pathlib.Path, "home", staticmethod(lambda: tmp_path))
+        client = TestClient(app)
+        resp = client.get(
+            "/api/benchmark/results",
+            headers={"Authorization": "Bearer test"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["results"] == []
+
+    def test_api_benchmark_results_returns_runs(self, tmp_path, monkeypatch):
+        """GET /api/benchmark/results returns persisted runs."""
+        import json as _json
+        import pathlib
+        from fastapi.testclient import TestClient
+        from castor.api import app
+
+        monkeypatch.setattr(pathlib.Path, "home", staticmethod(lambda: tmp_path))
+        bench_dir = tmp_path / ".castor"
+        bench_dir.mkdir(parents=True, exist_ok=True)
+        bench_path = bench_dir / "benchmarks.jsonl"
+        record = {"timestamp": "2026-01-01T00:00:00Z", "results": [{"provider": "google"}]}
+        bench_path.write_text(_json.dumps(record) + "\n")
+
+        client = TestClient(app)
+        resp = client.get(
+            "/api/benchmark/results",
+            headers={"Authorization": "Bearer test"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] == 1
+        assert data["results"][0]["timestamp"] == "2026-01-01T00:00:00Z"
