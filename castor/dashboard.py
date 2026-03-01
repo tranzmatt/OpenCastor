@@ -586,6 +586,17 @@ with right_col:
     ch_avail = status.get("channels_available", {})
     ch_active = set(channels_active)
 
+    _CH_DISPLAY = {
+        "whatsapp": "WhatsApp",
+        "whatsapp_twilio": "WhatsApp (Twilio)",
+        "telegram": "Telegram",
+        "discord": "Discord",
+        "slack": "Slack",
+        "mqtt": "MQTT",
+        "homeassistant": "Home Assistant",
+        "teams": "Microsoft Teams",
+        "matrix": "Matrix",
+    }
     if ch_avail:
         ch_rows = []
         # Sort: active first (🟢), then ready (🟡), then unavail (⚫); alpha within group
@@ -594,8 +605,9 @@ with right_col:
             is_active = ch_name in ch_active
             dot = "🟢" if is_active else ("🟡" if avail else "⚫")
             ch_status = "active" if is_active else ("ready" if avail else "unavail")
+            display_name = _CH_DISPLAY.get(ch_name, ch_name.replace("_", " ").title())
             ch_rows.append(
-                {"Channel": ch_name, "Status": ch_status, "": dot, "_ord": _order[ch_status]}
+                {"Channel": display_name, "Status": ch_status, "": dot, "_ord": _order[ch_status]}
             )
         ch_rows.sort(key=lambda r: (r["_ord"], r["Channel"]))
         for r in ch_rows:

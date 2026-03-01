@@ -1,9 +1,12 @@
 from .anthropic_provider import AnthropicProvider
 from .apple_provider import AppleProvider
+from .deepseek_provider import DeepSeekProvider
 from .google_provider import GoogleProvider
+from .grok_provider import GrokProvider
 from .groq_provider import GroqProvider
 from .huggingface_provider import HuggingFaceProvider
 from .llamacpp_provider import LlamaCppProvider
+from .mistral_provider import MistralProvider
 from .mlx_provider import MLXProvider
 from .ollama_provider import OllamaProvider
 from .openai_provider import OpenAIProvider
@@ -12,10 +15,13 @@ __all__ = [
     "get_provider",
     "AnthropicProvider",
     "AppleProvider",
+    "DeepSeekProvider",
     "GoogleProvider",
+    "GrokProvider",
     "GroqProvider",
     "HuggingFaceProvider",
     "LlamaCppProvider",
+    "MistralProvider",
     "MLXProvider",
     "OllamaProvider",
     "OpenAIProvider",
@@ -67,6 +73,12 @@ def _builtin_get_provider(config: dict):
         from .openrouter_provider import OpenRouterProvider
 
         return OpenRouterProvider(config)
+    elif provider_name in ("deepseek", "deep_seek"):
+        return DeepSeekProvider(config)
+    elif provider_name in ("grok", "xai"):
+        return GrokProvider(config)
+    elif provider_name in ("mistral", "mistral_ai", "mistralai"):
+        return MistralProvider(config)
     else:
         raise ValueError(f"Unknown AI provider: {provider_name}")
 

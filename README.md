@@ -51,6 +51,14 @@ Supports **Linux, macOS (Apple Silicon & Intel), Windows 11, Raspberry Pi, Docke
 Installer flags: `--dry-run`, `--no-rpi`, `--skip-wizard`
 </details>
 
+## ✨ What's New in v2026.2.28.0
+
+- **DeepSeek provider** — `provider: deepseek` unlocks `deepseek-chat`, `deepseek-reasoner` (R1), and `deepseek-coder` via the OpenAI-compatible API. Set `DEEPSEEK_API_KEY`. Vision input supported for `deepseek-vl2` models.
+- **xAI Grok provider** — `provider: grok` adds `grok-2`, `grok-2-vision`, and `grok-2-mini` from xAI. Set `XAI_API_KEY`. Multi-modal vision supported for `grok-2-vision`.
+- **Mistral AI provider** — `provider: mistral` adds `mistral-large-latest`, `mistral-small-latest`, `codestral-latest`, and `mistral-nemo`. Set `MISTRAL_API_KEY`. Vision supported for Pixtral models.
+- **Dashboard channel display names** — Channels table now shows friendly names (e.g. "Microsoft Teams", "Matrix", "Home Assistant") instead of raw internal keys.
+- **3,513 tests passing** across 128 test files.
+
 ## ✨ What's New in v2026.2.27.0
 
 - **Quantum Commitment Audit Trail** — every RCAN action is now optionally sealed into a cryptographic commitment chain via [QuantumLink-Sim](https://github.com/craigm26/Quantum-link-Sim). Three key modes: `classical` (HKDF-SHA256), `quantum` (BB84 QKD-derived), and `hybrid` (XOR of both — requires breaking both channels). Configurable under `security.commitment` in RCAN YAML.

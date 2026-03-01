@@ -27,6 +27,9 @@ PROVIDER_AUTH_MAP: Dict[str, tuple] = {
     "mlx": ("MLX_BASE_URL", "url"),
     "apple": ("APPLE_FM_SDK", "api_key"),
     "vertex_ai": ("VERTEX_PROJECT", "vertex_project"),
+    "deepseek": ("DEEPSEEK_API_KEY", "api_key"),
+    "grok": ("XAI_API_KEY", "api_key"),
+    "mistral": ("MISTRAL_API_KEY", "api_key"),
 }
 
 # Map of channel name -> list of (env var, config key) tuples
