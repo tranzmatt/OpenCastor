@@ -152,8 +152,8 @@ class TestPushToGateway:
         monkeypatch.setenv("CASTOR_PROMETHEUS_PUSHGATEWAY", "http://localhost:9091")
         mock_resp = MagicMock()
         mock_resp.status = 200
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.__enter__.return_value = mock_resp
+        mock_resp.__exit__.return_value = False
 
         with patch("urllib.request.urlopen", return_value=mock_resp):
             result = push_to_gateway()
@@ -165,8 +165,8 @@ class TestPushToGateway:
         monkeypatch.setenv("CASTOR_PROMETHEUS_PUSHGATEWAY", "http://wrong:9091")
         mock_resp = MagicMock()
         mock_resp.status = 204
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.__enter__.return_value = mock_resp
+        mock_resp.__exit__.return_value = False
 
         with patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
             push_to_gateway(gateway_url="http://correct:9091", job="test-job")
@@ -188,8 +188,8 @@ class TestPushToGateway:
         monkeypatch.setenv("CASTOR_PROMETHEUS_PUSHGATEWAY", "http://gw:9091")
         mock_resp = MagicMock()
         mock_resp.status = 200
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.__enter__.return_value = mock_resp
+        mock_resp.__exit__.return_value = False
 
         with patch("urllib.request.urlopen", return_value=mock_resp) as m:
             push_to_gateway(job="my-custom-job")
