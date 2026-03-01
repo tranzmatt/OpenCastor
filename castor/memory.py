@@ -108,7 +108,9 @@ class EpisodeMemory:
             latency_ms   REAL,
             image_hash   TEXT,
             outcome      TEXT,
-            source       TEXT DEFAULT 'loop'
+            source       TEXT DEFAULT 'loop',
+            image_blob   BLOB DEFAULT NULL,
+            tags         TEXT DEFAULT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_ts ON episodes (ts DESC);
         """
@@ -118,6 +120,12 @@ class EpisodeMemory:
             # Silently ignored when the column already exists.
             try:
                 con.execute("ALTER TABLE episodes ADD COLUMN image_blob BLOB DEFAULT NULL")
+            except Exception:
+                pass  # Column already exists
+            # Migration: add tags column for episode tagging (#270).
+            # Silently ignored when the column already exists.
+            try:
+                con.execute("ALTER TABLE episodes ADD COLUMN tags TEXT DEFAULT NULL")
             except Exception:
                 pass  # Column already exists
 
@@ -159,6 +167,7 @@ class EpisodeMemory:
         outcome: str = "ok",
         source: str = "loop",
         image_bytes: Optional[bytes] = None,
+        tags: Optional[List[str]] = None,
     ) -> str:
         """Insert a new episode.  Returns the generated episode UUID.
 
@@ -173,18 +182,21 @@ class EpisodeMemory:
             image_bytes:  Raw JPEG bytes of the camera frame.  When provided
                           a 320×240 thumbnail is stored in ``image_blob``
                           (requires *opencv-python*; falls back to raw bytes).
+            tags:         Optional list of user-defined tag strings stored as a
+                          comma-separated value (e.g. ``["patrol", "outdoor"]``).
         """
         ep_id = str(uuid.uuid4())
         action_json = json.dumps(action) if action else None
         ts = time.time()
         thumbnail: Optional[bytes] = self._make_thumbnail(image_bytes) if image_bytes else None
+        tags_str: Optional[str] = ",".join(tags) if tags else None
         with self._conn() as con:
             con.execute(
                 """
                 INSERT INTO episodes
                     (id, ts, instruction, raw_thought, action_json,
-                     latency_ms, image_hash, outcome, source, image_blob)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     latency_ms, image_hash, outcome, source, image_blob, tags)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     ep_id,
@@ -197,6 +209,7 @@ class EpisodeMemory:
                     outcome,
                     source,
                     thumbnail,
+                    tags_str,
                 ),
             )
         self._evict_if_needed()
@@ -219,6 +232,32 @@ class EpisodeMemory:
                     (excess,),
                 )
 
+    def add_tags(self, episode_id: str, tags: List[str]) -> bool:
+        """Append *tags* to the tag list of an existing episode.
+
+        Existing tags are preserved; duplicates are silently deduplicated.
+
+        Args:
+            episode_id: UUID string of the target episode.
+            tags:       List of tag strings to append.
+
+        Returns:
+            ``True`` if the episode was found and updated, ``False`` otherwise.
+        """
+        if not tags:
+            return False
+        with self._conn() as con:
+            row = con.execute("SELECT tags FROM episodes WHERE id = ?", (episode_id,)).fetchone()
+            if row is None:
+                return False
+            existing: List[str] = [t for t in (row["tags"] or "").split(",") if t]
+            merged = list(dict.fromkeys(existing + tags))  # deduplicate, preserve order
+            con.execute(
+                "UPDATE episodes SET tags = ? WHERE id = ?",
+                (",".join(merged), episode_id),
+            )
+        return True
+
     # ── Read ──────────────────────────────────────────────────────────────────
 
     def query_recent(
@@ -226,6 +265,7 @@ class EpisodeMemory:
         limit: int = 20,
         action_type: Optional[str] = None,
         source: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> List[Dict]:
         """Return the most recent episodes as a list of dicts.
 
@@ -234,6 +274,9 @@ class EpisodeMemory:
             action_type: If set, filter by ``action.type`` (e.g. ``"move"``).
             source:      If set, filter by origin (``"loop"``, ``"api"``,
                          ``"whatsapp"``, etc.).
+            tags:        If set, only return episodes that contain ALL of the
+                         specified tags (case-insensitive substring match on the
+                         comma-separated ``tags`` column).
         """
         limit = min(max(1, limit), 500)
         where_clauses = []
@@ -256,7 +299,17 @@ class EpisodeMemory:
                 params,
             ).fetchall()
 
-        return [self._row_to_dict(r) for r in rows]
+        results = [self._row_to_dict(r) for r in rows]
+
+        if tags:
+            filter_tags = [t.lower() for t in tags]
+            results = [
+                r
+                for r in results
+                if all(any(ft in stored.lower() for stored in r["tags"]) for ft in filter_tags)
+            ]
+
+        return results
 
     def get_episode(self, ep_id: str) -> Optional[Dict]:
         """Return a single episode by ID, or None if not found."""
@@ -382,6 +435,9 @@ class EpisodeMemory:
         del d["action_json"]
         # Replace raw blob with a boolean flag so JSON export stays clean.
         d["has_image"] = d.pop("image_blob", None) is not None
+        # Convert comma-separated tags string to a list; empty list when NULL/empty.
+        raw_tags: Optional[str] = d.get("tags")
+        d["tags"] = [t for t in raw_tags.split(",") if t] if raw_tags else []
         return d
 
     @staticmethod

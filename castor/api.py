@@ -827,7 +827,7 @@ async def config_rollback(req: _ConfigRollbackRequest, request: Request):
 
 @app.get("/api/provider/health", dependencies=[Depends(verify_token)])
 async def provider_health():
-    """Detailed provider health check including latency and token usage."""
+    """Detailed provider health check including latency, streaming latency, and token usage."""
     if state.brain is None:
         raise HTTPException(status_code=503, detail="Brain not initialized")
 
@@ -835,6 +835,20 @@ async def provider_health():
         health = await asyncio.to_thread(state.brain.health_check)
     except Exception as exc:
         health = {"ok": False, "error": str(exc)}
+
+    # Measure streaming latency: time-to-first-token (#275)
+    stream_latency_ms: Optional[float] = None
+    try:
+        import time as _time
+
+        active_brain = _get_active_brain()
+        if active_brain and hasattr(active_brain, "think_stream"):
+            t0 = _time.perf_counter()
+            gen = active_brain.think_stream(b"", "Reply with one word: ok")
+            next(gen, None)  # first token
+            stream_latency_ms = round((_time.perf_counter() - t0) * 1000, 1)
+    except Exception:
+        pass
 
     usage: dict = {}
     if hasattr(state.brain, "get_usage_stats"):
@@ -848,6 +862,7 @@ async def provider_health():
         "provider": provider_name,
         "model": getattr(state.brain, "model_name", None),
         "health": health,
+        "stream_latency_ms": stream_latency_ms,
         "usage": usage,
     }
 
@@ -3352,6 +3367,69 @@ async def thermal_health():
 
     thermal = get_thermal()
     return thermal.health_check()
+
+
+# ---------------------------------------------------------------------------
+# Thermal heatmap endpoint (#274)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/thermal/heatmap", dependencies=[Depends(verify_token)])
+async def thermal_heatmap(width: int = 256, height: int = 256):
+    """GET /api/thermal/heatmap — AMG8833 8x8 array rendered as a JPEG heatmap.
+
+    Bicubic-upscales to ``width`` × ``height`` pixels with JET colormap.
+    """
+    from fastapi.responses import Response
+
+    from castor.drivers.thermal_driver import get_thermal
+
+    thermal = get_thermal()
+    jpeg_bytes = await asyncio.to_thread(thermal.get_heatmap, width, height)
+    if not jpeg_bytes:
+        raise HTTPException(status_code=503, detail="Heatmap render failed (cv2 unavailable)")
+    return Response(content=jpeg_bytes, media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# Episode tagging endpoints (#270)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/memory/episodes/{episode_id}/tags", dependencies=[Depends(verify_token)])
+async def memory_add_tags(episode_id: str, body: dict):
+    """POST /api/memory/episodes/{id}/tags — Add tags to an episode.
+
+    Body: {"tags": ["patrol", "outdoor"]}
+    """
+    tags = body.get("tags", [])
+    if not isinstance(tags, list) or not tags:
+        raise HTTPException(status_code=422, detail="'tags' must be a non-empty list")
+    mem = state.memory if hasattr(state, "memory") and state.memory else None
+    if mem is None:
+        from castor.memory import EpisodeMemory
+
+        mem = EpisodeMemory()
+    ok = await asyncio.to_thread(mem.add_tags, episode_id, tags)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Episode not found")
+    return {"ok": True, "episode_id": episode_id, "tags": tags}
+
+
+@app.get("/api/nav/mission/status", dependencies=[Depends(verify_token)])
+async def nav_mission_status_full():
+    """GET /api/nav/mission/status — Mission status including ETA (#277)."""
+    if state.mission_runner is None:
+        return {
+            "running": False,
+            "current_waypoint": 0,
+            "total_waypoints": 0,
+            "position": {},
+            "geofence": None,
+            "elapsed_s": 0.0,
+            "eta_s": None,
+        }
+    return state.mission_runner.status()
 
 
 # ---------------------------------------------------------------------------

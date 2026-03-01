@@ -83,6 +83,11 @@ class MissionRunner:
         self._position: Dict[str, float] = {"x_m": 0.0, "y_m": 0.0, "heading_deg": 0.0}
         # Geo-fence bounds (or None for no fencing): {x_min, x_max, y_min, y_max} in metres
         self._geofence: Optional[Dict[str, float]] = self._parse_geofence(config)
+        # Mission ETA tracking
+        self._elapsed_s: float = 0.0
+        self._eta_s: Optional[float] = None
+        self._waypoint_durations: List[float] = []
+        self._mission_start_time: Optional[float] = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -130,6 +135,12 @@ class MissionRunner:
                 "results": [],
                 "error": None,
             }
+
+        # Reset ETA tracking fields for the new mission
+        self._elapsed_s = 0.0
+        self._eta_s = None
+        self._waypoint_durations = []
+        self._mission_start_time = None
 
         # Persist to history for later replay (FIFO eviction)
         self._history[job_id] = {"waypoints": list(waypoints), "loop": loop}
@@ -202,9 +213,28 @@ class MissionRunner:
                 self._status["error"] = "cancelled"
 
     def status(self) -> Dict[str, Any]:
-        """Return a snapshot of the current mission status."""
+        """Return a snapshot of the current mission status including ETA fields."""
         with self._lock:
-            return dict(self._status)
+            step = self._status["step"]
+            total = self._status["total"]
+            return {
+                # New ETA fields (#277)
+                "running": self._status["running"],
+                "current_waypoint": step,
+                "total_waypoints": total,
+                "elapsed_s": round(self._elapsed_s, 1),
+                "eta_s": round(self._eta_s, 1) if self._eta_s is not None else None,
+                "position": dict(self._position),
+                "geofence": self._geofence,
+                # Backwards-compatible legacy fields
+                "step": step,
+                "total": total,
+                "job_id": self._status.get("job_id"),
+                "loop": self._status.get("loop", False),
+                "loop_count": self._status.get("loop_count", 0),
+                "results": list(self._status.get("results", [])),
+                "error": self._status.get("error"),
+            }
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -258,6 +288,8 @@ class MissionRunner:
         nav = WaypointNav(self._driver, self._config)
         loop_count = 0
 
+        self._mission_start_time = time.time()
+
         try:
             while True:
                 for step_idx, wp in enumerate(waypoints):
@@ -285,6 +317,7 @@ class MissionRunner:
                         speed,
                     )
 
+                    wp_start = time.time()
                     try:
                         result = nav.execute(distance_m, heading_deg, speed)
                         result["label"] = label
@@ -299,6 +332,14 @@ class MissionRunner:
                             "label": label,
                             "step": step_idx + 1,
                         }
+
+                    wp_duration = time.time() - wp_start
+                    remaining = len(waypoints) - (step_idx + 1)
+                    with self._lock:
+                        self._waypoint_durations.append(wp_duration)
+                        self._elapsed_s = time.time() - self._mission_start_time
+                        avg_dur = sum(self._waypoint_durations) / len(self._waypoint_durations)
+                        self._eta_s = avg_dur * remaining
 
                     # Update dead-reckoning position
                     self._update_position(heading_deg, distance_m)
@@ -339,4 +380,5 @@ class MissionRunner:
         finally:
             with self._lock:
                 self._status["running"] = False
+                self._eta_s = 0.0
             logger.info("Mission %s finished", job_id[:8])

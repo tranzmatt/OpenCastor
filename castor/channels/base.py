@@ -200,3 +200,51 @@ class BaseChannel(ABC):
     async def send_message(self, chat_id: str, text: str):
         """Send a text message to a specific chat/user."""
         pass
+
+    async def send_message_with_retry(
+        self,
+        chat_id: str,
+        text: str,
+        max_retries: int = 3,
+        base_delay_s: float = 1.0,
+    ) -> bool:
+        """Send a message with exponential-backoff retry on transient failures.
+
+        Retries up to ``max_retries`` times with delays of ``base_delay_s``,
+        ``base_delay_s * 2``, ``base_delay_s * 4``, … seconds.
+
+        Args:
+            chat_id:     Destination chat / user ID.
+            text:        Message text.
+            max_retries: Maximum number of retry attempts (default 3).
+            base_delay_s: Initial retry delay in seconds (default 1.0).
+
+        Returns:
+            True if the message was sent successfully, False after all retries
+            are exhausted.
+        """
+        delay = base_delay_s
+        for attempt in range(1, max_retries + 2):
+            try:
+                await self.send_message(chat_id, text)
+                return True
+            except Exception as exc:
+                if attempt > max_retries:
+                    self.logger.error(
+                        "[%s] send_message failed after %d retries to %s: %s",
+                        self.name,
+                        max_retries,
+                        chat_id,
+                        exc,
+                    )
+                    return False
+                self.logger.warning(
+                    "[%s] send_message attempt %d/%d failed (%s) — retrying in %.1fs",
+                    self.name,
+                    attempt,
+                    max_retries,
+                    exc,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 30.0)

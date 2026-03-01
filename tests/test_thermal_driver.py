@@ -181,3 +181,27 @@ def test_api_thermal_health():
     data = resp.json()
     assert "ok" in data
     assert "mode" in data
+
+
+# ── Heatmap ───────────────────────────────────────────────────────────────────
+
+
+def test_get_heatmap_returns_bytes():
+    """get_heatmap() should return bytes (JPEG or empty)."""
+    driver = ThermalDriver({"mock": True})
+    result = driver.get_heatmap()
+    assert isinstance(result, bytes)
+
+
+def test_api_thermal_heatmap():
+    """GET /api/thermal/heatmap should return image/jpeg."""
+    from fastapi.testclient import TestClient
+
+    from castor.api import app
+
+    client = TestClient(app)
+    resp = client.get("/api/thermal/heatmap", headers={"Authorization": "Bearer test"})
+    # Either 200 (cv2 available) or 503 (cv2 not installed)
+    assert resp.status_code in (200, 503)
+    if resp.status_code == 200:
+        assert resp.headers.get("content-type", "").startswith("image/jpeg")

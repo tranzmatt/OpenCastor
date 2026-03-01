@@ -79,6 +79,7 @@ class BehaviorRunner:
             "nav_mission": self._step_nav_mission,
             "parallel": self._step_parallel,
             "loop": self._step_loop,
+            "condition": self._step_condition,
         }
 
     # ------------------------------------------------------------------
@@ -462,3 +463,131 @@ class BehaviorRunner:
             iteration += 1
 
         logger.info("loop step: done after %d iteration(s)", iteration - 1)
+
+    def _step_condition(self, step: dict) -> None:
+        """Evaluate a sensor condition and branch into ``then_steps`` or ``else_steps``.
+
+        The sensor is queried lazily at runtime; if the sensor driver is
+        unavailable the field lookup falls through to ``else_steps``.
+
+        Supported sensors (``sensor`` key):
+
+        * ``"lidar"`` — calls ``castor.drivers.lidar_driver.get_lidar().obstacles()``
+        * ``"thermal"`` — calls ``castor.drivers.thermal_driver.get_thermal().get_hotspot()``
+        * ``"imu"`` — calls ``castor.drivers.imu_driver.get_imu().read()``
+        * ``"none"`` (default) — empty dict; ``then_steps`` always runs when
+          ``sensor`` is ``"none"`` and ``field`` is absent or ``None``.
+
+        Supported operators (``op`` key): ``lt``, ``gt``, ``lte``, ``gte``,
+        ``eq``, ``neq``.
+
+        Example step::
+
+            - type: condition
+              sensor: lidar
+              field: center_cm
+              op: lt
+              value: 300
+              then_steps:
+                - type: stop
+              else_steps:
+                - type: wait
+                  seconds: 0.5
+
+        Parameters
+        ----------
+        step:
+            The step dict.  Required keys: ``field``, ``op``, ``value``.
+            Optional keys: ``sensor`` (default ``"none"``),
+            ``then_steps`` (default ``[]``), ``else_steps`` (default ``[]``).
+        """
+        sensor = step.get("sensor", "none")
+        field = step.get("field")
+        op = step.get("op", "")
+        value = step.get("value")
+        then_steps: list = step.get("then_steps") or []
+        else_steps: list = step.get("else_steps") or []
+
+        # --- Query sensor ------------------------------------------------
+        sensor_data: dict = {}
+        if sensor == "lidar":
+            try:
+                from castor.drivers.lidar_driver import get_lidar  # type: ignore
+
+                sensor_data = get_lidar().obstacles()
+            except (ImportError, Exception) as exc:
+                logger.warning("condition step: lidar query failed (%s) — using {}", exc)
+        elif sensor == "thermal":
+            try:
+                from castor.drivers.thermal_driver import get_thermal  # type: ignore
+
+                sensor_data = get_thermal().get_hotspot()
+            except (ImportError, Exception) as exc:
+                logger.warning("condition step: thermal query failed (%s) — using {}", exc)
+        elif sensor == "imu":
+            try:
+                from castor.drivers.imu_driver import get_imu  # type: ignore
+
+                sensor_data = get_imu().read()
+            except (ImportError, Exception) as exc:
+                logger.warning("condition step: imu query failed (%s) — using {}", exc)
+        elif sensor != "none":
+            logger.warning("condition step: unknown sensor '%s' — using {}", sensor)
+
+        # --- Extract field -----------------------------------------------
+        actual = sensor_data.get(field) if field is not None else None
+        if actual is None:
+            if sensor != "none" or field is not None:
+                logger.warning(
+                    "condition step: field '%s' not found in sensor '%s' data — running else_steps",
+                    field,
+                    sensor,
+                )
+            branch = else_steps
+        else:
+            # --- Evaluate operator -------------------------------------------
+            _OPS = {
+                "lt": lambda a, b: a < b,
+                "gt": lambda a, b: a > b,
+                "lte": lambda a, b: a <= b,
+                "gte": lambda a, b: a >= b,
+                "eq": lambda a, b: a == b,
+                "neq": lambda a, b: a != b,
+            }
+            op_fn = _OPS.get(op)
+            if op_fn is None:
+                logger.warning("condition step: unknown op '%s' — treating condition as False", op)
+                result = False
+            else:
+                result = bool(op_fn(actual, value))
+
+            logger.debug(
+                "condition step: sensor=%s field=%s actual=%s op=%s value=%s → %s",
+                sensor,
+                field,
+                actual,
+                op,
+                value,
+                result,
+            )
+            branch = then_steps if result else else_steps
+
+        # --- Execute branch ----------------------------------------------
+        branch_name = "then_steps" if branch is then_steps else "else_steps"
+        logger.info(
+            "condition step: executing %s (%d step(s))",
+            branch_name,
+            len(branch),
+        )
+        for inner_step in branch:
+            if not self._running:
+                break
+            step_type = inner_step.get("type", "")
+            handler = self._step_handlers.get(step_type)
+            if handler is None:
+                logger.warning("condition step: unknown inner step type '%s' — skipping", step_type)
+                continue
+            try:
+                handler(inner_step)
+            except Exception as exc:
+                logger.warning("condition step: inner step '%s' raised: %s", step_type, exc)

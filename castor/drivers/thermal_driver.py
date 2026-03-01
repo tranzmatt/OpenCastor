@@ -158,6 +158,60 @@ class ThermalDriver:
             "temp_c": pixels[max_idx],
         }
 
+    def get_heatmap(self, width: int = 256, height: int = 256) -> bytes:
+        """Render the 8x8 thermal pixel array as a JPEG heatmap.
+
+        Bicubic-upscales the 8x8 grid to ``width`` × ``height`` and applies
+        the JET colormap.  Falls back to a plain 8x8 grey PNG-encoded JPEG
+        when OpenCV/NumPy are unavailable.
+
+        Args:
+            width:  Output JPEG width in pixels (default 256).
+            height: Output JPEG height in pixels (default 256).
+
+        Returns:
+            JPEG bytes.
+        """
+        pixels = self.capture()
+        try:
+            import cv2
+            import numpy as np
+
+            arr = np.array(pixels, dtype=np.float32).reshape(8, 8)
+            # Normalise to 0-255
+            min_t, max_t = arr.min(), arr.max()
+            if max_t > min_t:
+                norm = ((arr - min_t) / (max_t - min_t) * 255).astype(np.uint8)
+            else:
+                norm = np.zeros((8, 8), dtype=np.uint8)
+            # Bicubic upscale
+            upscaled = cv2.resize(norm, (width, height), interpolation=cv2.INTER_CUBIC)
+            # JET colormap
+            coloured = cv2.applyColorMap(upscaled, cv2.COLORMAP_JET)
+            ok, buf = cv2.imencode(".jpg", coloured, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            if ok:
+                return bytes(buf)
+        except Exception as exc:
+            logger.warning("ThermalDriver heatmap render failed: %s — returning greyscale", exc)
+
+        # Minimal greyscale fallback: 8-byte per-pixel grey JPEG
+        try:
+            import cv2
+            import numpy as np
+
+            arr = np.array(pixels, dtype=np.float32).reshape(8, 8)
+            min_t, max_t = arr.min(), arr.max()
+            if max_t > min_t:
+                norm = ((arr - min_t) / (max_t - min_t) * 255).astype(np.uint8)
+            else:
+                norm = np.zeros((8, 8), dtype=np.uint8)
+            ok, buf = cv2.imencode(".jpg", norm)
+            if ok:
+                return bytes(buf)
+        except Exception:
+            pass
+        return b""
+
     def health_check(self) -> Dict[str, Any]:
         """Return driver health information.
 
