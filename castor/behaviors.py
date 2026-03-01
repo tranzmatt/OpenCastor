@@ -80,6 +80,7 @@ class BehaviorRunner:
             "parallel": self._step_parallel,
             "loop": self._step_loop,
             "condition": self._step_condition,
+            "waypoint_mission": self._step_waypoint_mission,
         }
 
     # ------------------------------------------------------------------
@@ -591,3 +592,94 @@ class BehaviorRunner:
                 handler(inner_step)
             except Exception as exc:
                 logger.warning("condition step: inner step '%s' raised: %s", step_type, exc)
+
+    def _step_waypoint_mission(self, step: dict) -> None:
+        """Execute an inline waypoint mission using :class:`castor.mission.MissionRunner`.
+
+        Embeds a full ``MissionRunner`` mission as a single behavior step.  The
+        step dict must contain a ``waypoints`` key — a list of dicts with at
+        least ``distance_m``.  Optional per-waypoint keys: ``heading_deg``,
+        ``speed``, ``dwell_s``, ``label``.
+
+        An optional ``loop`` key (default ``False``) causes the waypoint list to
+        repeat until this behavior is stopped or ``timeout_s`` is reached.
+
+        An optional ``timeout_s`` key sets a maximum wall-clock budget for the
+        whole mission.  If the mission is still running when the budget expires
+        it is cancelled via :meth:`MissionRunner.stop`.
+
+        Example step::
+
+            - type: waypoint_mission
+              waypoints:
+                - distance_m: 1.0
+                  heading_deg: 0
+                - distance_m: 0.5
+                  heading_deg: 90
+              loop: false
+              timeout_s: 30.0
+
+        Parameters
+        ----------
+        step:
+            The step dict.  Required key: ``waypoints``.
+            Optional keys: ``loop`` (bool, default ``False``),
+            ``timeout_s`` (float, default ``None`` = no timeout).
+        """
+        waypoints = step.get("waypoints", [])
+        if not waypoints:
+            logger.warning("waypoint_mission step: 'waypoints' is missing or empty — skipping")
+            return
+
+        if self.driver is None:
+            logger.warning("waypoint_mission step: no driver available — skipping")
+            return
+
+        loop: bool = bool(step.get("loop", False))
+        timeout_s = step.get("timeout_s")
+        if timeout_s is not None:
+            timeout_s = float(timeout_s)
+
+        try:
+            from castor.mission import MissionRunner  # lazy import to avoid circular deps
+        except ImportError as exc:
+            logger.warning(
+                "waypoint_mission step: castor.mission not available (%s) — skipping", exc
+            )
+            return
+
+        logger.info(
+            "waypoint_mission step: starting mission with %d waypoint(s), loop=%s, timeout_s=%s",
+            len(waypoints),
+            loop,
+            timeout_s,
+        )
+
+        mission_runner = MissionRunner(driver=self.driver, config=self.config)
+        mission_runner.start(waypoints, loop=loop)
+
+        start_time = time.monotonic()
+        timed_out = False
+
+        while self._running and mission_runner.status()["running"]:
+            time.sleep(0.1)
+            if timeout_s is not None and (time.monotonic() - start_time) > timeout_s:
+                timed_out = True
+                logger.warning(
+                    "waypoint_mission step: timeout of %.1fs exceeded — aborting mission",
+                    timeout_s,
+                )
+                mission_runner.stop()
+                break
+
+        mission_runner.stop()
+
+        if timed_out:
+            logger.info("waypoint_mission step: mission aborted due to timeout")
+        elif not self._running:
+            logger.info("waypoint_mission step: mission stopped externally")
+        else:
+            logger.info(
+                "waypoint_mission step: mission completed (running=%s)",
+                mission_runner.status()["running"],
+            )

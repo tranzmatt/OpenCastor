@@ -466,3 +466,87 @@ class TestBehaviorLoopStep:
         t.join(timeout=2.0)
         assert runner.is_running is False
         assert len(call_counts) < 20
+
+
+# ── waypoint_mission step ─────────────────────────────────────────────────────
+
+
+class TestBehaviorWaypointMissionStep:
+    """Tests for the 'waypoint_mission' step type (issue #281)."""
+
+    def _make_runner(self):
+        from castor.behaviors import BehaviorRunner
+
+        driver = MagicMock()
+        driver.stop = MagicMock()
+        driver.move = MagicMock()
+        return BehaviorRunner(driver=driver, brain=None, speaker=None, config={})
+
+    def test_skip_when_no_waypoints(self, caplog):
+        """Empty waypoints list should log a warning and return without error."""
+        import logging
+
+        runner = self._make_runner()
+        with caplog.at_level(logging.WARNING, logger="OpenCastor.Behaviors"):
+            runner._step_waypoint_mission({"waypoints": []})
+        assert any("missing or empty" in r.message for r in caplog.records)
+
+    def test_skip_when_driver_is_none(self, caplog):
+        """No driver should log a warning and return without error."""
+        import logging
+
+        from castor.behaviors import BehaviorRunner
+
+        runner = BehaviorRunner(driver=None, brain=None, speaker=None, config={})
+        with caplog.at_level(logging.WARNING, logger="OpenCastor.Behaviors"):
+            runner._step_waypoint_mission({"waypoints": [{"distance_m": 0.5}]})
+        assert any("no driver" in r.message for r in caplog.records)
+
+    def test_mission_runs_and_completes(self):
+        """Mission should start, run, and complete without error."""
+        runner = self._make_runner()
+
+        call_counts = [0]
+
+        def _status():
+            call_counts[0] += 1
+            return {"running": call_counts[0] < 3}
+
+        mock_runner = MagicMock()
+        mock_runner.status.side_effect = _status
+
+        with patch("castor.mission.MissionRunner", return_value=mock_runner):
+            runner._step_waypoint_mission({"waypoints": [{"distance_m": 1.0}]})
+
+        mock_runner.start.assert_called_once()
+        assert mock_runner.stop.call_count >= 1
+
+    def test_timeout_aborts_mission(self):
+        """When timeout_s is exceeded, mission should be stopped."""
+        runner = self._make_runner()
+
+        mock_runner = MagicMock()
+        mock_runner.status.return_value = {"running": True}  # never finishes
+
+        with patch("castor.mission.MissionRunner", return_value=mock_runner):
+            runner._step_waypoint_mission(
+                {"waypoints": [{"distance_m": 1.0}], "timeout_s": 0.05}
+            )
+
+        mock_runner.stop.assert_called()
+
+    def test_loop_flag_passed_to_mission(self):
+        """loop=True in step should be forwarded to MissionRunner.start()."""
+        runner = self._make_runner()
+
+        mock_runner = MagicMock()
+        mock_runner.status.return_value = {"running": False}
+
+        with patch("castor.mission.MissionRunner", return_value=mock_runner):
+            runner._step_waypoint_mission(
+                {"waypoints": [{"distance_m": 0.5}], "loop": True}
+            )
+
+        mock_runner.start.assert_called_once()
+        _, kwargs = mock_runner.start.call_args
+        assert kwargs.get("loop") is True

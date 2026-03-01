@@ -83,6 +83,10 @@ def _builtin_get_provider(config: dict):
         return MistralProvider(config)
     elif provider_name == "consensus":
         return ConsensusProvider(config)
+    elif provider_name in ("pool", "provider_pool"):
+        from .pool_provider import ProviderPool
+
+        return ProviderPool(config)
     else:
         raise ValueError(f"Unknown AI provider: {provider_name}")
 

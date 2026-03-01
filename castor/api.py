@@ -3433,6 +3433,60 @@ async def nav_mission_status_full():
 
 
 # ---------------------------------------------------------------------------
+# Battery monitor endpoints (#279 — INA219)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/battery/status", dependencies=[Depends(verify_token)])
+async def battery_status():
+    """GET /api/battery/status — INA219 battery voltage, current, power, and percent."""
+    from castor.drivers.battery_driver import get_battery
+
+    battery = get_battery()
+    return await asyncio.to_thread(battery.read)
+
+
+@app.get("/api/battery/health", dependencies=[Depends(verify_token)])
+async def battery_health():
+    """GET /api/battery/health — INA219 driver health status."""
+    from castor.drivers.battery_driver import get_battery
+
+    battery = get_battery()
+    return battery.health_check()
+
+
+# ---------------------------------------------------------------------------
+# Action validation endpoints (#271)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/action/validate", dependencies=[Depends(verify_token)])
+async def action_validate(body: dict):
+    """POST /api/action/validate — Validate a robot action dict against built-in schemas.
+
+    Body: the action dict, e.g. {"type": "move", "linear": 0.5}
+    Returns: {valid, action_type, errors, warnings}
+    """
+    from castor.action_validator import validate_action
+
+    result = validate_action(body)
+    return {
+        "valid": result.valid,
+        "action_type": result.action_type,
+        "errors": result.errors,
+        "warnings": result.warnings,
+    }
+
+
+@app.get("/api/action/schemas", dependencies=[Depends(verify_token)])
+async def action_schemas():
+    """GET /api/action/schemas — Return list of known action types."""
+    from castor.action_validator import get_validator
+
+    return {"types": get_validator().known_types()}
+
+
+# ---------------------------------------------------------------------------
 # Benchmark persistence endpoints (#257)
 # ---------------------------------------------------------------------------
 
