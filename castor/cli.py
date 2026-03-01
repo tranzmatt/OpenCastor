@@ -1636,7 +1636,7 @@ def _cmd_plugin_list_entry_points() -> None:
             return
         print("\n  Entry-Point Plugins:")
         print(f"  {'Group':<35}  {'Name':<20}  Package")
-        print(f"  {'-'*35}  {'-'*20}  -------")
+        print(f"  {'-' * 35}  {'-' * 20}  -------")
         for e in sorted(entries, key=lambda x: (x.group, x.name)):
             print(f"  {e.group:<35}  {e.name:<20}  {e.package}")
 
