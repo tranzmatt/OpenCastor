@@ -146,6 +146,12 @@ class TestPushToGateway:
         result = push_to_gateway(gateway_url=None)
         assert result is False
 
+    def _make_registry(self):
+        """Return a fresh, isolated MetricsRegistry to avoid global state pollution."""
+        from castor.metrics import MetricsRegistry
+
+        return MetricsRegistry()
+
     def test_uses_env_var(self, monkeypatch):
         from castor.metrics import push_to_gateway
 
@@ -156,7 +162,7 @@ class TestPushToGateway:
         mock_resp.__exit__.return_value = False
 
         with patch("urllib.request.urlopen", return_value=mock_resp):
-            result = push_to_gateway()
+            result = push_to_gateway(registry=self._make_registry())
         assert result is True
 
     def test_explicit_url_overrides_env(self, monkeypatch):
@@ -169,7 +175,11 @@ class TestPushToGateway:
         mock_resp.__exit__.return_value = False
 
         with patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
-            push_to_gateway(gateway_url="http://correct:9091", job="test-job")
+            push_to_gateway(
+                gateway_url="http://correct:9091",
+                job="test-job",
+                registry=self._make_registry(),
+            )
             call_url = mock_urlopen.call_args[0][0].full_url
         assert "correct" in call_url
         assert "test-job" in call_url
@@ -179,7 +189,7 @@ class TestPushToGateway:
 
         monkeypatch.setenv("CASTOR_PROMETHEUS_PUSHGATEWAY", "http://localhost:9091")
         with patch("urllib.request.urlopen", side_effect=ConnectionError("refused")):
-            result = push_to_gateway()
+            result = push_to_gateway(registry=self._make_registry())
         assert result is False
 
     def test_custom_job_label(self, monkeypatch):
@@ -192,6 +202,6 @@ class TestPushToGateway:
         mock_resp.__exit__.return_value = False
 
         with patch("urllib.request.urlopen", return_value=mock_resp) as m:
-            push_to_gateway(job="my-custom-job")
+            push_to_gateway(job="my-custom-job", registry=self._make_registry())
             url = m.call_args[0][0].full_url
         assert "my-custom-job" in url
