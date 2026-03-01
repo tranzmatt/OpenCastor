@@ -21,6 +21,7 @@ _EXACT_PROTOCOLS = {
     "ev3dev_sensor",
     "spike_hub_serial",
     "spike_hub_internal",
+    "arduino_serial_json",
 }
 
 
@@ -32,6 +33,8 @@ def is_supported_protocol(protocol: str) -> bool:
     if "pca9685" in proto:
         return True
     if "dynamixel" in proto:
+        return True
+    if "arduino" in proto:
         return True
     return False
 
@@ -139,6 +142,10 @@ def get_driver(config: dict):
         from castor.drivers.spike_driver import SpikeHubDriver
 
         return SpikeHubDriver(config)
+    elif protocol == "arduino_serial_json":
+        from castor.drivers.arduino_driver import ArduinoSerialDriver
+
+        return ArduinoSerialDriver(driver_config)
     else:
         logger.warning(f"Unknown driver protocol: {protocol}. Running without hardware.")
         return None
