@@ -1071,6 +1071,169 @@ class LidarDriver:
             logger.warning("LidarDriver.slam_hint error: %s", exc)
             return {"available": False, "walls": []}
 
+    # ── Issue #422 — arc scan ─────────────────────────────────────────────────
+
+    def arc_scan(self, start_deg: float = 0.0, end_deg: float = 180.0) -> Dict[str, Any]:
+        """Return LiDAR readings filtered to the angular arc [start_deg, end_deg].
+
+        Calls :meth:`scan` internally and filters results to angles within the
+        requested arc.  Handles wrap-around arcs where ``start_deg > end_deg``
+        (e.g. 350° to 10°).
+
+        In mock mode, when the hardware scan is unavailable, synthetic readings
+        are generated every 5° within the arc with
+        ``dist_mm = 500 + angle_deg * 2``.
+
+        Args:
+            start_deg: Start angle in degrees (0–360, default 0).
+            end_deg:   End angle in degrees (0–360, default 180).
+
+        Returns:
+            ``{
+                "readings": [{"angle_deg": float, "dist_mm": float}, ...],
+                "arc_start_deg": float,
+                "arc_end_deg": float,
+                "count": int,
+                "mode": str,
+            }``
+
+        Never raises.
+        """
+        try:
+            wrap = start_deg > end_deg
+
+            if self._mode != "hardware" or self._lidar is None:
+                # Mock: generate synthetic readings every 5° within the arc
+                readings: List[Dict[str, Any]] = []
+                if wrap:
+                    # From start_deg up to 360, then 0 to end_deg
+                    angle = start_deg
+                    while angle < 360.0:
+                        readings.append({"angle_deg": float(angle), "dist_mm": 500.0 + angle * 2.0})
+                        angle += 5.0
+                    angle = 0.0
+                    while angle <= end_deg:
+                        readings.append({"angle_deg": float(angle), "dist_mm": 500.0 + angle * 2.0})
+                        angle += 5.0
+                else:
+                    angle = start_deg
+                    while angle <= end_deg:
+                        readings.append({"angle_deg": float(angle), "dist_mm": 500.0 + angle * 2.0})
+                        angle += 5.0
+                return {
+                    "readings": readings,
+                    "arc_start_deg": float(start_deg),
+                    "arc_end_deg": float(end_deg),
+                    "count": len(readings),
+                    "mode": self._mode,
+                }
+
+            # Hardware: filter from real scan
+            raw_points = self.scan()
+            readings = []
+            for pt in raw_points:
+                angle_deg = pt.get("angle_deg")
+                dist_mm = pt.get("distance_mm")
+                if angle_deg is None or dist_mm is None or dist_mm <= 0:
+                    continue
+                angle_f = float(angle_deg)
+                if wrap:
+                    in_arc = angle_f >= start_deg or angle_f <= end_deg
+                else:
+                    in_arc = start_deg <= angle_f <= end_deg
+                if in_arc:
+                    readings.append({"angle_deg": round(angle_f, 1), "dist_mm": float(dist_mm)})
+
+            return {
+                "readings": readings,
+                "arc_start_deg": float(start_deg),
+                "arc_end_deg": float(end_deg),
+                "count": len(readings),
+                "mode": self._mode,
+            }
+        except Exception as exc:
+            logger.warning("LidarDriver.arc_scan error: %s", exc)
+            return {
+                "readings": [],
+                "arc_start_deg": float(start_deg),
+                "arc_end_deg": float(end_deg),
+                "count": 0,
+                "mode": self._mode,
+            }
+
+    # ── Issue #428 — radial profile ───────────────────────────────────────────
+
+    def radial_profile(self, n_sectors: int = 36) -> Dict[str, Any]:
+        """Divide 360° into equal sectors and return the minimum distance in each.
+
+        Calls :meth:`scan` and bins each reading into its sector using:
+        ``sector_idx = int(angle_deg / (360 / n_sectors))``.
+        The minimum valid distance per sector is returned.  Empty sectors
+        (no valid readings) have ``min_dist_mm: None``.
+
+        Args:
+            n_sectors: Number of equal sectors to divide 360° into (default 36
+                       gives 10°-wide sectors).
+
+        Returns:
+            ``{
+                "sectors": [
+                    {"start_deg": float, "end_deg": float, "min_dist_mm": float|None},
+                    ...
+                ],
+                "n_sectors": int,
+                "mode": str,
+            }``
+
+        Never raises.
+        """
+        try:
+            n = max(1, n_sectors)
+            sector_width = 360.0 / n
+
+            # Build sector metadata
+            sectors: List[Dict[str, Any]] = []
+            sector_mins: List[Optional[float]] = [None] * n
+            for i in range(n):
+                sectors.append(
+                    {
+                        "start_deg": round(i * sector_width, 6),
+                        "end_deg": round((i + 1) * sector_width, 6),
+                        "min_dist_mm": None,
+                    }
+                )
+
+            raw_points = self.scan()
+            for pt in raw_points:
+                angle_deg = pt.get("angle_deg")
+                dist_mm = pt.get("distance_mm")
+                if angle_deg is None or dist_mm is None or dist_mm <= 0:
+                    continue
+                # Clamp angle to [0, 360)
+                angle_f = float(angle_deg) % 360.0
+                idx = int(angle_f / sector_width)
+                idx = min(idx, n - 1)  # guard against floating-point edge case at exactly 360
+                current = sector_mins[idx]
+                if current is None or dist_mm < current:
+                    sector_mins[idx] = float(dist_mm)
+
+            # Write back min distances
+            for i, min_d in enumerate(sector_mins):
+                sectors[i]["min_dist_mm"] = min_d
+
+            return {
+                "sectors": sectors,
+                "n_sectors": n,
+                "mode": self._mode,
+            }
+        except Exception as exc:
+            logger.warning("LidarDriver.radial_profile error: %s", exc)
+            return {
+                "sectors": [],
+                "n_sectors": n_sectors,
+                "mode": self._mode,
+            }
+
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def start(self):

@@ -117,6 +117,10 @@ class BehaviorRunner:
             "parallel_race": self._step_parallel_race,
             # Issue #419: block until named threading.Event is set via set_event()
             "wait_for_event": self._step_wait_for_event,
+            # Issue #423: count down from N to 0 with optional TTS
+            "countdown": self._step_countdown,
+            # Issue #429: set a named threading.Event to unblock waiting steps
+            "emit_event": self._step_emit_event,
         }
 
         # Chain-recursion depth counter (not thread-local; behaviors run single-threaded)
@@ -2373,3 +2377,73 @@ class BehaviorRunner:
                 event_name,
                 timeout_s,
             )
+
+    # ------------------------------------------------------------------
+    # Issue #423 — countdown step
+    # ------------------------------------------------------------------
+
+    def _step_countdown(self, step: dict) -> None:
+        """Count down from ``from_s`` to 0 with ``interval_s`` sleep between counts.
+
+        Example::
+
+            - type: countdown
+              from_s: 10
+              interval_s: 1.0
+              speak: false
+
+        Parameters
+        ----------
+        step:
+            ``from_s`` (int, default 10): Starting count (counts down to 0).
+            ``interval_s`` (float, default 1.0): Sleep duration between counts.
+            ``speak`` (bool, default False): If True, speak each number via TTS.
+        """
+        from_s: int = int(step.get("from_s", 10))
+        interval_s: float = float(step.get("interval_s", 1.0))
+        speak: bool = bool(step.get("speak", False))
+
+        logger.info("countdown step: counting from %d to 0 (interval=%.2fs)", from_s, interval_s)
+
+        for remaining in range(from_s, -1, -1):
+            if not self._running:
+                logger.info("countdown step: stopped early at %d", remaining)
+                break
+            logger.debug("countdown step: %d", remaining)
+            if speak:
+                self._step_speak({"text": str(remaining)})
+            if remaining > 0:
+                time.sleep(interval_s)
+
+        logger.info("countdown step: done")
+
+    # ------------------------------------------------------------------
+    # Issue #429 — emit_event step
+    # ------------------------------------------------------------------
+
+    def _step_emit_event(self, step: dict) -> None:
+        """Set a named threading.Event, unblocking any steps waiting on it.
+
+        Creates the event in ``self._events`` if it does not yet exist.
+
+        Example::
+
+            - type: emit_event
+              event: my_event
+
+        Parameters
+        ----------
+        step:
+            ``event`` (str, required): Name of the event to set.
+        """
+        event_name: str = step.get("event", "")
+        if not event_name:
+            logger.warning("emit_event step: 'event' key missing — skipping")
+            return
+
+        with self._events_lock:
+            if event_name not in self._events:
+                self._events[event_name] = threading.Event()
+            self._events[event_name].set()
+
+        logger.debug("emit_event step: set event %r", event_name)

@@ -5851,6 +5851,87 @@ async def doctor_swap_usage():
     return {"ok": ok, "name": name, "detail": detail}
 
 
+@app.get("/api/metrics/error_rate_histogram", dependencies=[Depends(verify_token)])
+async def metrics_error_rate_histogram(window_s: float = 3600.0):
+    """GET /api/metrics/error_rate_histogram — Bucketed per-provider error rates (#421)."""
+    from castor.metrics import get_registry
+
+    return get_registry().error_rate_histogram(window_s=window_s)
+
+
+@app.get("/api/metrics/uptime", dependencies=[Depends(verify_token)])
+async def metrics_uptime():
+    """GET /api/metrics/uptime — System uptime in seconds/minutes/hours (#431)."""
+    from castor.metrics import get_registry
+
+    return get_registry().uptime_histogram()
+
+
+@app.get("/api/lidar/arc_scan", dependencies=[Depends(verify_token)])
+async def lidar_arc_scan(start_deg: float = 0.0, end_deg: float = 180.0):
+    """GET /api/lidar/arc_scan — Readings within angular arc (#422)."""
+    if state.driver is None:
+        raise HTTPException(status_code=503, detail="Driver not initialised")
+    return state.driver.arc_scan(start_deg=start_deg, end_deg=end_deg)
+
+
+@app.get("/api/lidar/radial_profile", dependencies=[Depends(verify_token)])
+async def lidar_radial_profile(n_sectors: int = 36):
+    """GET /api/lidar/radial_profile — Min distance per angular sector (#428)."""
+    if state.driver is None:
+        raise HTTPException(status_code=503, detail="Driver not initialised")
+    return state.driver.radial_profile(n_sectors=n_sectors)
+
+
+@app.get("/api/imu/activity_classifier", dependencies=[Depends(verify_token)])
+async def imu_activity_classifier(window_n: int = 32):
+    """GET /api/imu/activity_classifier — Classify motion activity (#425)."""
+    if state.imu is None:
+        raise HTTPException(status_code=503, detail="IMU not initialised")
+    return state.imu.activity_classifier(window_n=window_n)
+
+
+@app.get("/api/imu/tilt_alert", dependencies=[Depends(verify_token)])
+async def imu_tilt_alert(max_pitch_deg: float = 30.0, max_roll_deg: float = 30.0):
+    """GET /api/imu/tilt_alert — Check tilt against pitch/roll thresholds (#430)."""
+    if state.imu is None:
+        raise HTTPException(status_code=503, detail="IMU not initialised")
+    return state.imu.tilt_alert(max_pitch_deg=max_pitch_deg, max_roll_deg=max_roll_deg)
+
+
+@app.get("/api/memory/outcome_timeline", dependencies=[Depends(verify_token)])
+async def memory_outcome_timeline(
+    outcome: str = "",
+    bucket_s: float = 3600.0,
+    window_s: float = 86400.0,
+):
+    """GET /api/memory/outcome_timeline — Time-bucketed outcome event counts (#426)."""
+    import os
+
+    from castor.memory import EpisodeMemory
+
+    db_path = os.getenv("CASTOR_MEMORY_DB", os.path.expanduser("~/.castor/memory.db"))
+    mem = EpisodeMemory(db_path=db_path)
+    return mem.outcome_timeline(outcome=outcome, bucket_s=bucket_s, window_s=window_s)
+
+
+@app.get("/api/pool/cost_report", dependencies=[Depends(verify_token)])
+async def pool_cost_report():
+    """GET /api/pool/cost_report — Per-provider cost breakdown (#427)."""
+    if state.pool is None:
+        raise HTTPException(status_code=503, detail="ProviderPool not initialised")
+    return state.pool.cost_report()
+
+
+@app.get("/api/doctor/cpu_temperature", dependencies=[Depends(verify_token)])
+async def doctor_cpu_temperature():
+    """GET /api/doctor/cpu_temperature — CPU thermal zone check (#424)."""
+    from castor.doctor import check_cpu_temperature
+
+    ok, name, detail = check_cpu_temperature()
+    return {"ok": ok, "name": name, "detail": detail}
+
+
 @app.on_event("shutdown")
 async def on_shutdown():
     # Close WebRTC peers

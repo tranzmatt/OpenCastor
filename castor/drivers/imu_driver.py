@@ -320,6 +320,9 @@ class IMUDriver:
         self._heading_history: List[Tuple[float, float]] = []  # (ts, yaw_deg)
         self._heading_history_max: int = 3600  # max entries (~1 per second for 1 hour)
 
+        # Issue #425 — activity classifier mock state
+        self._mock_activity: str = "idle"
+
         # Resolve explicit address from env or constructor argument
         env_addr = os.getenv("IMU_I2C_ADDRESS", "")
         if env_addr:
@@ -1384,6 +1387,179 @@ class IMUDriver:
         except Exception as exc:
             logger.warning("IMUDriver.vibration_bands error: %s", exc)
             return _zero
+
+    # ── Issue #425 — activity classifier ─────────────────────────────────────
+
+    def activity_classifier(self, window_n: int = 32) -> dict:
+        """Classify robot activity from accelerometer magnitude variance.
+
+        Collects *window_n* accelerometer magnitude samples, computes the
+        variance, and maps it to an activity label.  In mock mode synthetic
+        fixed-variance values are used instead of hardware reads so the method
+        always returns a valid result without hardware.
+
+        Classification thresholds (variance in g²):
+            < 0.001  → "idle"
+            < 0.01   → "walking"
+            < 0.1    → "running"
+            < 1.0    → "vibrating"
+            any mag < 0.3 g → "falling" (low-g event)
+
+        Args:
+            window_n: Number of acceleration magnitude samples to collect
+                      (default 32).
+
+        Returns:
+            {
+                "activity":   str,    # one of idle/walking/running/vibrating/falling
+                "confidence": float,  # 0.0–1.0
+                "variance":   float,  # variance of magnitude samples
+                "window_n":   int,    # samples requested
+                "mode":       str,    # "mock" or "hardware"
+            }
+
+        Never raises.
+        """
+        try:
+            if self._mode != "hardware" or self._bus is None:
+                # Mock mode: return synthetic fixed values based on _mock_activity
+                _variance_map = {
+                    "idle": 0.0005,
+                    "walking": 0.005,
+                    "running": 0.05,
+                    "vibrating": 0.5,
+                    "falling": 0.0002,
+                }
+                activity = self._mock_activity
+                variance = _variance_map.get(activity, 0.0005)
+                return {
+                    "activity": activity,
+                    "confidence": 1.0,
+                    "variance": variance,
+                    "window_n": window_n,
+                    "mode": "mock",
+                }
+
+            # Hardware mode: collect window_n magnitude samples
+            magnitudes: list = []
+            for _ in range(window_n):
+                try:
+                    data = self.read()
+                    accel = data.get("accel_g", {})
+                    ax = float(accel.get("x", 0.0))
+                    ay = float(accel.get("y", 0.0))
+                    az = float(accel.get("z", 0.0))
+                    magnitudes.append(math.sqrt(ax * ax + ay * ay + az * az))
+                except Exception:
+                    continue
+
+            if not magnitudes:
+                return {
+                    "activity": self._mock_activity,
+                    "confidence": 0.0,
+                    "variance": 0.0,
+                    "window_n": window_n,
+                    "mode": self._mode,
+                }
+
+            mean_mag = sum(magnitudes) / len(magnitudes)
+            variance = sum((m - mean_mag) ** 2 for m in magnitudes) / len(magnitudes)
+
+            # Check for low-g (falling) event on any sample
+            if any(m < 0.3 for m in magnitudes):
+                activity = "falling"
+            elif variance < 0.001:
+                activity = "idle"
+            elif variance < 0.01:
+                activity = "walking"
+            elif variance < 0.1:
+                activity = "running"
+            elif variance < 1.0:
+                activity = "vibrating"
+            else:
+                activity = "vibrating"
+
+            # Simple confidence: ratio of distance from nearest boundary to the
+            # full threshold range, clamped to [0.0, 1.0]
+            thresholds = [0.001, 0.01, 0.1, 1.0]
+            for thr in thresholds:
+                if variance < thr:
+                    distance = thr - variance
+                    confidence = min(1.0, distance / thr)
+                    break
+            else:
+                confidence = 0.5
+
+            return {
+                "activity": activity,
+                "confidence": round(float(confidence), 4),
+                "variance": round(float(variance), 8),
+                "window_n": window_n,
+                "mode": self._mode,
+            }
+
+        except Exception as exc:
+            logger.warning("IMUDriver.activity_classifier error: %s", exc)
+            return {
+                "activity": "idle",
+                "confidence": 0.0,
+                "variance": 0.0,
+                "window_n": window_n,
+                "mode": self._mode,
+            }
+
+    # ── Issue #430 — tilt alert ───────────────────────────────────────────────
+
+    def tilt_alert(
+        self,
+        max_pitch_deg: float = 30.0,
+        max_roll_deg: float = 30.0,
+    ) -> dict:
+        """Check whether the robot has tilted beyond safe pitch or roll limits.
+
+        Calls :meth:`orientation` to obtain the current pitch and roll angles,
+        then compares their absolute values against the supplied thresholds.
+
+        Args:
+            max_pitch_deg: Maximum safe pitch in degrees (default 30.0).
+            max_roll_deg:  Maximum safe roll in degrees (default 30.0).
+
+        Returns:
+            {
+                "alert":         bool,   # True if either limit is exceeded
+                "pitch_deg":     float,  # current pitch
+                "roll_deg":      float,  # current roll
+                "max_pitch_deg": float,  # threshold used
+                "max_roll_deg":  float,  # threshold used
+                "mode":          str,    # "mock" or "hardware"
+            }
+
+        Never raises.
+        """
+        try:
+            ori = self.orientation()
+            pitch_deg = float(ori.get("pitch_deg", 0.0))
+            roll_deg = float(ori.get("roll_deg", 0.0))
+            mode = str(ori.get("mode", self._mode))
+            alert = abs(pitch_deg) > max_pitch_deg or abs(roll_deg) > max_roll_deg
+            return {
+                "alert": bool(alert),
+                "pitch_deg": pitch_deg,
+                "roll_deg": roll_deg,
+                "max_pitch_deg": float(max_pitch_deg),
+                "max_roll_deg": float(max_roll_deg),
+                "mode": mode,
+            }
+        except Exception as exc:
+            logger.warning("IMUDriver.tilt_alert error: %s", exc)
+            return {
+                "alert": False,
+                "pitch_deg": 0.0,
+                "roll_deg": 0.0,
+                "max_pitch_deg": float(max_pitch_deg),
+                "max_roll_deg": float(max_roll_deg),
+                "mode": self._mode,
+            }
 
     def health_check(self) -> dict:
         """Return driver health information."""

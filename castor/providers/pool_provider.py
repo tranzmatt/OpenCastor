@@ -653,6 +653,54 @@ class ProviderPool(BaseProvider):
 
         return {"providers": result, "pool_size": len(self._providers)}
 
+    def cost_report(self) -> Dict[str, Any]:
+        """Return a per-provider cost breakdown including percentage of total spend (Issue #427).
+
+        Iterates over ``self._providers`` and reads cost data from ``self._cost_tracker``
+        (keyed by provider index).
+
+        Returns:
+            Dict with keys:
+
+            - ``"providers"``: list of per-provider dicts, each containing:
+              ``name`` (str), ``calls`` (int), ``cost_usd_total`` (float),
+              ``cost_usd_avg_per_call`` (float), ``pct_of_total`` (float).
+            - ``"total_cost_usd"`` (float): sum of all provider costs.
+            - ``"pool_size"`` (int): number of providers in the pool.
+        """
+        with self._lock:
+            total_cost = 0.0
+            entries = []
+            for i, p in enumerate(self._providers):
+                name = getattr(p, "model_name", None) or f"pool[{i}]"
+                ct = self._cost_tracker.get(i, {})
+                calls = int(ct.get("calls", 0))
+                cost = float(ct.get("cost_usd_total", 0.0))
+                total_cost += cost
+                entries.append({"name": name, "calls": calls, "cost_usd_total": cost})
+
+        providers = []
+        for entry in entries:
+            calls = entry["calls"]
+            cost = entry["cost_usd_total"]
+            avg = cost / calls if calls > 0 else 0.0
+            pct = cost / total_cost * 100.0 if total_cost > 0.0 else 0.0
+            providers.append(
+                {
+                    "name": entry["name"],
+                    "calls": calls,
+                    "cost_usd_total": cost,
+                    "cost_usd_avg_per_call": avg,
+                    "pct_of_total": pct,
+                }
+            )
+
+        return {
+            "providers": providers,
+            "total_cost_usd": total_cost,
+            "pool_size": len(self._providers),
+        }
+
     def reset_stats(self) -> Dict[str, Any]:
         """Reset all per-provider counters and state to zero (Issue #416).
 

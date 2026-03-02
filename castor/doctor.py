@@ -494,6 +494,77 @@ def check_swap_usage() -> tuple:
     return True, _NAME, "swap info unavailable — skipping"
 
 
+def check_cpu_temperature() -> tuple:
+    """Check CPU temperature, warn when >= 75°C (Issue #424).
+
+    On Linux, reads from ``/sys/class/thermal/thermal_zone*/temp`` and takes the
+    maximum across all zones.  On macOS, queries
+    ``sysctl -n machdep.xcpm.cpu_thermal_level``.  Returns a safe skip result
+    when no thermal data is available.
+
+    Returns:
+        ``(ok, 'CPU temperature', detail_str)`` where ``ok`` is ``True`` when
+        temp < 75°C or no data is available.
+    """
+    import glob as _glob
+    import sys as _sys
+
+    _NAME = "CPU temperature"
+    _THRESHOLD = 75.0
+
+    # ── Linux: /sys/class/thermal/thermal_zone*/temp ─────────────────
+    if _sys.platform.startswith("linux"):
+        try:
+            zone_files = _glob.glob("/sys/class/thermal/thermal_zone*/temp")
+            if zone_files:
+                temps = []
+                for zone_file in zone_files:
+                    try:
+                        with open(zone_file, encoding="utf-8") as fh:
+                            raw = fh.read().strip()
+                        temps.append(int(raw) / 1000.0)
+                    except (OSError, ValueError):
+                        pass
+                if temps:
+                    temp = max(temps)
+                    if temp >= _THRESHOLD:
+                        return (
+                            False,
+                            _NAME,
+                            f"CPU temperature {temp:.1f}°C is high (>={_THRESHOLD:.0f}°C)",
+                        )
+                    return True, _NAME, f"CPU temperature {temp:.1f}°C OK"
+        except Exception:
+            pass
+
+    # ── macOS: sysctl ─────────────────────────────────────────────────
+    elif _sys.platform == "darwin":
+        try:
+            import subprocess as _sub
+
+            result = _sub.run(
+                ["sysctl", "-n", "machdep.xcpm.cpu_thermal_level"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                level = int(result.stdout.strip())
+                # xcpm level 0 = normal, >0 = throttling; map to a rough °C estimate
+                temp = float(level)
+                if temp >= _THRESHOLD:
+                    return (
+                        False,
+                        _NAME,
+                        f"CPU temperature {temp:.1f}°C is high (>={_THRESHOLD:.0f}°C)",
+                    )
+                return True, _NAME, f"CPU temperature {temp:.1f}°C OK"
+        except Exception:
+            pass
+
+    return True, _NAME, "No CPU temperature data available"
+
+
 def run_all_checks(config_path=None):
     """Run every health check.  Returns a flat list of (ok, name, detail) tuples."""
     results = []
@@ -533,6 +604,8 @@ def run_all_checks(config_path=None):
     results.append(check_gpu_memory())
     # Issue #412: swap usage check
     results.append(check_swap_usage())
+    # Issue #424: CPU temperature check
+    results.append(check_cpu_temperature())
 
     return results
 

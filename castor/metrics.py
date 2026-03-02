@@ -20,6 +20,7 @@ from __future__ import annotations
 import threading
 import time
 from collections import defaultdict
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 __all__ = ["MetricsRegistry", "get_registry", "ChannelInterArrivalTracker", "RequestRateTracker"]
@@ -423,6 +424,10 @@ class MetricsRegistry:
         # Issue #417 — loop latency samples for percentile computation
         self._loop_latency_samples: List[float] = []
         self._loop_latency_max_samples: int = 1000
+        # Issue #421 — per-provider error timestamps for error_rate_histogram()
+        self._provider_error_times: Dict[str, List[float]] = {}
+        # Issue #431 — registry start time for uptime_histogram()
+        self._started_at: float = time.time()
 
         # Pre-register standard OpenCastor metrics
         self._init_standard_metrics()
@@ -552,10 +557,14 @@ class MetricsRegistry:
         if c and self._enabled:
             c.inc(provider=provider_name, error_type=error_type)
         # Issue #397: update per-provider error count dict
+        # Issue #421: also record timestamp for error_rate_histogram()
         with self._lock:
             self._provider_error_counts[provider_name] = (
                 self._provider_error_counts.get(provider_name, 0) + 1
             )
+            if provider_name not in self._provider_error_times:
+                self._provider_error_times[provider_name] = []
+            self._provider_error_times[provider_name].append(time.time())
 
     def record_provider_latency(self, provider_name: str, latency_ms: float) -> None:
         """Record a provider think() latency observation for Prometheus export."""
@@ -814,6 +823,96 @@ class MetricsRegistry:
             "p99_ms": _pct(0.99),
             "sample_count": n,
         }
+
+    def error_rate_histogram(self, window_s: float = 3600.0) -> Dict[str, Any]:
+        """Return per-provider error rates binned into histogram buckets (Issue #421).
+
+        Considers only errors recorded within the last *window_s* seconds.
+        The rate for each provider is ``errors_in_window / window_s``.
+
+        Bucket thresholds (errors/second): ``<=0.001``, ``<=0.01``, ``<=0.1``,
+        ``<=1.0``, ``+Inf``.  Each bucket counts the number of providers whose
+        rate falls at or below that threshold.
+
+        Args:
+            window_s: Sliding time window in seconds (default 3600.0).
+
+        Returns:
+            ``{
+                "buckets": {"<=0.001": int, "<=0.01": int, "<=0.1": int,
+                            "<=1.0": int, "+Inf": int},
+                "per_provider": {name: {"rate": float, "total_errors": int,
+                                        "window_s": float}},
+                "window_s": float,
+            }``
+            Never raises.
+        """
+        _BUCKET_THRESHOLDS = [0.001, 0.01, 0.1, 1.0]
+        try:
+            now = time.time()
+            cutoff = now - window_s
+            with self._lock:
+                error_times_snapshot = {p: list(ts) for p, ts in self._provider_error_times.items()}
+
+            per_provider: Dict[str, Any] = {}
+            for provider, timestamps in error_times_snapshot.items():
+                recent = [t for t in timestamps if t >= cutoff]
+                if not recent:
+                    continue
+                rate = len(recent) / window_s
+                per_provider[provider] = {
+                    "rate": rate,
+                    "total_errors": len(recent),
+                    "window_s": window_s,
+                }
+
+            buckets: Dict[str, int] = {f"<={t}": 0 for t in _BUCKET_THRESHOLDS}
+            buckets["+Inf"] = len(per_provider)
+            for info in per_provider.values():
+                r = info["rate"]
+                for t in _BUCKET_THRESHOLDS:
+                    if r <= t:
+                        buckets[f"<={t}"] += 1
+
+            return {"buckets": buckets, "per_provider": per_provider, "window_s": window_s}
+        except Exception as exc:
+            import logging as _logging
+
+            _logging.getLogger("OpenCastor.Metrics").warning("error_rate_histogram error: %s", exc)
+            return {"buckets": {}, "per_provider": {}, "window_s": window_s}
+
+    def uptime_histogram(self) -> Dict[str, Any]:
+        """Return registry uptime statistics (Issue #431).
+
+        Computes elapsed time since this :class:`MetricsRegistry` was
+        instantiated (i.e. since ``_started_at``).
+
+        Returns:
+            ``{
+                "uptime_s": float,
+                "uptime_m": float,
+                "uptime_h": float,
+                "started_at_iso": str,   # ISO 8601 UTC, e.g. "2026-03-02T12:00:00Z"
+            }``
+            Never raises.
+        """
+        try:
+            now = time.time()
+            uptime_s = now - self._started_at
+            uptime_m = uptime_s / 60.0
+            uptime_h = uptime_s / 3600.0
+            started_at_iso = datetime.utcfromtimestamp(self._started_at).isoformat() + "Z"
+            return {
+                "uptime_s": uptime_s,
+                "uptime_m": uptime_m,
+                "uptime_h": uptime_h,
+                "started_at_iso": started_at_iso,
+            }
+        except Exception as exc:
+            import logging as _logging
+
+            _logging.getLogger("OpenCastor.Metrics").warning("uptime_histogram error: %s", exc)
+            return {"uptime_s": 0.0, "uptime_m": 0.0, "uptime_h": 0.0, "started_at_iso": ""}
 
 
 # ── Singleton ─────────────────────────────────────────────────────────────────

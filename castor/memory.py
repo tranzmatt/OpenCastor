@@ -1263,6 +1263,75 @@ class EpisodeMemory:
             logger.warning("EpisodeMemory.find_by_outcome error: %s", exc)
             return []
 
+    # ------------------------------------------------------------------
+    # Issue #426 — outcome timeline bucketing
+    # ------------------------------------------------------------------
+
+    def outcome_timeline(
+        self,
+        outcome: str,
+        bucket_s: float = 3600.0,
+        window_s: float = 86400.0,
+    ) -> List[Dict[str, Any]]:
+        """Return per-outcome episode counts bucketed over a time window.
+
+        Scans episodes within the last *window_s* seconds and divides them
+        into equal-width time buckets of *bucket_s* seconds.  Each bucket
+        records how many episodes whose ``outcome`` column contains *outcome*
+        (case-sensitive ``LIKE %outcome%`` substring match).
+
+        Args:
+            outcome:  Outcome substring to match (``LIKE %outcome%``).
+            bucket_s: Width of each time bucket in seconds (default 3 600 s).
+            window_s: Total look-back window in seconds (default 86 400 s).
+
+        Returns:
+            List of ``{"bucket_start": float, "bucket_end": float, "count": int}``
+            dicts, one per bucket (including zero-count buckets).  Always
+            returns at least one bucket.  Never raises.
+        """
+        import math as _math
+        import time as _time
+
+        try:
+            bucket_s = max(1.0, float(bucket_s))
+            window_s = max(bucket_s, float(window_s))
+            now = _time.time()
+            cutoff = now - window_s
+
+            # Build bucket boundaries
+            n_buckets = max(1, int(_math.ceil(window_s / bucket_s)))
+            buckets: List[Dict[str, Any]] = []
+            for i in range(n_buckets):
+                bstart = cutoff + i * bucket_s
+                bend = bstart + bucket_s
+                buckets.append({"bucket_start": bstart, "bucket_end": bend, "count": 0})
+
+            with self._conn() as con:
+                rows = con.execute(
+                    "SELECT ts FROM episodes WHERE ts >= ? AND outcome LIKE ? ORDER BY ts ASC",
+                    (cutoff, f"%{outcome}%"),
+                ).fetchall()
+
+            for row in rows:
+                ts_val = row["ts"]
+                idx = int((ts_val - cutoff) / bucket_s)
+                if 0 <= idx < n_buckets:
+                    buckets[idx]["count"] += 1
+
+            return buckets
+        except Exception as exc:
+            logger.warning("EpisodeMemory.outcome_timeline error: %s", exc)
+            # Return a minimal single bucket on error
+            try:
+                import time as _t2
+
+                now2 = _t2.time()
+                cutoff2 = now2 - float(window_s)
+                return [{"bucket_start": cutoff2, "bucket_end": now2, "count": 0}]
+            except Exception:
+                return [{"bucket_start": 0.0, "bucket_end": 0.0, "count": 0}]
+
     def export_csv(
         self,
         path: str,
