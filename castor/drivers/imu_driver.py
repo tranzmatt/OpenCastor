@@ -299,6 +299,12 @@ class IMUDriver:
         self._tap_accel_threshold_g: float = float(os.getenv("IMU_TAP_THRESHOLD_G", "2.0"))
         self._double_tap_window_s: float = float(os.getenv("IMU_DOUBLE_TAP_WINDOW_S", "0.5"))
 
+        # Issue #369 — shake detection state
+        self._shake_history: list = []  # list of (timestamp, axis, sign) tuples
+        self._shake_window_s: float = float(os.getenv("IMU_SHAKE_WINDOW_S", "0.5"))
+        self._shake_threshold_g: float = float(os.getenv("IMU_SHAKE_THRESHOLD_G", "1.5"))
+        self._shake_min_reversals: int = int(os.getenv("IMU_SHAKE_MIN_REVERSALS", "3"))
+
         # Resolve explicit address from env or constructor argument
         env_addr = os.getenv("IMU_I2C_ADDRESS", "")
         if env_addr:
@@ -806,6 +812,86 @@ class IMUDriver:
         """Zero tap detection state for a fresh single/double-tap sequence."""
         self._last_tap_time = None
         self._tap_count = 0
+
+    # ------------------------------------------------------------------
+    # Issue #369 — shake detection
+    # ------------------------------------------------------------------
+
+    def shake_detection(
+        self,
+        threshold_g: Optional[float] = None,
+        min_reversals: Optional[int] = None,
+        window_s: Optional[float] = None,
+    ) -> dict:
+        """Detect a shake gesture via rapid high-magnitude acceleration reversals.
+
+        Each call reads the current acceleration.  If the magnitude on any
+        axis exceeds *threshold_g* the event is appended to a rolling history
+        window.  A shake is reported when at least *min_reversals* sign-change
+        transitions are detected within the *window_s* time window.
+
+        In mock mode always returns ``{shaking: False, ...}``.
+
+        Args:
+            threshold_g:   Acceleration magnitude threshold in g.  Defaults to
+                           ``IMU_SHAKE_THRESHOLD_G`` env var (1.5 g).
+            min_reversals: Minimum sign-change count to classify as a shake.
+                           Defaults to ``IMU_SHAKE_MIN_REVERSALS`` env var (3).
+            window_s:      Rolling time window in seconds.  Defaults to
+                           ``IMU_SHAKE_WINDOW_S`` env var (0.5 s).
+
+        Returns:
+            ``{shaking: bool, reversals: int, axis: str|None, timestamp: float|None}``
+        """
+        _mock = {"shaking": False, "reversals": 0, "axis": None, "timestamp": None}
+        if self._mode != "hardware" or self._bus is None:
+            return _mock
+
+        _threshold = threshold_g if threshold_g is not None else self._shake_threshold_g
+        _min_rev = min_reversals if min_reversals is not None else self._shake_min_reversals
+        _window = window_s if window_s is not None else self._shake_window_s
+
+        try:
+            data = self.read()
+            accel = data.get("accel_g", {})
+            now = time.time()
+
+            # Prune history outside window
+            self._shake_history = [e for e in self._shake_history if now - e[0] <= _window]
+
+            # Determine dominant axis and check threshold
+            ax = float(accel.get("x", 0.0))
+            ay = float(accel.get("y", 0.0))
+            az = float(accel.get("z", 0.0))
+            magnitudes = {"x": abs(ax), "y": abs(ay), "z": abs(az)}
+            dominant_axis = max(magnitudes, key=lambda k: magnitudes[k])
+            dominant_val = {"x": ax, "y": ay, "z": az}[dominant_axis]
+
+            if magnitudes[dominant_axis] >= _threshold:
+                sign = 1 if dominant_val >= 0 else -1
+                self._shake_history.append((now, dominant_axis, sign))
+
+            # Count sign reversals on the dominant axis within the window
+            axis_events = [(t, s) for t, a, s in self._shake_history if a == dominant_axis]
+            reversals = 0
+            for i in range(1, len(axis_events)):
+                if axis_events[i][1] != axis_events[i - 1][1]:
+                    reversals += 1
+
+            shaking = reversals >= _min_rev
+            return {
+                "shaking": shaking,
+                "reversals": reversals,
+                "axis": dominant_axis if shaking else None,
+                "timestamp": now if shaking else None,
+            }
+        except Exception as exc:
+            logger.warning("IMUDriver.shake_detection error: %s", exc)
+            return _mock
+
+    def reset_shake(self) -> None:
+        """Clear shake detection history."""
+        self._shake_history = []
 
     def reset_pose(self) -> None:
         """Zero all accumulated pose state.

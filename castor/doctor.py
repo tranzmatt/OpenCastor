@@ -251,6 +251,34 @@ def check_signal_channel() -> tuple:
 # ── Runner functions ──────────────────────────────────────────────────
 
 
+def check_disk_space(path: str = "/") -> tuple:
+    """Check available disk space on the root partition (Issue #371).
+
+    Warns when the partition is >90% full.
+
+    Args:
+        path: Filesystem path to check (default: ``"/"``).
+
+    Returns:
+        ``(ok, name, detail)`` tuple where ``ok`` is ``True`` when usage <90%.
+    """
+    import shutil
+
+    try:
+        usage = shutil.disk_usage(path)
+        pct = usage.used / usage.total * 100.0
+        free_gb = usage.free / (1024**3)
+        if pct >= 90.0:
+            return (
+                False,
+                "Disk space",
+                f"{pct:.1f}% used ({free_gb:.1f} GB free) — partition is >90% full",
+            )
+        return True, "Disk space", f"{pct:.1f}% used ({free_gb:.1f} GB free)"
+    except Exception as exc:
+        return False, "Disk space", str(exc)
+
+
 def run_all_checks(config_path=None):
     """Run every health check.  Returns a flat list of (ok, name, detail) tuples."""
     results = []
@@ -282,6 +310,8 @@ def run_all_checks(config_path=None):
     results.append(check_memory_db_size())
     results.append(check_ble_driver())
     results.append(check_signal_channel())
+    # Issue #371: disk space check
+    results.append(check_disk_space())
 
     return results
 

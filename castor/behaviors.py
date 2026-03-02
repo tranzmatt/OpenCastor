@@ -94,6 +94,13 @@ class BehaviorRunner:
             "foreach_file": self._step_foreach_file,
             # Issue #360: execute steps at a wall-clock time or recurring interval
             "schedule": self._step_schedule,
+            # Issue #365: retry inner steps with backoff on failure
+            "retry": self._step_retry,
+            # Issue #368: runtime variable store
+            "set_var": self._step_set_var,
+            "get_var": self._step_get_var,
+            # Issue #373: assert condition — halt if false
+            "assert": self._step_assert,
         }
 
         # Chain-recursion depth counter (not thread-local; behaviors run single-threaded)
@@ -103,6 +110,9 @@ class BehaviorRunner:
         import threading as _threading
 
         self._stop_event: _threading.Event = _threading.Event()
+
+        # Issue #368: runtime variable store (reset on stop())
+        self._vars: Dict[str, Any] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -210,6 +220,7 @@ class BehaviorRunner:
         self._current_name = None
         self._stop_event.set()
         self._stop_event.clear()
+        self._vars.clear()
         if self.driver is not None:
             try:
                 self.driver.stop()
@@ -1708,3 +1719,221 @@ class BehaviorRunner:
 
         else:
             logger.warning("schedule step: neither 'at' nor 'every' specified — skipping")
+
+    # ------------------------------------------------------------------
+    # Issue #365 — retry step
+    # ------------------------------------------------------------------
+
+    def _step_retry(self, step: dict) -> None:
+        """Re-run inner steps up to *max_attempts* times on failure.
+
+        A "failure" is detected by ``self._running`` becoming ``False`` during
+        execution of the inner step list (e.g. because a sub-step called
+        ``stop()`` or an exception propagated).  Uses ``_stop_event.wait()``
+        for interruptible backoff.
+
+        Example step::
+
+            - type: retry
+              max_attempts: 3
+              backoff_s: 2.0
+              steps:
+                - type: think
+                  instruction: "navigate to dock"
+
+        Parameters
+        ----------
+        step:
+            ``max_attempts`` (int, default 3): Maximum attempts.
+            ``backoff_s`` (float, default 1.0): Seconds to wait between tries.
+            ``steps`` (list): Inner steps to retry.
+        """
+        inner = step.get("steps") or []
+        if not inner:
+            logger.warning("retry step: 'steps' is empty — skipping")
+            return
+
+        max_attempts: int = max(1, int(step.get("max_attempts", 3)))
+        backoff_s: float = max(0.0, float(step.get("backoff_s", 1.0)))
+
+        for attempt in range(1, max_attempts + 1):
+            if not self._running:
+                break
+            logger.debug("retry step: attempt %d/%d", attempt, max_attempts)
+            # Snapshot running state before attempt
+            self._run_step_list(inner, f"retry attempt {attempt}")
+            if self._running:
+                logger.info("retry step: succeeded on attempt %d", attempt)
+                return
+            if attempt < max_attempts:
+                logger.info(
+                    "retry step: attempt %d failed — waiting %.1fs before retry",
+                    attempt,
+                    backoff_s,
+                )
+                self._running = True  # re-arm for next attempt
+                if backoff_s > 0:
+                    self._stop_event.wait(timeout=backoff_s)
+
+        logger.warning("retry step: all %d attempts exhausted", max_attempts)
+
+    # ------------------------------------------------------------------
+    # Issue #368 — set_var / get_var steps
+    # ------------------------------------------------------------------
+
+    def _step_set_var(self, step: dict) -> None:
+        """Store a value in the runtime variable store.
+
+        Example::
+
+            - type: set_var
+              name: target_distance
+              value: 1.5
+
+        Parameters
+        ----------
+        step:
+            ``name`` (str, required): Variable name.
+            ``value`` (any): Value to store.
+        """
+        name: str = step.get("name", "")
+        if not name:
+            logger.warning("set_var step: 'name' key missing — skipping")
+            return
+        value = step.get("value")
+        self._vars[name] = value
+        logger.debug("set_var: %r = %r", name, value)
+
+    def _step_get_var(self, step: dict) -> None:
+        """Retrieve a value from the runtime variable store and inject it.
+
+        Injects the variable value into nested steps by substituting
+        ``"$var.<name>"`` string placeholders.
+
+        Example::
+
+            - type: get_var
+              name: target_distance
+              steps:
+                - type: waypoint
+                  distance_m: "$var.target_distance"
+
+        Parameters
+        ----------
+        step:
+            ``name`` (str, required): Variable name.
+            ``default`` (any, default None): Value if variable not set.
+            ``steps`` (list): Inner steps with ``$var.<name>`` substitution.
+        """
+        name: str = step.get("name", "")
+        if not name:
+            logger.warning("get_var step: 'name' key missing — skipping")
+            return
+
+        default = step.get("default")
+        value = self._vars.get(name, default)
+        inner_steps: list = step.get("steps") or []
+        placeholder = f"$var.{name}"
+
+        substituted: list = []
+        for s in inner_steps:
+            new_s: dict = {}
+            for k, v in s.items():
+                if isinstance(v, str) and v == placeholder:
+                    new_s[k] = value
+                else:
+                    new_s[k] = v
+            substituted.append(new_s)
+
+        logger.debug("get_var: %r = %r → %d inner step(s)", name, value, len(substituted))
+        self._run_step_list(substituted, f"get_var {name}")
+
+    # ------------------------------------------------------------------
+    # Issue #373 — assert step
+    # ------------------------------------------------------------------
+
+    def _step_assert(self, step: dict) -> None:
+        """Halt (or warn) if a numeric condition is not met.
+
+        Evaluates a simple condition of the form ``<lhs> <op> <rhs>`` where
+        *lhs* may reference a runtime variable via ``"$var.<name>"``.
+
+        Supported operators: ``>``, ``>=``, ``<``, ``<=``, ``==``, ``!=``.
+
+        Example::
+
+            - type: assert
+              condition: "$var.battery_pct > 20"
+              on_fail: stop
+
+        Parameters
+        ----------
+        step:
+            ``condition`` (str, required): Condition expression.
+            ``on_fail`` (str, default ``"stop"``): ``"stop"`` halts the
+                behavior; ``"warn"`` logs a warning but continues.
+        """
+        condition: str = step.get("condition", "")
+        on_fail: str = step.get("on_fail", "stop")
+
+        if not condition:
+            logger.warning("assert step: 'condition' key missing — skipping")
+            return
+
+        try:
+            result = self._eval_condition(condition)
+        except Exception as exc:
+            logger.warning("assert step: condition evaluation error: %s", exc)
+            result = False
+
+        if result:
+            logger.debug("assert step: condition %r passed", condition)
+            return
+
+        msg = f"assert step: condition {condition!r} FAILED"
+        if on_fail == "warn":
+            logger.warning(msg)
+        else:
+            logger.error(msg)
+            self._running = False
+
+    def _eval_condition(self, condition: str) -> bool:
+        """Evaluate a simple ``lhs op rhs`` condition string.
+
+        Substitutes ``$var.<name>`` tokens from ``self._vars`` before
+        evaluating.  Only numeric comparisons are supported (no exec/eval).
+        """
+        import re as _re
+
+        # Substitute $var.<name> placeholders
+        def _sub(m: _re.Match) -> str:
+            var_name = m.group(1)
+            val = self._vars.get(var_name)
+            return str(val) if val is not None else "None"
+
+        expr = _re.sub(r"\$var\.(\w+)", _sub, condition.strip())
+
+        # Parse: <lhs> <op> <rhs>
+        _OPS = {
+            ">=": lambda a, b: a >= b,
+            "<=": lambda a, b: a <= b,
+            "!=": lambda a, b: a != b,
+            "==": lambda a, b: a == b,
+            ">": lambda a, b: a > b,
+            "<": lambda a, b: a < b,
+        }
+        for op_str, op_fn in _OPS.items():
+            if op_str in expr:
+                parts = expr.split(op_str, 1)
+                if len(parts) == 2:
+                    lhs_s = parts[0].strip()
+                    rhs_s = parts[1].strip()
+                    try:
+                        lhs = float(lhs_s)
+                        rhs = float(rhs_s)
+                        return op_fn(lhs, rhs)
+                    except (ValueError, TypeError) as exc:
+                        raise ValueError(
+                            f"Cannot evaluate condition {condition!r}: lhs={lhs_s!r}, rhs={rhs_s!r}"
+                        ) from exc
+        raise ValueError(f"No supported operator found in condition {condition!r}")

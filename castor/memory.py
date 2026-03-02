@@ -960,6 +960,57 @@ class EpisodeMemory:
                 totals[i] += x
         return [t / len(vectors) for t in totals]
 
+    # ------------------------------------------------------------------
+    # Issue #367 — action-tag frequency histogram
+    # ------------------------------------------------------------------
+
+    def tag_frequency(self, window_s: float = 3600.0, top_k: int = 10) -> List[Dict]:
+        """Return a histogram of action-type tags in the recent episode window.
+
+        Reads episodes stored within the last *window_s* seconds and counts
+        the ``action.type`` field of each episode.  Returns a list of
+        ``{tag, count, frequency}`` dicts sorted descending by count, limited
+        to *top_k* entries.
+
+        Args:
+            window_s: Look-back window in seconds (default: 3 600 s = 1 hour).
+            top_k:    Maximum number of tags to return (default: 10).
+
+        Returns:
+            List of ``{"tag": str, "count": int, "frequency": float}`` dicts.
+            Returns ``[]`` if no episodes exist.  Never raises.
+        """
+        import time as _time
+
+        try:
+            cutoff = _time.time() - max(0.0, window_s)
+            with self._conn() as con:
+                rows = con.execute(
+                    "SELECT action_json FROM episodes WHERE ts >= ?",
+                    (cutoff,),
+                ).fetchall()
+
+            import json as _json
+
+            counts: Dict[str, int] = {}
+            for (action_json,) in rows:
+                try:
+                    action = _json.loads(action_json) if action_json else {}
+                    tag = str(action.get("type", "unknown"))
+                except Exception:
+                    tag = "unknown"
+                counts[tag] = counts.get(tag, 0) + 1
+
+            total = sum(counts.values()) or 1
+            sorted_tags = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:top_k]
+            return [
+                {"tag": tag, "count": cnt, "frequency": round(cnt / total, 4)}
+                for tag, cnt in sorted_tags
+            ]
+        except Exception as exc:
+            logger.warning("EpisodeMemory.tag_frequency error: %s", exc)
+            return []
+
     def cluster_episodes(
         self,
         n_clusters: int = 5,

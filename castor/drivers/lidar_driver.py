@@ -639,6 +639,110 @@ class LidarDriver:
             logger.warning("LidarDriver.moving_objects error: %s", exc)
             return []
 
+    # ── Issue #366 — per-zone velocity ────────────────────────────────────────
+
+    def zone_velocity(self, zone: str = "front", window_s: float = 2.0) -> Dict[str, Any]:
+        """Estimate the approaching velocity (m/s) in a named angular zone.
+
+        Fetches recent scan history and computes the linear regression slope of
+        median zone distance vs time.  A negative slope means objects are
+        approaching; positive means receding.
+
+        Zones (using signed angles from -180..180):
+            ``front``  : -45 ≤ angle < 45
+            ``left``   : 45 ≤ angle < 135
+            ``rear``   : ±135 ≤ |angle| ≤ 180
+            ``right``  : -135 ≤ angle < -45
+
+        Args:
+            zone:     One of ``"front"``, ``"left"``, ``"rear"``, ``"right"``.
+            window_s: History window in seconds (default 2.0).
+
+        Returns:
+            ``{zone, velocity_m_s, samples, window_s, direction}``
+            where *direction* is ``"approaching"`` / ``"receding"`` / ``"stationary"``.
+        """
+        _zone_bounds = {
+            "front": (-45.0, 45.0),
+            "left": (45.0, 135.0),
+            "rear": (135.0, 180.0),  # special: |angle| ≥ 135
+            "right": (-135.0, -45.0),
+        }
+        _result_base: Dict[str, Any] = {
+            "zone": zone,
+            "velocity_m_s": 0.0,
+            "samples": 0,
+            "window_s": window_s,
+            "direction": "stationary",
+        }
+        if zone not in _zone_bounds:
+            logger.warning("LidarDriver.zone_velocity: unknown zone %r", zone)
+            return _result_base
+
+        try:
+            history = self.get_scan_history(window_s=window_s, limit=200)
+            if len(history) < 2:
+                return _result_base
+
+            import statistics as _stats
+
+            times: list = []
+            medians: list = []
+
+            for entry in history:
+                ts = entry.get("timestamp", 0.0)
+                points = entry.get("points", [])
+                zone_dists: list = []
+                for pt in points:
+                    try:
+                        raw_angle = float(pt.get("angle", 0.0))
+                        # normalise to -180..180
+                        signed = ((raw_angle + 180.0) % 360.0) - 180.0
+                        dist_m = float(pt.get("distance", 0.0)) / 1000.0
+                        if dist_m <= 0.0:
+                            continue
+                        lo, hi = _zone_bounds[zone]
+                        if zone == "rear":
+                            if abs(signed) >= 135.0:
+                                zone_dists.append(dist_m)
+                        else:
+                            if lo <= signed < hi:
+                                zone_dists.append(dist_m)
+                    except (TypeError, ValueError):
+                        continue
+                if zone_dists:
+                    times.append(float(ts))
+                    medians.append(_stats.median(zone_dists))
+
+            n = len(times)
+            if n < 2:
+                return _result_base
+
+            # Simple linear regression: slope = cov(t, d) / var(t)
+            t_mean = sum(times) / n
+            d_mean = sum(medians) / n
+            num = sum((times[i] - t_mean) * (medians[i] - d_mean) for i in range(n))
+            den = sum((times[i] - t_mean) ** 2 for i in range(n))
+            slope = num / den if den != 0.0 else 0.0
+
+            if slope < -0.005:
+                direction = "approaching"
+            elif slope > 0.005:
+                direction = "receding"
+            else:
+                direction = "stationary"
+
+            return {
+                "zone": zone,
+                "velocity_m_s": round(slope, 4),
+                "samples": n,
+                "window_s": window_s,
+                "direction": direction,
+            }
+        except Exception as exc:
+            logger.warning("LidarDriver.zone_velocity error: %s", exc)
+            return _result_base
+
     # ── SLAM hint ─────────────────────────────────────────────────────────────
 
     def slam_hint(self) -> dict:

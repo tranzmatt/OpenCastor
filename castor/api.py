@@ -5471,6 +5471,68 @@ async def metrics_push(gateway_url: str = "", job: str = "opencastor"):
     )
 
 
+@app.get("/api/metrics/json", dependencies=[Depends(verify_token)])
+async def metrics_json():
+    """GET /api/metrics/json — Structured JSON snapshot of all metrics (#372)."""
+    from castor.metrics import get_registry
+
+    return get_registry().export_json()
+
+
+@app.get("/api/imu/shake", dependencies=[Depends(verify_token)])
+async def imu_shake_detection():
+    """GET /api/imu/shake — Single/shake gesture detection (#369)."""
+    if state.driver is None:
+        return {"shaking": False, "reversals": 0, "axis": None, "timestamp": None, "error": "no driver"}
+    from castor.drivers.imu_driver import get_imu
+
+    imu = get_imu()
+    return imu.shake_detection()
+
+
+@app.post("/api/imu/shake/reset", dependencies=[Depends(verify_token)])
+async def imu_shake_reset():
+    """POST /api/imu/shake/reset — Clear shake detection history (#369)."""
+    from castor.drivers.imu_driver import get_imu
+
+    get_imu().reset_shake()
+    return {"status": "ok"}
+
+
+@app.get("/api/lidar/zone_velocity", dependencies=[Depends(verify_token)])
+async def lidar_zone_velocity(zone: str = "front", window_s: float = 2.0):
+    """GET /api/lidar/zone_velocity — Per-zone approaching speed estimate (#366)."""
+    if state.driver is None:
+        return {"zone": zone, "velocity_m_s": 0.0, "samples": 0, "window_s": window_s, "direction": "stationary"}
+    from castor.drivers.lidar_driver import get_lidar
+
+    lidar = get_lidar()
+    return lidar.zone_velocity(zone=zone, window_s=window_s)
+
+
+@app.get("/api/memory/tag_frequency", dependencies=[Depends(verify_token)])
+async def memory_tag_frequency(window_s: float = 3600.0, top_k: int = 10):
+    """GET /api/memory/tag_frequency — Action-type tag histogram (#367)."""
+    from castor.memory import EpisodeMemory
+
+    db = __import__("os").getenv("CASTOR_MEMORY_DB", __import__("os").path.expanduser("~/.castor/memory.db"))
+    mem = EpisodeMemory(db_path=db)
+    return {"tags": mem.tag_frequency(window_s=window_s, top_k=top_k)}
+
+
+@app.get("/api/pool/warm", dependencies=[Depends(verify_token)])
+async def pool_warm_providers():
+    """GET /api/pool/warm — Run warm_providers() health check (#370)."""
+    if state.brain is None:
+        return JSONResponse(status_code=503, content={"error": "no brain configured", "code": "HTTP_503"})
+    from castor.providers.pool_provider import ProviderPool
+
+    if not isinstance(state.brain, ProviderPool):
+        return JSONResponse(status_code=400, content={"error": "brain is not a ProviderPool", "code": "HTTP_400"})
+    results = state.brain.warm_providers()
+    return {"warm_results": results, "all_ok": all(results.values())}
+
+
 @app.on_event("shutdown")
 async def on_shutdown():
     # Close WebRTC peers

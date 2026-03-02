@@ -1021,7 +1021,65 @@ class ProviderPool(BaseProvider):
             "ttl_s": self._sticky_ttl_s,
             "active_bindings": active_sticky,
         }
+        # Issue #370: warm_providers results
+        with self._lock:
+            health["warm_results"] = getattr(self, "_warm_results", {})
         return health
+
+    # ------------------------------------------------------------------
+    # Issue #370 — pre-flight warm-up health check
+    # ------------------------------------------------------------------
+
+    def warm_providers(self, timeout_s: float = 10.0) -> Dict[str, bool]:
+        """Run health_check() on all pool members in parallel and log results.
+
+        Stores results in ``self._warm_results`` and returns a mapping of
+        ``pool_index (str) → ok (bool)``.  Never raises.
+
+        Args:
+            timeout_s: Per-provider health-check timeout in seconds (default 10).
+
+        Returns:
+            ``{"0": True, "1": False, ...}`` — one entry per provider.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        results: Dict[str, bool] = {}
+
+        def _check(idx: int, provider: Any) -> tuple:
+            try:
+                h = provider.health_check()
+                return idx, bool(h.get("ok", False))
+            except Exception as exc:
+                logger.warning("ProviderPool.warm_providers[%d] error: %s", idx, exc)
+                return idx, False
+
+        with ThreadPoolExecutor(max_workers=max(1, len(self._providers))) as ex:
+            futures = {ex.submit(_check, i, p): i for i, p in enumerate(self._providers)}
+            for fut in as_completed(futures, timeout=timeout_s):
+                try:
+                    idx, ok = fut.result()
+                    results[str(idx)] = ok
+                    status = "ok" if ok else "FAIL"
+                    logger.info(
+                        "ProviderPool warm[%d] %s — %s",
+                        idx,
+                        getattr(self._providers[idx], "model_name", "?"),
+                        status,
+                    )
+                except Exception as exc:
+                    i = futures[fut]
+                    results[str(i)] = False
+                    logger.warning("ProviderPool warm[%d] timed out or error: %s", i, exc)
+
+        # Mark any missing (timed out) providers as failed
+        for i in range(len(self._providers)):
+            results.setdefault(str(i), False)
+
+        with self._lock:
+            self._warm_results: Dict[str, bool] = results
+
+        return results
 
     def stop(self) -> None:
         """Stop the background health-check thread (if running)."""

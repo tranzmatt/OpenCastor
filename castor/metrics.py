@@ -20,7 +20,7 @@ from __future__ import annotations
 import threading
 import time
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 __all__ = ["MetricsRegistry", "get_registry", "ChannelInterArrivalTracker", "RequestRateTracker"]
 
@@ -570,6 +570,81 @@ class MetricsRegistry:
             Latency in milliseconds, or ``None`` if no observations exist.
         """
         return self._provider_latency.percentile(provider, pct)
+
+    # ── Issue #372 — JSON snapshot ─────────────────────────────────────────────
+
+    def export_json(self) -> Dict[str, Any]:
+        """Return a structured dict snapshot of all metrics for the dashboard API.
+
+        Returns a JSON-serialisable dict with keys:
+            ``counters``        — ``{name: {label_key: value, ...}, ...}``
+            ``gauges``          — ``{name: {label_key: value, ...}, ...}``
+            ``histograms``      — ``{name: {sum, count, buckets: {le: cumulative}}}``
+            ``provider_latency``— ``{provider: {sum_ms, count, p50, p95, p99}}``
+            ``endpoint_rps``    — ``{endpoint: rps}``
+            ``timestamp``       — Unix epoch of the snapshot.
+
+        Never raises.
+        """
+        snapshot: Dict[str, Any] = {
+            "counters": {},
+            "gauges": {},
+            "histograms": {},
+            "provider_latency": {},
+            "endpoint_rps": {},
+            "timestamp": time.time(),
+        }
+
+        # Counters
+        for name, counter in self._counters.items():
+            with counter._lock:
+                snapshot["counters"][name] = {
+                    ",".join(f"{k}={v}" for k, v in key) if key else "__total__": val
+                    for key, val in counter._values.items()
+                }
+
+        # Gauges
+        for name, gauge in self._gauges.items():
+            with gauge._lock:
+                snapshot["gauges"][name] = {
+                    ",".join(f"{k}={v}" for k, v in key) if key else "__value__": val
+                    for key, val in gauge._values.items()
+                }
+
+        # Histograms
+        for name, hist in self._histograms.items():
+            with hist._lock:
+                cumulative = 0.0
+                buckets: Dict[str, float] = {}
+                for b in hist._buckets:
+                    cumulative += hist._counts[b]
+                    buckets[str(b)] = cumulative
+                buckets["+Inf"] = hist._total
+                snapshot["histograms"][name] = {
+                    "sum": hist._sum,
+                    "count": hist._total,
+                    "buckets": buckets,
+                }
+
+        # Provider latency
+        for provider in self._provider_latency.providers():
+            snapshot["provider_latency"][provider] = {
+                "sum_ms": 0.0,
+                "count": 0.0,
+                "p50": self._provider_latency.percentile(provider, 50.0),
+                "p95": self._provider_latency.percentile(provider, 95.0),
+                "p99": self._provider_latency.percentile(provider, 99.0),
+            }
+            with self._provider_latency._lock:
+                d = self._provider_latency._data.get(provider, {})
+                snapshot["provider_latency"][provider]["sum_ms"] = d.get("sum", 0.0)
+                snapshot["provider_latency"][provider]["count"] = d.get("total", 0.0)
+
+        # Endpoint request rates
+        for endpoint in self._request_rate.endpoints():
+            snapshot["endpoint_rps"][endpoint] = round(self._request_rate.rate(endpoint), 4)
+
+        return snapshot
 
 
 # ── Singleton ─────────────────────────────────────────────────────────────────
