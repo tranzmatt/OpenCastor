@@ -40,6 +40,10 @@ logger = logging.getLogger("OpenCastor.Behaviors")
 REQUIRED_KEYS = {"name", "steps"}
 
 
+class _BreakLoop(Exception):
+    """Sentinel raised by ``break_on`` step to exit enclosing loops."""
+
+
 class BehaviorRunner:
     """Execute named behavior scripts that drive the robot through a sequence of steps.
 
@@ -105,6 +109,10 @@ class BehaviorRunner:
             "event_trigger": self._step_event_trigger,
             # Issue #383: append structured JSON log to file
             "log_step": self._step_log_step,
+            # Issue #400: inverse condition — run inner_steps when condition is False
+            "unless": self._step_unless,
+            # Issue #402: raise _BreakLoop to exit enclosing loops
+            "break_on": self._step_break_on,
         }
 
         # Chain-recursion depth counter (not thread-local; behaviors run single-threaded)
@@ -715,6 +723,8 @@ class BehaviorRunner:
                 continue
             try:
                 handler(inner_step)
+            except _BreakLoop:
+                raise  # propagate to enclosing loop handler
             except Exception as exc:
                 logger.warning("%s: inner step '%s' raised: %s", context, step_type, exc)
 
@@ -901,7 +911,11 @@ class BehaviorRunner:
                 break
 
             # Execute all inner steps for this iteration.
-            self._run_step_list(inner_steps, "repeat_until step")
+            try:
+                self._run_step_list(inner_steps, "repeat_until step")
+            except _BreakLoop as bl:
+                logger.info("repeat_until step: break_on triggered: %s", bl)
+                break
 
             # Check exit condition.
             condition_met = self._eval_condition(sensor, field, op, value)
@@ -1083,7 +1097,11 @@ class BehaviorRunner:
                 new_s = {k: (item if v == var else v) for k, v in s.items()}
                 substituted.append(new_s)
 
-            self._run_step_list(substituted, "for_each step")
+            try:
+                self._run_step_list(substituted, "for_each step")
+            except _BreakLoop as bl:
+                logger.info("for_each step: break_on triggered: %s", bl)
+                break
 
             # Optional dwell between iterations, honoured at 50 ms granularity.
             if dwell_s > 0 and self._running and idx < len(items) - 1:
@@ -1276,7 +1294,11 @@ class BehaviorRunner:
             iteration += 1
 
             # --- Execute inner steps --------------------------------------
-            self._run_step_list(inner_steps, "while_true step")
+            try:
+                self._run_step_list(inner_steps, "while_true step")
+            except _BreakLoop as bl:
+                logger.info("while_true step: break_on triggered: %s", bl)
+                break
 
             # --- Optional dwell between iterations ------------------------
             if dwell_s > 0 and self._running:
@@ -2134,3 +2156,87 @@ class BehaviorRunner:
             logger.debug("log_step: wrote record to %r", path)
         except Exception as exc:
             logger.warning("log_step: could not write to %r: %s", path, exc)
+
+    # ------------------------------------------------------------------
+    # Issue #400 — unless step (inverse condition)
+    # ------------------------------------------------------------------
+
+    def _step_unless(self, step: dict) -> None:
+        """Run *inner_steps* only when *condition* evaluates to False (Issue #400).
+
+        This is the inverse of the ``condition`` step — it skips execution when
+        the condition is truthy and runs the steps when it is falsy.
+
+        Example step::
+
+            - type: unless
+              condition: "battery.soc_pct > 20"
+              inner_steps:
+                - type: speak
+                  text: "Battery low!"
+
+        Parameters
+        ----------
+        step:
+            ``condition`` (str, required): Expression evaluated by :meth:`_eval_condition`.
+            ``inner_steps`` (list, required): Steps to run when condition is False.
+        """
+        condition = step.get("condition", "")
+        inner_steps: list = step.get("inner_steps") or []
+
+        if not condition:
+            logger.warning("unless step: 'condition' is missing — skipping")
+            return
+        if not inner_steps:
+            logger.warning("unless step: 'inner_steps' is empty — skipping")
+            return
+
+        try:
+            result = self._eval_condition(condition)
+        except Exception as exc:
+            logger.warning("unless step: condition eval error: %s — skipping", exc)
+            return
+
+        if result:
+            logger.debug("unless step: condition %r is True — skipping inner steps", condition)
+            return
+
+        logger.debug("unless step: condition %r is False — running inner steps", condition)
+        self._run_step_list(inner_steps, "unless")
+
+    # ------------------------------------------------------------------
+    # Issue #402 — break_on step (sentinel exception for loop exit)
+    # ------------------------------------------------------------------
+
+    def _step_break_on(self, step: dict) -> None:
+        """Raise _BreakLoop if *condition* is True, exiting the enclosing loop (Issue #402).
+
+        Example step::
+
+            - type: break_on
+              condition: "imu.steps > 100"
+
+        Parameters
+        ----------
+        step:
+            ``condition`` (str, required): Expression evaluated by :meth:`_eval_condition`.
+                If omitted, always breaks.
+        """
+        condition = step.get("condition", "")
+
+        if not condition:
+            # No condition — always break
+            logger.debug("break_on step: no condition — breaking loop")
+            raise _BreakLoop("break_on: unconditional break")
+
+        try:
+            result = self._eval_condition(condition)
+        except Exception as exc:
+            logger.warning("break_on step: condition eval error: %s — not breaking", exc)
+            return
+
+        if result:
+            logger.debug("break_on step: condition %r is True — breaking loop", condition)
+            raise _BreakLoop(f"break_on: condition={condition!r}")
+        else:
+            logger.debug("break_on step: condition %r is False — continuing", condition)

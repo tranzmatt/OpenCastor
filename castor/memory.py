@@ -1011,6 +1011,124 @@ class EpisodeMemory:
             logger.warning("EpisodeMemory.tag_frequency error: %s", exc)
             return []
 
+    # ------------------------------------------------------------------
+    # Issue #401 — per-tag episode timeline bucketed over time
+    # ------------------------------------------------------------------
+
+    def tag_timeline(
+        self,
+        tag: str,
+        bucket_s: float = 3600.0,
+        window_s: float = 86400.0,
+    ) -> List[Dict[str, Any]]:
+        """Return per-tag episode counts bucketed over a time window.
+
+        Scans episodes within the last *window_s* seconds and divides them
+        into equal-width time buckets of *bucket_s* seconds.  Each bucket
+        records how many episodes carried the specified *tag*.
+
+        Args:
+            tag:      Tag string to count (matched against comma-separated
+                      ``tags`` column values).
+            bucket_s: Width of each time bucket in seconds (default 3 600 s).
+            window_s: Total look-back window in seconds (default 86 400 s).
+
+        Returns:
+            List of ``{"bucket_start": float, "bucket_end": float, "count": int}``
+            dicts, one per bucket (including zero-count buckets).  Always
+            returns at least one bucket.  Never raises.
+        """
+        import math as _math
+        import time as _time
+
+        try:
+            bucket_s = max(1.0, float(bucket_s))
+            window_s = max(bucket_s, float(window_s))
+            now = _time.time()
+            cutoff = now - window_s
+
+            # Build bucket boundaries
+            n_buckets = max(1, int(_math.ceil(window_s / bucket_s)))
+            buckets: List[Dict[str, Any]] = []
+            for i in range(n_buckets):
+                bstart = cutoff + i * bucket_s
+                bend = bstart + bucket_s
+                buckets.append({"bucket_start": bstart, "bucket_end": bend, "count": 0})
+
+            with self._conn() as con:
+                rows = con.execute(
+                    "SELECT ts, tags FROM episodes WHERE ts >= ? ORDER BY ts ASC",
+                    (cutoff,),
+                ).fetchall()
+
+            for row in rows:
+                ts_val = row["ts"]
+                raw_tags: Optional[str] = row["tags"]
+                if not raw_tags:
+                    continue
+                row_tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
+                if tag not in row_tags:
+                    continue
+                # Find bucket index
+                idx = int((ts_val - cutoff) / bucket_s)
+                if 0 <= idx < n_buckets:
+                    buckets[idx]["count"] += 1
+
+            return buckets
+        except Exception as exc:
+            logger.warning("EpisodeMemory.tag_timeline error: %s", exc)
+            # Return a minimal single bucket on error
+            try:
+                import time as _t2
+
+                now2 = _t2.time()
+                cutoff2 = now2 - float(window_s)
+                return [{"bucket_start": cutoff2, "bucket_end": now2, "count": 0}]
+            except Exception:
+                return [{"bucket_start": 0.0, "bucket_end": 0.0, "count": 0}]
+
+    # ------------------------------------------------------------------
+    # Issue #407 — find episodes by outcome
+    # ------------------------------------------------------------------
+
+    def find_by_outcome(
+        self,
+        outcome: str,
+        limit: int = 50,
+        exact: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Return episodes whose outcome matches the given string.
+
+        Args:
+            outcome: Outcome string to search for.
+            limit:   Maximum number of results (default 50).
+            exact:   When ``True`` match the outcome exactly; when ``False``
+                     (default) perform a case-sensitive ``LIKE %outcome%``
+                     substring match.
+
+        Returns:
+            List of episode dicts (same format as :meth:`query_recent`),
+            ordered by ``ts DESC``.  Returns ``[]`` when no match.
+            Never raises.
+        """
+        try:
+            limit = max(1, int(limit))
+            with self._conn() as con:
+                if exact:
+                    rows = con.execute(
+                        "SELECT * FROM episodes WHERE outcome = ? ORDER BY ts DESC LIMIT ?",
+                        (outcome, limit),
+                    ).fetchall()
+                else:
+                    rows = con.execute(
+                        "SELECT * FROM episodes WHERE outcome LIKE ? ORDER BY ts DESC LIMIT ?",
+                        (f"%{outcome}%", limit),
+                    ).fetchall()
+            return [self._row_to_dict(r) for r in rows]
+        except Exception as exc:
+            logger.warning("EpisodeMemory.find_by_outcome error: %s", exc)
+            return []
+
     def export_csv(
         self,
         path: str,

@@ -418,6 +418,8 @@ class MetricsRegistry:
         self._enabled = True
         # Issue #395: per-channel cumulative message counts for message histogram
         self._channel_msg_counts: Dict[str, int] = {}
+        # Issue #397: per-provider error counts for error histogram
+        self._provider_error_counts: Dict[str, int] = {}
 
         # Pre-register standard OpenCastor metrics
         self._init_standard_metrics()
@@ -539,6 +541,11 @@ class MetricsRegistry:
         c = self._counters.get("opencastor_provider_errors_total")
         if c and self._enabled:
             c.inc(provider=provider_name, error_type=error_type)
+        # Issue #397: update per-provider error count dict
+        with self._lock:
+            self._provider_error_counts[provider_name] = (
+                self._provider_error_counts.get(provider_name, 0) + 1
+            )
 
     def record_provider_latency(self, provider_name: str, latency_ms: float) -> None:
         """Record a provider think() latency observation for Prometheus export."""
@@ -747,6 +754,29 @@ class MetricsRegistry:
                 "channel_message_histogram error: %s", exc
             )
             return {"buckets": {}, "per_channel": {}}
+
+    def provider_error_histogram(self) -> Dict[str, Any]:
+        """Return per-provider error counts binned into histogram buckets (Issue #397).
+
+        Returns:
+            Dict with keys:
+
+            - ``buckets``: mapping label → count of providers with errors <= threshold
+            - ``per_provider``: mapping provider name → total error count
+        """
+        _BUCKET_THRESHOLDS = [1, 5, 10, 50, 100, 500, 1000]
+        with self._lock:
+            counts = dict(self._provider_error_counts)
+
+        # Build histogram: for each threshold, count providers with errors <= threshold
+        buckets: Dict[str, int] = {}
+        for t in _BUCKET_THRESHOLDS:
+            label = f"<={t}"
+            buckets[label] = sum(1 for c in counts.values() if c <= t)
+        # +Inf bucket = total providers with any errors recorded
+        buckets["+Inf"] = len(counts)
+
+        return {"buckets": buckets, "per_provider": counts}
 
 
 # ── Singleton ─────────────────────────────────────────────────────────────────

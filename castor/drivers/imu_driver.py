@@ -312,6 +312,10 @@ class IMUDriver:
         self._shake_threshold_g: float = float(os.getenv("IMU_SHAKE_THRESHOLD_G", "1.5"))
         self._shake_min_reversals: int = int(os.getenv("IMU_SHAKE_MIN_REVERSALS", "3"))
 
+        # Issue #404 — fall detection state
+        self._fall_consecutive: int = 0  # count of consecutive readings below threshold
+        self._fall_detected: bool = False  # latch: True after a fall event until reset
+
         # Resolve explicit address from env or constructor argument
         env_addr = os.getenv("IMU_I2C_ADDRESS", "")
         if env_addr:
@@ -954,6 +958,81 @@ class IMUDriver:
         """Reset the accumulated step counter to zero."""
         self._step_count = 0
         self._step_in_peak = False
+
+    # ── Issue #404 — fall detection ───────────────────────────────────────────
+
+    def fall_detection(
+        self,
+        threshold_g: float = 0.2,
+        window_n: int = 3,
+    ) -> dict:
+        """Detect sudden free-fall events via total acceleration magnitude.
+
+        Free-fall is detected when the total acceleration magnitude drops near
+        0g across all axes, indicating approximately equal gravity cancellation
+        on each axis (i.e. the device is in free-fall).
+
+        Each call reads a fresh IMU sample and checks whether the total
+        magnitude is below *threshold_g*.  If so, ``_fall_consecutive`` is
+        incremented; once it reaches *window_n* the fall latch
+        ``_fall_detected`` is set to ``True`` and remains latched until
+        :meth:`reset_fall` is called.
+
+        In mock mode the simulated magnitude is ~1.0g (normal gravity on the
+        Z-axis from :meth:`_mock_read`), so ``fall_detected`` is ``False``
+        by default.
+
+        Args:
+            threshold_g: Total acceleration magnitude below which a reading
+                         is classified as a free-fall sample (default 0.2 g).
+            window_n:    Number of consecutive sub-threshold readings required
+                         to trigger a fall event (default 3).
+
+        Returns:
+            {
+                "fall_detected":      bool,  # latched after window_n consecutive hits
+                "magnitude_g":        float, # most recent total accel magnitude
+                "threshold_g":        float, # threshold used
+                "consecutive_below":  int,   # how many consecutive readings below threshold
+                "mode":               str,   # "mock" or "hardware"
+            }
+
+        Never raises.
+        """
+        try:
+            data = self.read()
+            accel = data.get("accel_g", {})
+            ax = float(accel.get("x", 0.0))
+            ay = float(accel.get("y", 0.0))
+            az = float(accel.get("z", 0.0))
+            magnitude_g = math.sqrt(ax * ax + ay * ay + az * az)
+            mode = data.get("mode", self._mode)
+
+            if magnitude_g < threshold_g:
+                self._fall_consecutive += 1
+                if self._fall_consecutive >= window_n:
+                    self._fall_detected = True
+            else:
+                self._fall_consecutive = 0
+                # _fall_detected stays latched until reset_fall() is called
+
+        except Exception as exc:
+            logger.warning("IMUDriver.fall_detection error: %s", exc)
+            magnitude_g = 0.0
+            mode = self._mode
+
+        return {
+            "fall_detected": self._fall_detected,
+            "magnitude_g": float(magnitude_g),
+            "threshold_g": float(threshold_g),
+            "consecutive_below": self._fall_consecutive,
+            "mode": mode,
+        }
+
+    def reset_fall(self) -> None:
+        """Clear the fall-detection latch and consecutive counter."""
+        self._fall_consecutive = 0
+        self._fall_detected = False
 
     # ── Issue #391 — adaptive calibration ─────────────────────────────────────
 

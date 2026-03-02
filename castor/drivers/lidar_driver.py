@@ -439,6 +439,89 @@ class LidarDriver:
                 "mode": self._mode,
             }
 
+    # ── Issue #398 — nearest obstacle angle ──────────────────────────────────
+
+    def nearest_obstacle_angle(self) -> Dict[str, Any]:
+        """Return the angle and distance of the closest obstacle in the current scan.
+
+        Calls :meth:`scan` to obtain the latest scan points, filters out zero/invalid
+        distance readings, and returns the point with the minimum distance.
+
+        Returns:
+            ``{"angle_deg": float, "distance_mm": float, "mode": str}`` when a valid
+            point is found, or ``{"angle_deg": None, "distance_mm": None, "mode": str}``
+            when no valid points are present.  Never raises.
+        """
+        try:
+            points = self.scan()
+            best_dist = float("inf")
+            best_angle: Optional[float] = None
+            for pt in points:
+                dist = pt.get("distance_mm")
+                angle = pt.get("angle_deg")
+                if dist is None or dist <= 0 or angle is None:
+                    continue
+                if dist < best_dist:
+                    best_dist = dist
+                    best_angle = float(angle)
+            if best_angle is None:
+                return {"angle_deg": None, "distance_mm": None, "mode": self._mode}
+            return {
+                "angle_deg": round(best_angle, 1),
+                "distance_mm": round(best_dist, 1),
+                "mode": self._mode,
+            }
+        except Exception as exc:
+            logger.warning("LidarDriver.nearest_obstacle_angle error: %s", exc)
+            return {"angle_deg": None, "distance_mm": None, "mode": self._mode}
+
+    # ── Issue #403 — scan rate ────────────────────────────────────────────────
+
+    def scan_rate(self) -> Dict[str, Any]:
+        """Estimate the number of scans per second from the scan history.
+
+        Queries the last 10 seconds of scan history.  Requires at least 2 entries
+        to compute a meaningful rate; otherwise returns 0.0.
+
+        Returns:
+            ``{
+                "scans_per_second": float,
+                "window_s": float,
+                "sample_count": int,
+                "mode": str,
+            }``
+        Never raises.
+        """
+        _window = 10.0
+        _base: Dict[str, Any] = {
+            "scans_per_second": 0.0,
+            "window_s": _window,
+            "sample_count": 0,
+            "mode": self._mode,
+        }
+        try:
+            history = self.get_scan_history(window_s=_window)
+            n = len(history)
+            _base["sample_count"] = n
+            if n < 2:
+                return _base
+            timestamps = [row["ts"] for row in history]
+            min_ts = min(timestamps)
+            max_ts = max(timestamps)
+            elapsed = max_ts - min_ts
+            if elapsed <= 0.0:
+                return _base
+            rate = (n - 1) / elapsed
+            return {
+                "scans_per_second": round(rate, 4),
+                "window_s": _window,
+                "sample_count": n,
+                "mode": self._mode,
+            }
+        except Exception as exc:
+            logger.warning("LidarDriver.scan_rate error: %s", exc)
+            return _base
+
     # ── Zone map ──────────────────────────────────────────────────────────────
 
     def zone_map(self, resolution_m: float = 0.05, size_m: float = 5.0) -> dict:

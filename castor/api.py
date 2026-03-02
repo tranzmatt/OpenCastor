@@ -5654,6 +5654,105 @@ async def imu_calibrate_step_threshold(
     return imu.calibrate_step_threshold(n_idle=n_idle, calibration_factor=calibration_factor)
 
 
+# ── Cycle 19 endpoints (#397–#407) ──────────────────────────────────────────
+
+
+@app.get("/api/metrics/provider_error_histogram", dependencies=[Depends(verify_token)])
+async def metrics_provider_error_histogram():
+    """GET /api/metrics/provider_error_histogram — Per-provider error counts (#397)."""
+    from castor.metrics import get_registry
+
+    return get_registry().provider_error_histogram()
+
+
+@app.get("/api/lidar/nearest_obstacle_angle", dependencies=[Depends(verify_token)])
+async def lidar_nearest_obstacle_angle():
+    """GET /api/lidar/nearest_obstacle_angle — Angle of closest obstacle (#398)."""
+    from castor.drivers.lidar_driver import get_lidar
+
+    return get_lidar().nearest_obstacle_angle()
+
+
+@app.get("/api/lidar/scan_rate", dependencies=[Depends(verify_token)])
+async def lidar_scan_rate():
+    """GET /api/lidar/scan_rate — Estimated scans per second (#403)."""
+    from castor.drivers.lidar_driver import get_lidar
+
+    return get_lidar().scan_rate()
+
+
+@app.get("/api/imu/fall_detection", dependencies=[Depends(verify_token)])
+async def imu_fall_detection(
+    threshold_g: float = 0.2,
+    window_n: int = 3,
+):
+    """GET /api/imu/fall_detection — Detect sudden free-fall event (#404)."""
+    from castor.drivers.imu_driver import get_imu
+
+    return get_imu().fall_detection(threshold_g=threshold_g, window_n=window_n)
+
+
+@app.post("/api/imu/fall_detection/reset", dependencies=[Depends(verify_token)])
+async def imu_reset_fall_detection():
+    """POST /api/imu/fall_detection/reset — Clear fall-detection latch (#404)."""
+    from castor.drivers.imu_driver import get_imu
+
+    get_imu().reset_fall()
+    return {"ok": True}
+
+
+@app.get("/api/memory/tag_timeline", dependencies=[Depends(verify_token)])
+async def memory_tag_timeline(
+    tag: str,
+    bucket_s: float = 3600.0,
+    window_s: float = 86400.0,
+):
+    """GET /api/memory/tag_timeline — Per-tag count over time buckets (#401)."""
+    from castor.memory import EpisodeMemory
+
+    db = __import__("os").getenv(
+        "CASTOR_MEMORY_DB", __import__("os").path.expanduser("~/.castor/memory.db")
+    )
+    mem = EpisodeMemory(db_path=db)
+    return {"timeline": mem.tag_timeline(tag=tag, bucket_s=bucket_s, window_s=window_s)}
+
+
+@app.get("/api/memory/find_by_outcome", dependencies=[Depends(verify_token)])
+async def memory_find_by_outcome(
+    outcome: str,
+    limit: int = 50,
+    exact: bool = False,
+):
+    """GET /api/memory/find_by_outcome — Filter episodes by outcome string (#407)."""
+    from castor.memory import EpisodeMemory
+
+    db = __import__("os").getenv(
+        "CASTOR_MEMORY_DB", __import__("os").path.expanduser("~/.castor/memory.db")
+    )
+    mem = EpisodeMemory(db_path=db)
+    return {"episodes": mem.find_by_outcome(outcome=outcome, limit=limit, exact=exact)}
+
+
+@app.get("/api/pool/provider_stats", dependencies=[Depends(verify_token)])
+async def pool_provider_stats():
+    """GET /api/pool/provider_stats — Per-provider call/error/latency summary (#405)."""
+    brain = state.brain
+    if brain is None:
+        return {"error": "no brain loaded", "code": "HTTP_503"}
+    if not hasattr(brain, "provider_stats"):
+        return {"error": "brain is not a ProviderPool", "code": "HTTP_400"}
+    return brain.provider_stats()
+
+
+@app.get("/api/doctor/gpu_memory", dependencies=[Depends(verify_token)])
+async def doctor_gpu_memory():
+    """GET /api/doctor/gpu_memory — GPU VRAM usage check (#406)."""
+    from castor.doctor import check_gpu_memory
+
+    ok, name, detail = check_gpu_memory()
+    return {"ok": ok, "name": name, "detail": detail}
+
+
 @app.on_event("shutdown")
 async def on_shutdown():
     # Close WebRTC peers

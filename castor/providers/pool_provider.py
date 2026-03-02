@@ -102,6 +102,9 @@ class ProviderPool(BaseProvider):
         self._sticky_session: bool = bool(config.get("pool_sticky_session", False))
         self._sticky_ttl_s: float = float(config.get("pool_sticky_ttl_s", 3600.0))
 
+        # Issue #399: treat blank/empty raw_text as failure and retry next provider
+        self._fallback_on_empty: bool = bool(config.get("pool_fallback_on_empty", False))
+
         # Issue #345: Cost tracking — per-provider cumulative token/USD accounting
         # Config: pool_cost_per_1k_tokens — dict mapping provider name to USD per 1k tokens
         self._cost_per_1k: Dict[str, float] = dict(config.get("pool_cost_per_1k_tokens", {}))
@@ -586,6 +589,44 @@ class ProviderPool(BaseProvider):
         }
         return summary
 
+    def provider_stats(self) -> Dict[str, Any]:
+        """Return per-provider call count, error count, and latency summary (Issue #405).
+
+        Returns:
+            Dict with key ``"providers"`` mapping to a list of per-provider dicts:
+            ``{name, index, calls, cost_usd_total, tokens_total, avg_latency_ms, degraded, cb_open}``
+        """
+        from castor.metrics import get_registry
+
+        registry = get_registry()
+        tracker = registry._provider_latency  # ProviderLatencyTracker
+
+        stats = []
+        for i, p in enumerate(self._providers):
+            name = getattr(p, "model_name", None) or f"pool[{i}]"
+            cost_entry = self._cost_tracker.get(i, {})
+
+            # Get latency p50 from tracker
+            avg_ms = tracker.percentile(name, 0.5)
+
+            stat = {
+                "name": name,
+                "index": i,
+                "calls": int(cost_entry.get("calls", 0)),
+                "cost_usd_total": float(cost_entry.get("cost_usd_total", 0.0)),
+                "tokens_total": int(cost_entry.get("tokens_total", 0)),
+                "avg_latency_ms": float(avg_ms) if avg_ms is not None else None,
+                "degraded": i in self._degraded,
+                "cb_open": i in self._cb_open_until and self._cb_open_until[i] > time.monotonic(),
+            }
+            stats.append(stat)
+
+        return {
+            "providers": stats,
+            "strategy": self._strategy,
+            "pool_size": len(self._providers),
+        }
+
     # ------------------------------------------------------------------
     # Issue #340: Shadow mode helpers
     # ------------------------------------------------------------------
@@ -816,6 +857,9 @@ class ProviderPool(BaseProvider):
                     self._ab_record(ab_group, success=True)
                 self._record_thought(instruction, result)
                 self._record_cost(start_idx, result)
+                # Issue #399: raise on empty response when no fallback is available
+                if self._fallback_on_empty and (not result.raw_text or not result.raw_text.strip()):
+                    raise RuntimeError("ProviderPool: provider returned empty response")
                 # Sticky: bind this conversation to the successful provider
                 self._set_sticky_provider(conversation_id, start_idx)
                 if self._shadow_provider is not None:
@@ -845,6 +889,14 @@ class ProviderPool(BaseProvider):
                 self._burst_check(idx, latency_ms)
                 if self._strategy == "adaptive":
                     self._update_adaptive_weight(idx, latency_ms)
+                # Issue #399: treat blank response as failure if configured
+                if self._fallback_on_empty and (not result.raw_text or not result.raw_text.strip()):
+                    logger.warning(
+                        "ProviderPool: provider %s returned empty response — trying next",
+                        getattr(provider, "model_name", str(provider)),
+                    )
+                    last_exc = RuntimeError("empty response")
+                    continue
                 if ab_group is not None:
                     self._ab_record(ab_group, success=True)
                 self._record_thought(instruction, result)

@@ -354,6 +354,76 @@ def check_memory_usage() -> tuple:
         return False, _NAME, str(exc)
 
 
+def check_gpu_memory() -> tuple:
+    """Check GPU VRAM usage, warn when ≥80% used (Issue #406).
+
+    Tries nvidia-smi first, then torch.cuda, then returns a skip result.
+
+    Returns:
+        ``(ok, 'GPU memory', detail_str)``
+    """
+    _NAME = "GPU memory"
+    _THRESHOLD = 80.0
+
+    # ── nvidia-smi ──────────────────────────────────────────────────────
+    try:
+        import subprocess as _sub
+
+        result = _sub.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.used,memory.total",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            lines = [ln.strip() for ln in result.stdout.strip().splitlines() if ln.strip()]
+            if lines:
+                # Take the first GPU
+                parts = lines[0].split(",")
+                used_mb = float(parts[0].strip())
+                total_mb = float(parts[1].strip())
+                if total_mb > 0:
+                    pct = used_mb / total_mb * 100.0
+                    free_mb = total_mb - used_mb
+                    if pct >= _THRESHOLD:
+                        return (
+                            False,
+                            _NAME,
+                            f"{pct:.1f}% VRAM used ({free_mb:.0f} MB free) — GPU >80% full",
+                        )
+                    return True, _NAME, f"{pct:.1f}% VRAM used ({free_mb:.0f} MB free)"
+    except (FileNotFoundError, Exception):
+        pass
+
+    # ── torch.cuda fallback ─────────────────────────────────────────────
+    try:
+        import torch as _torch  # type: ignore[import-untyped]
+
+        if _torch.cuda.is_available():
+            used_bytes = _torch.cuda.memory_allocated()
+            total_bytes = _torch.cuda.get_device_properties(0).total_memory
+            if total_bytes > 0:
+                pct = used_bytes / total_bytes * 100.0
+                free_mb = (total_bytes - used_bytes) / (1024 * 1024)
+                if pct >= _THRESHOLD:
+                    return (
+                        False,
+                        _NAME,
+                        f"{pct:.1f}% VRAM used ({free_mb:.0f} MB free) — GPU >80% full",
+                    )
+                return True, _NAME, f"{pct:.1f}% VRAM used ({free_mb:.0f} MB free)"
+    except ImportError:
+        pass
+    except Exception as exc:
+        return False, _NAME, str(exc)
+
+    return True, _NAME, "no GPU detected — skipping"
+
+
 def run_all_checks(config_path=None):
     """Run every health check.  Returns a flat list of (ok, name, detail) tuples."""
     results = []
@@ -389,6 +459,8 @@ def run_all_checks(config_path=None):
     results.append(check_disk_space())
     # Issue #382: memory usage check
     results.append(check_memory_usage())
+    # Issue #406: GPU VRAM check
+    results.append(check_gpu_memory())
 
     return results
 
