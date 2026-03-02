@@ -293,6 +293,13 @@ class IMUDriver:
         self._step_threshold: float = float(os.getenv("IMU_STEP_THRESHOLD", "1.2"))
         self._step_in_peak: bool = False
 
+        # Issue #391 — adaptive calibration for step_counter
+        self._cal_samples: list = []  # idle magnitude readings
+        self._cal_n_idle: int = int(os.getenv("IMU_STEP_CAL_IDLE_N", "20"))
+        self._cal_factor: float = float(os.getenv("IMU_STEP_CAL_FACTOR", "2.0"))
+        self._cal_noise_floor: Optional[float] = None
+        self._calibrated: bool = False
+
         # ── Tap detection (#357) ──────────────────────────────────────────────
         self._last_tap_time: Optional[float] = None
         self._tap_count: int = 0
@@ -947,6 +954,94 @@ class IMUDriver:
         """Reset the accumulated step counter to zero."""
         self._step_count = 0
         self._step_in_peak = False
+
+    # ── Issue #391 — adaptive calibration ─────────────────────────────────────
+
+    def calibrate_step_threshold(
+        self,
+        n_idle: Optional[int] = None,
+        calibration_factor: Optional[float] = None,
+    ) -> dict:
+        """Collect idle accelerometer readings and compute an adaptive threshold.
+
+        Reads the IMU ``n_idle`` times in the current mode (or collects the
+        buffered idle samples) and sets ``_step_threshold`` to
+        ``noise_floor * calibration_factor``.  In mock mode, returns a fixed
+        noise floor of ``1.0 g`` and sets ``_calibrated = True`` immediately.
+
+        Args:
+            n_idle:             Number of idle readings to collect (default from
+                                ``IMU_STEP_CAL_IDLE_N`` env var, usually 20).
+            calibration_factor: Multiplier applied to the noise floor
+                                (default from ``IMU_STEP_CAL_FACTOR``, usually 2.0).
+
+        Returns:
+            ``{"noise_floor_g": float, "threshold_g": float,
+               "calibrated": bool, "samples": int, "mode": str}``.
+            Never raises.
+        """
+        _n = int(n_idle) if n_idle is not None else self._cal_n_idle
+        _factor = float(calibration_factor) if calibration_factor is not None else self._cal_factor
+
+        try:
+            if self._mode != "hardware":
+                # Mock mode: assume 1 g noise floor
+                self._cal_noise_floor = 1.0
+                self._step_threshold = 1.0 * _factor
+                self._calibrated = True
+                return {
+                    "noise_floor_g": self._cal_noise_floor,
+                    "threshold_g": self._step_threshold,
+                    "calibrated": True,
+                    "samples": _n,
+                    "mode": self._mode,
+                }
+
+            samples: list = []
+            for _ in range(_n):
+                try:
+                    data = self.read()
+                    accel = data.get("accel_g", {})
+                    ax = float(accel.get("x", 0.0))
+                    ay = float(accel.get("y", 0.0))
+                    az = float(accel.get("z", 0.0))
+                    mag = math.sqrt(ax * ax + ay * ay + az * az)
+                    samples.append(mag)
+                except Exception:
+                    pass
+
+            if not samples:
+                return {
+                    "noise_floor_g": None,
+                    "threshold_g": self._step_threshold,
+                    "calibrated": False,
+                    "samples": 0,
+                    "mode": self._mode,
+                }
+
+            noise_floor = sum(samples) / len(samples)
+            self._cal_noise_floor = noise_floor
+            self._step_threshold = noise_floor * _factor
+            self._calibrated = True
+            self._cal_samples = samples
+
+            return {
+                "noise_floor_g": round(noise_floor, 4),
+                "threshold_g": round(self._step_threshold, 4),
+                "calibrated": True,
+                "samples": len(samples),
+                "mode": self._mode,
+            }
+
+        except Exception as exc:
+            logger.warning("IMUDriver.calibrate_step_threshold error: %s", exc)
+            return {
+                "noise_floor_g": None,
+                "threshold_g": self._step_threshold,
+                "calibrated": False,
+                "samples": 0,
+                "mode": self._mode,
+            }
 
     def reset_pose(self) -> None:
         """Zero all accumulated pose state.

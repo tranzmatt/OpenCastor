@@ -118,6 +118,8 @@ class LidarDriver:
         self._scan_count: int = 0
         self._last_scan: list = []
         self._prev_scan_points: list = []  # ── Issue #358: moving_objects() history
+        # Issue #393: per-obstacle velocity tracking
+        self._vel_prev_sectors: dict = {}  # sector → (dist_mm, ts)
         # Issue #376: accumulated SLAM occupancy map
         self._slam_map: Optional[List[List[float]]] = None
         self._slam_map_size_m: float = 5.0
@@ -371,6 +373,71 @@ class LidarDriver:
             "nearest_angle_deg": round(global_angle, 1),
             "sectors": sector_result,
         }
+
+    # ── Issue #393 — per-obstacle velocity tracking ───────────────────────────
+
+    def obstacles_with_velocity(self) -> dict:
+        """Return per-sector obstacle distances with approach/recession velocity.
+
+        Extends :meth:`obstacles` by tracking each sector's minimum distance
+        between consecutive calls and computing velocity as:
+        ``velocity_mm_s = (current_dist - prev_dist) / elapsed_s``
+
+        A **negative** velocity means the obstacle is *approaching*; a
+        **positive** velocity means it is *receding*.
+
+        On the first call (no previous snapshot) velocities are ``0.0``.
+        In mock mode (no real scan), all distances and velocities are ``None``
+        / ``0.0`` respectively.  Never raises.
+
+        Returns:
+            ``{
+                "sectors": {
+                    "front": {"dist_mm": float|None, "velocity_mm_s": float},
+                    "right": ...,
+                    "rear":  ...,
+                    "left":  ...,
+                },
+                "min_distance_mm": float|None,
+                "nearest_angle_deg": float,
+                "mode": str,
+            }``
+        """
+        import time as _time
+
+        now = _time.time()
+        try:
+            base = self.obstacles()
+            sectors_dist = base.get("sectors", {})
+            result_sectors = {}
+            for sector, dist in sectors_dist.items():
+                prev_entry = self._vel_prev_sectors.get(sector)
+                if prev_entry is not None and dist is not None and prev_entry[0] is not None:
+                    prev_dist, prev_ts = prev_entry
+                    elapsed = now - prev_ts
+                    vel = (dist - prev_dist) / elapsed if elapsed > 0 else 0.0
+                else:
+                    vel = 0.0
+                result_sectors[sector] = {
+                    "dist_mm": dist,
+                    "velocity_mm_s": round(vel, 4),
+                }
+                self._vel_prev_sectors[sector] = (dist, now)
+
+            return {
+                "sectors": result_sectors,
+                "min_distance_mm": base.get("min_distance_mm"),
+                "nearest_angle_deg": base.get("nearest_angle_deg", 0.0),
+                "mode": self._mode,
+            }
+        except Exception as exc:
+            logger.warning("LidarDriver.obstacles_with_velocity error: %s", exc)
+            return {
+                "sectors": {s: {"dist_mm": None, "velocity_mm_s": 0.0} for s in _SECTORS},
+                "min_distance_mm": None,
+                "nearest_angle_deg": 0.0,
+                "mode": self._mode,
+            }
 
     # ── Zone map ──────────────────────────────────────────────────────────────
 

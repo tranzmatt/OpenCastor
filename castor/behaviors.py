@@ -124,6 +124,10 @@ class BehaviorRunner:
         self._events: Dict[str, Any] = {}  # name → threading.Event
         self._events_lock: _threading2.Lock = _threading2.Lock()
 
+        # Issue #387: robot tag set for tag-based step filtering
+        robot_tags = self.config.get("robot_tags") or self.config.get("tags") or []
+        self._robot_tags: set = set(robot_tags) if robot_tags else set()
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -216,6 +220,17 @@ class BehaviorRunner:
                     logger.warning("Unknown step type '%s' at index %d — skipping", step_type, i)
                     continue
 
+                # Issue #387: tag-based step filtering
+                if not self._step_tags_match(step):
+                    logger.debug(
+                        "Step %d (%s): tags %r not in robot tags %r — skipping",
+                        i,
+                        step_type,
+                        step.get("tags"),
+                        self._robot_tags,
+                    )
+                    continue
+
                 logger.debug("Step %d: %s %r", i, step_type, step)
                 try:
                     handler(step)
@@ -240,6 +255,35 @@ class BehaviorRunner:
                 self.driver.stop()
             except Exception as exc:
                 logger.warning("Driver stop error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # Issue #387 — tag-based step filtering
+    # ------------------------------------------------------------------
+
+    def _step_tags_match(self, step: dict) -> bool:
+        """Return True if *step* should execute given ``self._robot_tags``.
+
+        A step is executed when:
+
+        * The step has no ``tags`` key (unconditional).
+        * The step's ``tags`` list is empty.
+        * The step's ``tags`` list intersects ``self._robot_tags``.
+
+        When ``self._robot_tags`` is empty *all* steps pass (the robot has no
+        tag filter configured).
+
+        Args:
+            step: Step dict (may or may not have a ``"tags"`` key).
+
+        Returns:
+            ``True`` when the step should run, ``False`` to skip it.
+        """
+        step_tags = step.get("tags")
+        if not step_tags:  # no tags on step → always run
+            return True
+        if not self._robot_tags:  # robot has no tags configured → run all
+            return True
+        return bool(set(step_tags) & self._robot_tags)
 
     # ------------------------------------------------------------------
     # Step handlers
@@ -655,6 +699,15 @@ class BehaviorRunner:
         for inner_step in inner_steps:
             if not self._running:
                 break
+            # Issue #387: tag-based step filtering
+            if not self._step_tags_match(inner_step):
+                logger.debug(
+                    "%s: step tags %r not in robot tags %r — skipping",
+                    context,
+                    inner_step.get("tags"),
+                    self._robot_tags,
+                )
+                continue
             step_type = inner_step.get("type", "")
             handler = self._step_handlers.get(step_type)
             if handler is None:

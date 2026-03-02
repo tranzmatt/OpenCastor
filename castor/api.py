@@ -5625,6 +5625,35 @@ async def memory_clusters(n_clusters: int = 5, limit: int = 500):
         return JSONResponse(status_code=400, content={"error": str(exc), "code": "HTTP_400"})
 
 
+@app.get("/api/lidar/obstacles_velocity", dependencies=[Depends(verify_token)])
+async def lidar_obstacles_velocity():
+    """GET /api/lidar/obstacles_velocity — Per-sector obstacle velocity tracking (#393)."""
+    from castor.drivers.lidar_driver import get_lidar
+
+    lidar = get_lidar()
+    return lidar.obstacles_with_velocity()
+
+
+@app.get("/api/metrics/channel_message_histogram", dependencies=[Depends(verify_token)])
+async def metrics_channel_message_histogram():
+    """GET /api/metrics/channel_message_histogram — Binned channel message counts (#395)."""
+    from castor.metrics import get_registry
+
+    return get_registry().channel_message_histogram()
+
+
+@app.get("/api/imu/step_counter/calibrate", dependencies=[Depends(verify_token)])
+async def imu_calibrate_step_threshold(
+    n_idle: int = 20,
+    calibration_factor: float = 2.0,
+):
+    """GET /api/imu/step_counter/calibrate — Adaptive step threshold calibration (#391)."""
+    from castor.drivers.imu_driver import get_imu
+
+    imu = get_imu()
+    return imu.calibrate_step_threshold(n_idle=n_idle, calibration_factor=calibration_factor)
+
+
 @app.on_event("shutdown")
 async def on_shutdown():
     # Close WebRTC peers

@@ -416,6 +416,8 @@ class MetricsRegistry:
         self._lock = threading.Lock()
         self._start_time = time.time()
         self._enabled = True
+        # Issue #395: per-channel cumulative message counts for message histogram
+        self._channel_msg_counts: Dict[str, int] = {}
 
         # Pre-register standard OpenCastor metrics
         self._init_standard_metrics()
@@ -522,6 +524,9 @@ class MetricsRegistry:
             c.inc(channel=channel)
         if self._enabled:
             self._channel_interarrival.record(channel)
+            # Issue #395: track cumulative count for message histogram
+            with self._lock:
+                self._channel_msg_counts[channel] = self._channel_msg_counts.get(channel, 0) + 1
 
     def record_provider_error(self, provider_name: str, error_type: str = "unknown") -> None:
         """Increment the per-provider error counter.
@@ -705,6 +710,43 @@ class MetricsRegistry:
                 "channel_rate_histogram error: %s", exc
             )
         return result
+
+    def channel_message_histogram(self) -> Dict[str, Any]:
+        """Return binned message-count distribution per channel (Issue #395).
+
+        Buckets: 1, 5, 10, 50, 100, 500, 1000, +Inf.  Each bucket reports
+        the cumulative count of channels with total message count ≤ bucket
+        value.  Also returns a ``per_channel`` dict with the raw count for
+        each channel.
+
+        Returns:
+            ``{
+                "buckets": {1: int, 5: int, ..., "+Inf": int},
+                "per_channel": {channel: count},
+            }``
+            Never raises.
+        """
+        _BUCKETS = [1, 5, 10, 50, 100, 500, 1000]
+        try:
+            with self._lock:
+                per_channel = dict(self._channel_msg_counts)
+
+            bucket_counts: Dict[str, int] = {str(b): 0 for b in _BUCKETS}
+            bucket_counts["+Inf"] = len(per_channel)
+
+            for count in per_channel.values():
+                for b in _BUCKETS:
+                    if count <= b:
+                        bucket_counts[str(b)] += 1
+
+            return {"buckets": bucket_counts, "per_channel": per_channel}
+        except Exception as exc:
+            import logging as _logging
+
+            _logging.getLogger("OpenCastor.Metrics").warning(
+                "channel_message_histogram error: %s", exc
+            )
+            return {"buckets": {}, "per_channel": {}}
 
 
 # ── Singleton ─────────────────────────────────────────────────────────────────

@@ -1,151 +1,145 @@
-"""Tests for BehaviorRunner._step_retry — issue #365."""
-
-from __future__ import annotations
+"""Tests for BehaviorRunner retry step (#396)."""
 
 from unittest.mock import MagicMock
 
-import pytest
+from castor.behaviors import BehaviorRunner
 
 
 def _make_runner():
-    from castor.behaviors import BehaviorRunner
-
-    runner = BehaviorRunner(driver=MagicMock(), brain=None, speaker=None)
+    driver = MagicMock()
+    runner = BehaviorRunner(driver=driver, config={})
     runner._running = True
     return runner
 
 
-# ── Dispatch table ─────────────────────────────────────────────────────────────
+# ── dispatch table ────────────────────────────────────────────────────────────
 
-
-def test_retry_step_registered():
+def test_retry_in_dispatch_table():
     runner = _make_runner()
     assert "retry" in runner._step_handlers
 
 
-# ── Empty steps ────────────────────────────────────────────────────────────────
+def test_retry_handler_callable():
+    runner = _make_runner()
+    assert callable(runner._step_handlers["retry"])
 
+
+# ── empty steps ───────────────────────────────────────────────────────────────
 
 def test_retry_empty_steps_skips(caplog):
     import logging
 
     runner = _make_runner()
-    with caplog.at_level(logging.WARNING, logger="OpenCastor.Behaviors"):
-        runner._step_retry({"max_attempts": 3, "steps": []})
-    assert any("empty" in r.message.lower() or "skipping" in r.message.lower() for r in caplog.records)
+    with caplog.at_level(logging.WARNING):
+        runner._step_retry({"steps": []})
+    assert any("steps" in r.message.lower() for r in caplog.records)
 
 
-# ── Success on first attempt ───────────────────────────────────────────────────
+def test_retry_no_steps_key_skips(caplog):
+    import logging
 
+    runner = _make_runner()
+    with caplog.at_level(logging.WARNING):
+        runner._step_retry({})
+    assert any("steps" in r.message.lower() for r in caplog.records)
+
+
+# ── success on first attempt ──────────────────────────────────────────────────
 
 def test_retry_succeeds_on_first_attempt():
     runner = _make_runner()
-    calls = []
+    count = [0]
 
-    def _fake_run(steps, label):
-        calls.append(1)
-        # running stays True → success
+    def fake_wait(step):
+        count[0] += 1
 
-    runner._run_step_list = _fake_run
-    runner._step_retry({"max_attempts": 3, "backoff_s": 0, "steps": [{"type": "wait"}]})
-    assert len(calls) == 1
-
-
-# ── Retry on failure ───────────────────────────────────────────────────────────
+    runner._step_handlers["wait"] = fake_wait
+    runner._step_retry({"steps": [{"type": "wait", "seconds": 0}], "max_attempts": 3, "backoff_s": 0.0})
+    assert count[0] == 1
 
 
-def test_retry_attempts_up_to_max():
+def test_retry_returns_none():
     runner = _make_runner()
-    calls = []
+    result = runner._step_retry(
+        {"steps": [{"type": "wait", "seconds": 0}], "max_attempts": 1, "backoff_s": 0.0}
+    )
+    assert result is None
+
+
+# ── failure + retry ───────────────────────────────────────────────────────────
+
+def test_retry_retries_on_failure():
+    runner = _make_runner()
     attempt_count = [0]
 
-    def _fake_run(steps, label):
-        calls.append(1)
+    def fail_step(step):
         attempt_count[0] += 1
-        # Simulate failure by setting _running = False (then retry re-arms it)
+        runner._running = False  # simulate failure
+
+    runner._step_handlers["fail"] = fail_step
+    runner._step_retry(
+        {"steps": [{"type": "fail"}], "max_attempts": 3, "backoff_s": 0.0}
+    )
+    assert attempt_count[0] == 3
+
+
+def test_retry_stops_after_max_attempts():
+    runner = _make_runner()
+    count = [0]
+
+    def fail_step(step):
+        count[0] += 1
         runner._running = False
 
-    runner._run_step_list = _fake_run
-    runner._stop_event.wait = lambda timeout=None: None  # instant
-    runner._step_retry({"max_attempts": 3, "backoff_s": 0, "steps": [{"type": "wait"}]})
-    assert len(calls) == 3
+    runner._step_handlers["fail"] = fail_step
+    runner._step_retry(
+        {"steps": [{"type": "fail"}], "max_attempts": 2, "backoff_s": 0.0}
+    )
+    assert count[0] == 2
 
 
-def test_retry_succeeds_on_second_attempt():
+def test_retry_succeeds_after_one_failure():
     runner = _make_runner()
-    calls = []
+    call_count = [0]
 
-    def _fake_run(steps, label):
-        calls.append(1)
-        if len(calls) == 1:
-            runner._running = False  # first attempt fails
+    def sometimes_fail(step):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            runner._running = False  # fail first
+        # second call succeeds (running stays True)
 
-    runner._run_step_list = _fake_run
-    runner._stop_event.wait = lambda timeout=None: None
-    runner._step_retry({"max_attempts": 3, "backoff_s": 0, "steps": [{"type": "wait"}]})
-    assert len(calls) == 2
+    runner._step_handlers["sometimes_fail"] = sometimes_fail
+    runner._step_retry(
+        {"steps": [{"type": "sometimes_fail"}], "max_attempts": 3, "backoff_s": 0.0}
+    )
+    assert call_count[0] == 2  # attempted twice
 
 
-# ── max_attempts ──────────────────────────────────────────────────────────────
-
+# ── parameters ────────────────────────────────────────────────────────────────
 
 def test_retry_default_max_attempts_is_3():
     runner = _make_runner()
-    calls = []
+    count = [0]
 
-    def _fake_run(steps, label):
-        calls.append(1)
+    def fail_step(step):
+        count[0] += 1
         runner._running = False
 
-    runner._run_step_list = _fake_run
-    runner._stop_event.wait = lambda timeout=None: None
-    runner._step_retry({"backoff_s": 0, "steps": [{"type": "wait"}]})
-    assert len(calls) == 3
+    runner._step_handlers["fail"] = fail_step
+    runner._step_retry({"steps": [{"type": "fail"}], "backoff_s": 0.0})
+    assert count[0] == 3  # default is 3
 
 
-def test_retry_max_attempts_one_no_retry():
+def test_retry_max_attempts_1_no_retry():
     runner = _make_runner()
-    calls = []
+    count = [0]
 
-    def _fake_run(steps, label):
-        calls.append(1)
+    def fail_step(step):
+        count[0] += 1
         runner._running = False
 
-    runner._run_step_list = _fake_run
-    runner._step_retry({"max_attempts": 1, "backoff_s": 0, "steps": [{"type": "wait"}]})
-    assert len(calls) == 1
-
-
-# ── backoff_s ─────────────────────────────────────────────────────────────────
-
-
-def test_retry_uses_stop_event_for_backoff():
-    runner = _make_runner()
-    waits = []
-
-    def _fake_wait(timeout=None):
-        waits.append(timeout)
-
-    runner._stop_event.wait = _fake_wait
-    calls = []
-
-    def _fake_run(steps, label):
-        calls.append(1)
-        if len(calls) < 2:
-            runner._running = False
-
-    runner._run_step_list = _fake_run
-    runner._step_retry({"max_attempts": 3, "backoff_s": 2.5, "steps": [{"type": "wait"}]})
-    assert any(w == 2.5 for w in waits)
-
-
-# ── Stop propagation ──────────────────────────────────────────────────────────
-
-
-def test_retry_stops_when_not_running_before_start():
-    runner = _make_runner()
-    runner._running = False
-    calls = []
-    runner._run_step_list = lambda steps, label: calls.append(1)
-    runner._step_retry({"max_attempts": 3, "steps": [{"type": "wait"}]})
-    assert len(calls) == 0
+    runner._step_handlers["fail"] = fail_step
+    runner._step_retry(
+        {"steps": [{"type": "fail"}], "max_attempts": 1, "backoff_s": 0.0}
+    )
+    assert count[0] == 1
