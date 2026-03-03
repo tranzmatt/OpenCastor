@@ -296,3 +296,81 @@ def _show_config(config: dict, has_rich: bool, console):
         for line in text.splitlines():
             print(f"    {line}")
         print()
+
+
+# ---------------------------------------------------------------------------
+# Gate config parsing (used by main.py / api.py at startup)
+# ---------------------------------------------------------------------------
+
+def parse_confidence_gates(config: dict) -> list:
+    """Parse ``agent.confidence_gates`` from a config dict.
+
+    Returns a list of :class:`~castor.confidence_gate.ConfidenceGate` objects.
+    Returns an empty list when the key is absent.
+
+    Example RCAN YAML::
+
+        agent:
+          confidence_gates:
+            - scope: control
+              min_confidence: 0.6
+              on_fail: escalate
+    """
+    from castor.confidence_gate import ConfidenceGate
+
+    raw = config.get("agent", {}).get("confidence_gates", []) or []
+    gates = []
+    for g in raw:
+        try:
+            gates.append(
+                ConfidenceGate(
+                    scope=g["scope"],
+                    min_confidence=float(g["min_confidence"]),
+                    on_fail=g.get("on_fail", "escalate"),
+                )
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            import logging
+            logging.getLogger("OpenCastor.Configure").warning(
+                "Skipping malformed confidence_gate entry: %s (%s)", g, exc
+            )
+    return gates
+
+
+def parse_hitl_gates(config: dict) -> list:
+    """Parse ``agent.hitl_gates`` from a config dict.
+
+    Returns a list of :class:`~castor.hitl_gate.HiTLGate` objects.
+    Returns an empty list when the key is absent.
+
+    Example RCAN YAML::
+
+        agent:
+          hitl_gates:
+            - action_types: [grip]
+              require_auth: true
+              auth_timeout_ms: 30000
+              on_timeout: block
+              notify: [whatsapp]
+    """
+    from castor.hitl_gate import HiTLGate
+
+    raw = config.get("agent", {}).get("hitl_gates", []) or []
+    gates = []
+    for g in raw:
+        try:
+            gates.append(
+                HiTLGate(
+                    action_types=list(g.get("action_types", [])),
+                    require_auth=bool(g.get("require_auth", True)),
+                    auth_timeout_ms=int(g.get("auth_timeout_ms", 30000)),
+                    on_timeout=g.get("on_timeout", "block"),
+                    notify=list(g.get("notify", [])),
+                )
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            import logging
+            logging.getLogger("OpenCastor.Configure").warning(
+                "Skipping malformed hitl_gate entry: %s (%s)", g, exc
+            )
+    return gates

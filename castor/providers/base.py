@@ -1,6 +1,8 @@
 import json
 import logging
+import uuid
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Any, Dict, Iterator, List, Optional
 
 logger = logging.getLogger("OpenCastor.BaseProvider")
@@ -23,13 +25,22 @@ class ProviderQuotaError(Exception):
         self.http_status = http_status
 
 
+@dataclass
 class Thought:
     """Hardware-agnostic representation of a single AI reasoning step."""
 
-    def __init__(self, raw_text: str, action: Optional[Dict] = None):
-        self.raw_text = raw_text
-        self.action = action  # The strict JSON command (e.g., {"linear": 0.5})
-        self.confidence = 1.0
+    raw_text: str
+    action: Optional[Dict] = None  # The strict JSON command (e.g., {"linear": 0.5})
+    confidence: float = 1.0
+    # AI Decision Accountability fields (F1)
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    provider: str = ""
+    model: str = ""
+    model_version: Optional[str] = None
+    layer: str = "fast"           # reactive | fast | planner
+    latency_ms: Optional[int] = None
+    escalated: bool = False
+    gate_bypassed: bool = False
 
 
 class BaseProvider(ABC):

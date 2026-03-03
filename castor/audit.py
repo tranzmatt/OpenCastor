@@ -121,7 +121,14 @@ class AuditLog:
             # Cryptographic commitment (non-blocking; uses pre-generated pool key)
             if self._commitment_engine is not None:
                 try:
-                    record = self._commitment_engine.commit(entry)
+                    commit_payload = {
+                        "event": entry.get("event"),
+                        "message_id": entry.get("message_id"),
+                        "principal": entry.get("principal"),
+                        "outcome": entry.get("outcome"),
+                        "ai": entry.get("ai"),  # F5: model identity in commitment chain
+                    }
+                    record = self._commitment_engine.commit(commit_payload)
                     entry["commitment_id"] = record.id
                     entry["commitment_mode"] = record.key_mode
                     if record.qber is not None:
@@ -140,16 +147,34 @@ class AuditLog:
     # Convenience loggers
     # ------------------------------------------------------------------
 
-    def log_motor_command(self, action: dict, source: str = "brain"):
-        """Log a motor command."""
-        self.log(
-            "motor_command",
-            source=source,
+    def log_motor_command(self, action: dict, source: str = "brain", thought=None):
+        """Log a motor command.
+
+        Args:
+            action: The action dict dispatched to the driver.
+            source: Origin of the command (e.g. ``"brain"``).
+            thought: Optional :class:`~castor.providers.base.Thought` that produced
+                     the action.  When provided, an ``ai`` sub-dict is included in
+                     the audit entry with model identity and confidence fields.
+        """
+        kwargs = dict(
             action_type=action.get("type", "?"),
             linear=action.get("linear"),
             angular=action.get("angular"),
             intent_id=action.get("intent_id"),
         )
+        if thought is not None:
+            kwargs["ai"] = {
+                "provider": getattr(thought, "provider", ""),
+                "model": getattr(thought, "model", ""),
+                "model_version": getattr(thought, "model_version", None),
+                "layer": getattr(thought, "layer", "fast"),
+                "confidence": getattr(thought, "confidence", None),
+                "inference_latency_ms": getattr(thought, "latency_ms", None),
+                "thought_id": getattr(thought, "id", None),
+                "escalated": getattr(thought, "escalated", False),
+            }
+        self.log("motor_command", source=source, **kwargs)
 
     def log_approval(self, approval_id: int, decision: str, source: str = "cli"):
         """Log an approval decision."""

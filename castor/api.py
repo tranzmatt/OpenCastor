@@ -190,6 +190,8 @@ class AppState:
     behavior_job = None  # Current behavior job dict or None (issue #121)
     personality_registry = None  # PersonalityRegistry singleton (lazy-init)
     slam_mapper = None  # SLAMMapper instance (lazy-init, issue #136)
+    thought_log = None  # ThoughtLog instance (F4 — AI accountability)
+    hitl_gate_manager = None  # HiTLGateManager instance (F3 — HiTL gates)
 
 
 state = AppState()
@@ -4246,6 +4248,28 @@ async def on_startup():
             except Exception as _snap_exc:
                 logger.debug("Snapshot manager init skipped: %s", _snap_exc)
 
+            # Initialize ThoughtLog (F4 — AI accountability)
+            try:
+                from castor.thought_log import ThoughtLog
+
+                _tl_path = state.config.get("agent", {}).get("thought_log_path", None)
+                state.thought_log = ThoughtLog(max_memory=1000, storage_path=_tl_path)
+                logger.info("ThoughtLog initialized")
+            except Exception as _tl_exc:
+                logger.debug("ThoughtLog init skipped: %s", _tl_exc)
+
+            # Initialize HiTLGateManager (F3 — HiTL gates)
+            try:
+                from castor.configure import parse_hitl_gates
+                from castor.hitl_gate import HiTLGateManager
+
+                _hgates = parse_hitl_gates(state.config)
+                if _hgates:
+                    state.hitl_gate_manager = HiTLGateManager(_hgates)
+                    logger.info("HiTLGateManager initialized (%d gates)", len(_hgates))
+            except Exception as _hg_exc:
+                logger.debug("HiTLGateManager init skipped: %s", _hg_exc)
+
         except Exception as e:
             logger.warning(f"Config load error (gateway still operational): {e}")
     else:
@@ -5930,6 +5954,70 @@ async def doctor_cpu_temperature():
 
     ok, name, detail = check_cpu_temperature()
     return {"ok": ok, "name": name, "detail": detail}
+
+
+# ---------------------------------------------------------------------------
+# F4: Thought Log endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/thoughts/{thought_id}", dependencies=[Depends(verify_token)])
+async def get_thought(thought_id: str, request: Request):
+    """Return a recorded Thought by ID.
+
+    Requires at least ``viewer`` role (status scope).
+    The ``reasoning`` field is only included for ``admin`` / operator-level JWT.
+    """
+    _check_min_role(request, "viewer")
+
+    if state.thought_log is None:
+        raise HTTPException(status_code=503, detail="ThoughtLog not initialised")
+
+    # Include reasoning only for admin/operator (config scope)
+    role = getattr(request.state, "jwt_role", "viewer")
+    from castor.auth_jwt import ROLES
+    include_reasoning = ROLES.get(role, 0) >= ROLES.get("operator", 2)
+
+    entry = state.thought_log.get(thought_id, include_reasoning=include_reasoning)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Thought not found")
+    return JSONResponse(content=entry)
+
+
+# ---------------------------------------------------------------------------
+# F3: HiTL authorization endpoint
+# ---------------------------------------------------------------------------
+
+class HiTLAuthorizeRequest(BaseModel):
+    pending_id: str
+    decision: str  # "approve" | "deny"
+
+
+@app.post("/api/hitl/authorize", dependencies=[Depends(verify_token)])
+async def hitl_authorize(body: HiTLAuthorizeRequest, request: Request):
+    """Approve or deny a pending HiTL gate authorization request.
+
+    Requires ``admin`` role (OWNER+).
+    """
+    _check_min_role(request, "admin")
+
+    if body.decision not in ("approve", "deny"):
+        raise HTTPException(
+            status_code=400,
+            detail="decision must be 'approve' or 'deny'",
+        )
+
+    if state.hitl_gate_manager is None:
+        raise HTTPException(status_code=503, detail="HiTLGateManager not initialised")
+
+    resolved = state.hitl_gate_manager.authorize(body.pending_id, body.decision)
+    if not resolved:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No pending HiTL request with id '{body.pending_id}'",
+        )
+    return JSONResponse(
+        content={"ok": True, "pending_id": body.pending_id, "decision": body.decision}
+    )
 
 
 @app.on_event("shutdown")

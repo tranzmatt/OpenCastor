@@ -220,6 +220,7 @@ class TieredBrain:
         t0 = time.time()
         thought = self.fast.think(image_bytes, instruction)
         fast_ms = (time.time() - t0) * 1000
+        thought.layer = "fast"
         self.stats["fast_count"] += 1
 
         if thought.action:
@@ -254,6 +255,8 @@ class TieredBrain:
                 t0 = time.time()
                 plan_thought = self.planner.think(image_bytes, plan_instruction)
                 plan_ms = (time.time() - t0) * 1000
+                plan_thought.layer = "planner"
+                plan_thought.escalated = True
                 self.stats["planner_count"] += 1
                 if plan_thought.action:
                     self.last_plan = plan_thought.action

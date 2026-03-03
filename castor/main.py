@@ -970,6 +970,43 @@ def main():
     except Exception as e:
         logger.debug(f"Audit log skipped: {e}")
 
+    # 6g-i. CONFIDENCE GATE ENFORCER (F2)
+    confidence_gate_enforcer = None
+    try:
+        from castor.configure import parse_confidence_gates
+        from castor.confidence_gate import ConfidenceGateEnforcer
+
+        _cgates = parse_confidence_gates(config)
+        if _cgates:
+            confidence_gate_enforcer = ConfidenceGateEnforcer(_cgates)
+            logger.info("Confidence gate enforcer active (%d gates)", len(_cgates))
+    except Exception as e:
+        logger.debug(f"Confidence gate enforcer skipped: {e}")
+
+    # 6g-ii. HiTL GATE MANAGER (F3)
+    hitl_gate_manager = None
+    try:
+        from castor.configure import parse_hitl_gates
+        from castor.hitl_gate import HiTLGateManager
+
+        _hgates = parse_hitl_gates(config)
+        if _hgates:
+            hitl_gate_manager = HiTLGateManager(_hgates, audit=audit)
+            logger.info("HiTL gate manager active (%d gates)", len(_hgates))
+    except Exception as e:
+        logger.debug(f"HiTL gate manager skipped: {e}")
+
+    # 6g-iii. THOUGHT LOG (F4)
+    thought_log = None
+    try:
+        from castor.thought_log import ThoughtLog
+
+        _tl_path = config.get("agent", {}).get("thought_log_path", None)
+        thought_log = ThoughtLog(max_memory=1000, storage_path=_tl_path)
+        logger.info("Thought log active")
+    except Exception as e:
+        logger.debug(f"Thought log skipped: {e}")
+
     # 6h. CHANNELS (messaging — WhatsApp, Telegram, etc.)
     import queue as _queue
 
@@ -1283,6 +1320,13 @@ def main():
                 thought = brain.think(frame_bytes, instruction)
             fs.proc.record_thought(thought.raw_text, thought.action)
 
+            # Record thought to ThoughtLog (F4)
+            if thought_log is not None:
+                try:
+                    thought_log.record(thought)
+                except Exception as _tl_exc:
+                    logger.debug("ThoughtLog.record failed (non-fatal): %s", _tl_exc)
+
             # Watchdog heartbeat (brain responded successfully)
             if watchdog:
                 watchdog.heartbeat()
@@ -1378,7 +1422,7 @@ def main():
                                     logger.warning("Bounds warning: %s", bounds_result.details)
                                 driver.move(linear, angular)
                             if audit:
-                                audit.log_motor_command(safe_action)
+                                audit.log_motor_command(safe_action, thought=thought)
                         elif action_type == "stop":
                             driver.stop()
 
