@@ -204,7 +204,7 @@ class ProviderLatencyTracker:
     def providers(self) -> List[str]:
         """Return sorted list of provider names that have been observed."""
         with self._lock:
-            return sorted(self._data.keys())
+            return sorted(self._data.keys(), key=str)
 
     def render_percentiles(self) -> str:
         """Render p50/p95/p99 gauges in Prometheus text exposition format.
@@ -325,7 +325,7 @@ class ChannelInterArrivalTracker:
     def channels(self) -> List[str]:
         """Return sorted list of channel names that have been observed."""
         with self._lock:
-            return sorted(self._data.keys())
+            return sorted(self._data.keys(), key=str)
 
     def render(self) -> str:
         """Render labeled histogram in Prometheus text exposition format."""
@@ -384,7 +384,7 @@ class RequestRateTracker:
     def endpoints(self) -> List[str]:
         """Return sorted list of endpoint names that have been recorded."""
         with self._lock:
-            return sorted(self._timestamps.keys())
+            return sorted(self._timestamps.keys(), key=str)
 
     def render(self) -> str:
         """Render as opencastor_endpoint_rps gauge in Prometheus text format."""
