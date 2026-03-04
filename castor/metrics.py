@@ -222,7 +222,7 @@ class ProviderLatencyTracker:
             )
             lines.append(f"# TYPE {metric_name} gauge")
             with self._lock:
-                providers = sorted(self._data.keys())
+                providers = sorted(self._data.keys(), key=str)
             for provider in providers:
                 val = self.percentile(provider, pct_val)
                 if val is not None:
@@ -237,7 +237,7 @@ class ProviderLatencyTracker:
             f"# TYPE {name} histogram",
         ]
         with self._lock:
-            for provider in sorted(self._data.keys()):
+            for provider in sorted(self._data.keys(), key=str):
                 d = self._data[provider]
                 cumulative = 0.0
                 for b in self._buckets:
@@ -335,7 +335,7 @@ class ChannelInterArrivalTracker:
             f"# TYPE {name} histogram",
         ]
         with self._lock:
-            for channel in sorted(self._data.keys()):
+            for channel in sorted(self._data.keys(), key=str):
                 d = self._data[channel]
                 cumulative = 0.0
                 for b in self._buckets:
@@ -396,7 +396,7 @@ class RequestRateTracker:
         now = time.time()
         cutoff = now - self._window_s
         with self._lock:
-            for endpoint in sorted(self._timestamps.keys()):
+            for endpoint in sorted(self._timestamps.keys(), key=str):
                 recent = [t for t in self._timestamps[endpoint] if t >= cutoff]
                 rps = len(recent) / self._window_s if recent else 0.0
                 ep_safe = endpoint.replace('"', '\\"')
