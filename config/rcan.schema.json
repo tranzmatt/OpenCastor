@@ -29,7 +29,7 @@
         "author",
         "license"
       ],
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "robot_name": {
           "type": "string",
@@ -52,12 +52,10 @@
           "pattern": "^rcan://[a-zA-Z0-9_*-]+\\.[a-zA-Z0-9_*-]+\\.[a-zA-Z0-9_*-]+(/[a-zA-Z0-9_/-]*)?$"
         },
         "manufacturer": {
-          "type": "string",
-          "description": "Manufacturer or organisation identifier for RURI generation."
+          "type": "string"
         },
         "model": {
-          "type": "string",
-          "description": "Robot model name for RURI generation."
+          "type": "string"
         },
         "tags": {
           "type": "array",
@@ -72,6 +70,12 @@
         "description": {
           "type": "string",
           "description": "Human-readable description of this robot configuration."
+        },
+        "version": {
+          "type": "string"
+        },
+        "device_id": {
+          "type": "string"
         }
       }
     },
@@ -135,7 +139,9 @@
         "tools": {
           "type": "array",
           "description": "Extra tools to pass to the provider (e.g. ['code_execution'] for Gemini).",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "secondary_models": {
           "type": "array",
@@ -220,7 +226,7 @@
         "hailo_calibration": {
           "type": "number",
           "minimum": 0,
-          "description": "Hailo-8 distance-estimation calibration constant. distance_m ≈ calibration / bbox_area. Default: 0.25"
+          "description": "Hailo-8 distance-estimation calibration constant. distance_m \u2248 calibration / bbox_area. Default: 0.25"
         },
         "min_obstacle_m": {
           "type": "number",

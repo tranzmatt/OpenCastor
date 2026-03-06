@@ -169,9 +169,7 @@ def test_detect_platform_returns_string():
 
 
 def test_detect_platform_rpi(tmp_path):
-    model_file = tmp_path / "model"
-    model_file.write_text("Raspberry Pi 4 Model B")
-    with patch("builtins.open", lambda path, *a, **kw: open(model_file)):
+    with patch("castor.hardware_detect._read_device_tree_model", return_value="Raspberry Pi 4 Model B"):
         from castor.hardware_detect import _detect_platform
 
         assert _detect_platform() == "rpi"

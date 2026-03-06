@@ -3,6 +3,10 @@ rcan_version: "1.1.0"
 metadata:
   robot_name: "TestBot"
   robot_uuid: "00000000-0000-0000-0000-000000000001"
+  manufacturer: "opencastor"
+  model: "testbot"
+  version: "1.0.0"
+  device_id: "test-device-001"
   author: "OpenCastor Tests"
   license: "Apache-2.0"
   tags:

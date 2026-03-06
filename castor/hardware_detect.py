@@ -152,16 +152,21 @@ def detect_hardware() -> dict:
     return result
 
 
+def _read_device_tree_model(path: str = "/proc/device-tree/model") -> str:
+    """Read device tree model file. Extracted for testability."""
+    with open(path) as f:
+        return f.read()
+
+
 def _detect_platform() -> str:
     """Detect the current platform (Raspberry Pi, Jetson, or generic)."""
     # Check for Raspberry Pi
     try:
-        with open("/proc/device-tree/model") as f:
-            model = f.read().lower()
-            if "raspberry pi" in model:
-                return "rpi"
-            if "jetson" in model:
-                return "jetson"
+        model = _read_device_tree_model().lower()
+        if "raspberry pi" in model:
+            return "rpi"
+        if "jetson" in model:
+            return "jetson"
     except (FileNotFoundError, PermissionError):
         pass
 
