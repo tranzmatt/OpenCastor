@@ -222,10 +222,8 @@ jobs:
 
       - name: Generate SBOM (CycloneDX)
         run: |
-          pip install cyclonedx-bom
-          cyclonedx-py environment \
-            --output-format json \
-            --outfile opencastor-${{ github.ref_name }}-sbom.cyclonedx.json
+          pip install "cyclonedx-bom>=4,<5"
+          cyclonedx-bom -e -o opencastor-${{ github.ref_name }}-sbom.cyclonedx.json
           echo "SBOM generated:"
           python3 -c "import json; d=json.load(open('opencastor-${{ github.ref_name }}-sbom.cyclonedx.json')); print(f'Components: {len(d.get(\"components\", []))}')"
 
