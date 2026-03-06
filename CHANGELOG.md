@@ -6,6 +6,37 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.7.0] — 2026-03-06
+### What's New — "Whole Solution" Release
+The complete RCAN robot safety stack is now production-ready:
+
+#### Safety & Accountability
+- **Streaming inference loop** (`StreamingInferenceLoop`) — live perception at up to 10 FPS
+- **Confidence gates** — auto-block actions below configurable thresholds
+- **HiTL gates** — human-in-the-loop approval for critical actions
+- **Thought log** — full AI reasoning audit trail with JSONL persistence
+- **Commitment chain** — XDG-compliant HMAC-chained action ledger
+
+#### Compliance
+- `castor compliance` — generate structured compliance reports (text/JSON)
+- `castor doctor` — 13-point system health check
+- RCAN v1.2 compatibility (rcan_version field validation)
+
+#### Developer Experience
+- `castor update` — in-place self-update
+- `castor logs` — stream/tail commitment log entries
+- `castor benchmark` — measure inference latency
+- `castor register` — register robot at rcan.dev (interactive + programmatic)
+- Web wizard at port 8765 (`castor wizard --web`)
+- Episode memory replay (`castor memory replay`)
+
+#### Quality
+- 6,248+ tests across Python 3.10/3.11/3.12/3.13
+- Full ruff lint + format compliance
+- RCAN SDK integration tests (rcan-py + rcan-validate)
+
+---
+
 ## [2026.3.6.0] - 2026-03-06
 
 ### Added
