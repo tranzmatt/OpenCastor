@@ -65,6 +65,31 @@ Vulnerabilities that could cause physical harm (uncontrolled robot motion, safet
 
 Critical and High findings: we request a CVE via GitHub's CVE numbering authority partnership and coordinate a 90-day maximum embargo with the reporter.
 
+## RCAN Integration
+
+OpenCastor is the reference runtime for the [RCAN protocol](https://rcan.dev). The following RCAN-specific security surfaces apply:
+
+### Commitment Chain
+Every robot action is recorded as an HMAC-chained entry in the commitment log (`~/.local/share/opencastor/commitments.jsonl` by default, XDG-compliant). Chain integrity can be verified with:
+```bash
+rcan-validate audit ~/.local/share/opencastor/commitments.jsonl
+```
+The HMAC secret defaults to an environment variable (`OPENCASTOR_COMMITMENT_SECRET`) and falls back to a built-in default for development. **Production deployments must override this secret.**
+
+### Confidence Gates
+`agent.confidence_gates` in the RCAN config are a configurable safety surface — actions below the configured threshold are automatically blocked. Misconfigured or absent gates may allow low-confidence AI actions to execute unvetted.
+
+### HiTL Gates
+`agent.hitl_gates` require human approval before executing flagged action classes. Bypassing the approval channel (e.g., by setting `auto_approve: true` in a low-security environment) removes a critical safety layer.
+
+### Thought Log
+The AI thought log (`ThoughtLog`) records full reasoning traces as JSONL. These files may contain sensitive operational context. Restrict read access appropriately (`chmod 600`).
+
+### Compliance Reports
+`castor compliance` generates audit reports against RCAN §16 (AI Accountability). Reports are informational — they do not replace a security audit.
+
+---
+
 ## Responsible Disclosure Hall of Fame
 
 *(None yet — be the first.)*
