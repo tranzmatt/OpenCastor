@@ -35,7 +35,10 @@ jobs:
         run: |
           python3 .github/scripts/validate_rcan.py \
             --schema config/rcan.schema.json \
-            --dir .
+            --dir config/presets
+          python3 .github/scripts/validate_rcan.py \
+            --schema config/rcan.schema.json \
+            --dir tests/fixtures
 
       - name: Check setup docs sync
         run: python scripts/sync_setup_docs.py --check

@@ -25,3 +25,14 @@ drivers:
   - id: "motor_driver"
     protocol: "pca9685_i2c"
     port: "/dev/i2c-1"
+
+network:
+  telemetry_stream: false
+  sim_to_real_sync: false
+  allow_remote_override: false
+
+rcan_protocol:
+  port: 8000
+  capabilities: [status, nav]
+  enable_mdns: false
+  enable_jwt: false

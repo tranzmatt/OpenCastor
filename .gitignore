@@ -19,3 +19,8 @@ hailort.log
 *.audit.log
 .opencastor-audit.log
 !tests/fixtures/*.rcan.yaml
+
+# Local robot operation configs (not preset templates)
+bob.rcan.yaml
+alex.rcan.yaml
+9.rcan.yaml
