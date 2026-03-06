@@ -602,6 +602,71 @@ def check_rcan_compliance_version(config_path: Optional[str] = None) -> tuple[bo
         return True, "RCAN compliance", f"could not parse compatibility matrix: {exc}"
 
 
+def check_rcan_registry_reachable() -> tuple[str, str, str]:
+    """Check rcan.dev registry reachability and latency.
+
+    Returns ('PASS'|'WARN'|'FAIL', 'check_rcan_registry_reachable', detail)
+    """
+    try:
+        from castor.rcan.node_resolver import NodeResolver
+
+        resolver = NodeResolver()
+        ok, latency_ms = resolver.is_reachable(timeout=5)
+        if ok and latency_ms < 500:
+            return (
+                "PASS",
+                "check_rcan_registry_reachable",
+                f"rcan.dev reachable in {latency_ms:.0f}ms",
+            )
+        elif ok:
+            return (
+                "WARN",
+                "check_rcan_registry_reachable",
+                f"rcan.dev slow: {latency_ms:.0f}ms (>500ms)",
+            )
+        else:
+            return ("FAIL", "check_rcan_registry_reachable", "rcan.dev unreachable")
+    except Exception as e:
+        return ("WARN", "check_rcan_registry_reachable", f"Could not check rcan.dev: {e}")
+
+
+def check_rrn_valid(rrn: Optional[str] = None) -> tuple[str, str, str]:
+    """Verify the configured RRN resolves in the RCAN federation.
+
+    Returns ('PASS'|'WARN'|'SKIP', 'check_rrn_valid', detail)
+    """
+    if rrn is None:
+        try:
+            import os
+
+            import yaml  # type: ignore[import]
+
+            cfg_path = os.environ.get("RCAN_CONFIG", "rcan.yaml")
+            if not os.path.exists(cfg_path):
+                return ("SKIP", "check_rrn_valid", "No RCAN config found")
+            with open(cfg_path) as _f:
+                config = yaml.safe_load(_f)
+            rrn = config.get("metadata", {}).get("device_id")
+            if not rrn or not str(rrn).startswith("RRN-"):
+                return ("SKIP", "check_rrn_valid", "No RRN found in RCAN config")
+        except Exception:
+            return ("SKIP", "check_rrn_valid", "Could not read RCAN config")
+
+    try:
+        from castor.rcan.node_resolver import NodeResolver
+
+        resolver = NodeResolver()
+        robot = resolver.resolve(str(rrn))
+        source = "stale" if robot.stale else ("cached" if robot.from_cache else "live")
+        return (
+            "PASS",
+            "check_rrn_valid",
+            f"RRN {rrn} valid ({source}, resolved by {robot.resolved_by})",
+        )
+    except Exception as e:
+        return ("WARN", "check_rrn_valid", f"RRN {rrn} could not be resolved: {e}")
+
+
 def run_all_checks(config_path: Optional[str] = None) -> list[tuple[bool, str, str]]:
     """Run all checks and return list of (ok, name, detail) tuples."""
     checks = [
@@ -614,6 +679,8 @@ def run_all_checks(config_path: Optional[str] = None) -> list[tuple[bool, str, s
         check_memory_db_size,
         check_signal_channel,
         check_rcan_compliance_version,
+        check_rcan_registry_reachable,
+        check_rrn_valid,
     ]
     results = []
     for fn in checks:
