@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -212,10 +211,11 @@ async def replay_episodes(
             consolidation_fn = consolidate_episode
         except ImportError:
             try:
-                from castor.rcan.sdk_bridge import check_compliance  # fallback no-op
-                consolidation_fn = lambda ep: {"promoted": 0, "merged": 0}
+                def consolidation_fn(ep):
+                    return {"promoted": 0, "merged": 0}
             except Exception:
-                consolidation_fn = lambda ep: {"promoted": 0, "merged": 0}
+                def consolidation_fn(ep):
+                    return {"promoted": 0, "merged": 0}
 
     # Process episodes
     for ep_path in episode_files:
@@ -285,7 +285,7 @@ def run_replay_cli(args: Any) -> None:
     if dry_run:
         pr("\n[yellow]DRY RUN — no changes will be written[/yellow]")
 
-    pr(f"\n🔄 [bold]castor memory replay[/bold]"
+    pr("\n🔄 [bold]castor memory replay[/bold]"
        + (f"  since {since}" if since else "")
        + (f"  episode {ep_id}" if ep_id else "")
        + ("\n"))
