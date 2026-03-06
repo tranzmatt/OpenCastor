@@ -5,12 +5,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from castor.providers.deepseek_provider import DeepSeekProvider  # noqa: E402
+
 pytestmark = pytest.mark.skipif(
     __import__('importlib').util.find_spec('openai') is None,
     reason='openai not installed'
 )
-
-from castor.providers.deepseek_provider import DeepSeekProvider
 
 _CFG = {
     "provider": "deepseek",
