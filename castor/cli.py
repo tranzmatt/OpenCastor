@@ -663,6 +663,78 @@ def cmd_inspect(args) -> None:
     _pr("")
 
 
+def cmd_node(args) -> None:
+    """castor node — manage RCAN namespace delegation for this robot fleet."""
+    node_cmd = getattr(args, "node_cmd", None)
+
+    if node_cmd == "status":
+        try:
+            from castor.rcan.node_broadcaster import NodeBroadcaster, NodeConfig
+
+            config = NodeConfig()
+            broadcaster = NodeBroadcaster(config)
+            manifest = broadcaster.get_manifest()
+            print("RCAN Node Status:")
+            print(f"  Type:         {manifest['node_type']}")
+            print(f"  Operator:     {manifest['operator'] or '(not set)'}")
+            print(f"  Namespace:    {manifest['namespace_prefix']}")
+            print(f"  API Base:     {manifest['api_base'] or '(not set)'}")
+            print(f"  Capabilities: {', '.join(manifest['capabilities'])}")
+            print(f"  Last sync:    {manifest['last_sync']}")
+        except Exception as e:
+            print(f"❌ Error: {e}", file=__import__("sys").stderr)
+
+    elif node_cmd == "manifest":
+        import json
+
+        try:
+            from castor.rcan.node_broadcaster import NodeBroadcaster, NodeConfig
+
+            config = NodeConfig()
+            broadcaster = NodeBroadcaster(config)
+            manifest = broadcaster.get_manifest()
+            print(json.dumps(manifest, indent=2))
+        except Exception as e:
+            print(f"❌ Error: {e}", file=__import__("sys").stderr)
+
+    elif node_cmd == "resolve":
+        rrn = getattr(args, "rrn", None)
+        if not rrn:
+            print("  Usage: castor node resolve <RRN>")
+            return
+        try:
+            from castor.rcan.node_resolver import NodeResolver
+
+            resolver = NodeResolver()
+            robot = resolver.resolve(rrn)
+            source = "stale cache" if robot.stale else ("cache" if robot.from_cache else "live")
+            print(f"✅ {rrn}")
+            print(f"  Manufacturer: {robot.manufacturer}")
+            print(f"  Model:        {robot.model}")
+            print(f"  Attestation:  {robot.attestation}")
+            print(f"  Resolved by:  {robot.resolved_by} ({source})")
+        except Exception as e:
+            print(f"❌ {e}", file=__import__("sys").stderr)
+            raise SystemExit(1) from e
+
+    elif node_cmd == "ping":
+        try:
+            from castor.rcan.node_resolver import NodeResolver
+
+            resolver = NodeResolver()
+            ok, latency_ms = resolver.is_reachable()
+            if ok:
+                print(f"✅ rcan.dev reachable ({latency_ms:.0f}ms)")
+            else:
+                print(f"❌ rcan.dev unreachable ({latency_ms:.0f}ms)")
+                raise SystemExit(1)
+        except ImportError as e:
+            print(f"❌ {e}", file=__import__("sys").stderr)
+
+    else:
+        print("Usage: castor node <status|manifest|resolve|ping>")
+
+
 def cmd_register(args) -> None:
     """Register this robot with rcan.dev and get a globally unique RRN."""
     import os
@@ -683,6 +755,24 @@ def cmd_register(args) -> None:
         sys.exit(1)
 
     meta = config.get("metadata", {})
+
+    # --dry-run: validate and show what would be registered, no API calls
+    if getattr(args, "dry_run", False):
+        from castor.rcan.sdk_compat import validate_before_register
+
+        ok, issues = validate_before_register(config, strict=False)
+        for issue in issues:
+            print(f"  ⚠️  {issue}", file=sys.stderr)
+
+        print("\n🔍 Dry run — would register:")
+        print(f"  Name:         {meta.get('robot_name', meta.get('name', 'unnamed'))}")
+        print(f"  Manufacturer: {meta.get('manufacturer', 'unknown')}")
+        print(f"  Model:        {meta.get('model', meta.get('robot_name', 'unknown'))}")
+        print(f"  Version:      {meta.get('version', meta.get('firmware_version', 'v1'))}")
+        print(f"  RCAN version: {config.get('rcan_version', 'unknown')}")
+        print("  Registry:     https://rcan.dev/api/v1/robots")
+        print("\n✅ Dry run complete — no API calls made.")
+        return
 
     # Resolve fields (CLI args > config > prompts)
     manufacturer = args.manufacturer or meta.get("manufacturer") or ""
@@ -2579,6 +2669,29 @@ def main() -> None:
     p_fl_status = fleet_sub.add_parser("status", help="Show which groups each robot belongs to")
     p_fl_status.add_argument("--config", default=None)
 
+    # castor node — RCAN §17 namespace delegation
+    p_node = sub.add_parser(
+        "node",
+        help="Manage RCAN namespace delegation for this robot fleet",
+        epilog=(
+            "Examples:\n"
+            "  castor node status        # Show node broadcaster status\n"
+            "  castor node manifest      # Print /.well-known/rcan-node.json\n"
+            "  castor node resolve <RRN> # Resolve an RRN via federated registry\n"
+            "  castor node ping          # Check rcan.dev reachability\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    node_sub = p_node.add_subparsers(dest="node_cmd")
+
+    node_sub.add_parser("status", help="Show current node broadcaster status and manifest")
+    node_sub.add_parser("manifest", help="Print the /.well-known/rcan-node.json manifest")
+    p_node_resolve = node_sub.add_parser(
+        "resolve", help="Resolve an RRN via the federated registry"
+    )
+    p_node_resolve.add_argument("rrn", help="Robot Registry Number (e.g. RRN-AB-00000042)")
+    node_sub.add_parser("ping", help="Check rcan.dev registry reachability")
+
     # castor inspect
     p_inspect = sub.add_parser(
         "inspect",
@@ -2620,6 +2733,12 @@ def main() -> None:
     p_register.add_argument("--version", default=None, help="Override version string")
     p_register.add_argument(
         "--device-id", default=None, dest="device_id", help="Override device ID"
+    )
+    p_register.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Validate config and show what would be registered without making API calls",
     )
 
     # castor fix
@@ -3434,6 +3553,7 @@ def main() -> None:
         "streaming": cmd_streaming,
         "doctor": cmd_doctor,
         "update": cmd_update,
+        "node": cmd_node,
         "inspect": cmd_inspect,
         "verification": cmd_verification,
         "register": cmd_register,

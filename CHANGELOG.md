@@ -18,11 +18,30 @@ The complete RCAN robot safety stack is now production-ready:
 - **Commitment chain** — XDG-compliant HMAC-chained action ledger
 
 #### Distributed Registry (RCAN §17)
-- **`node_resolver.py`** — `NodeResolver` resolves delegated RRNs via `rcan-py` `NodeClient`; follows delegation chain automatically
-- **`node_broadcaster.py`** — `NodeBroadcaster` pushes robot record updates to the root rcan.dev registry via `POST /api/v1/sync`
-- **Verification tiers** — `castor inspect` now displays robot verification badge (⬜🟡🔵✅) pulled from live registry
-- **SDK compat pre-register check** — `castor register` calls `check_rcan_compliance_version()` before submitting; aborts with clear message if spec version mismatch
-- **`rcan-py >= 0.2.0`** is now a core dependency (NodeClient, RRN delegated format, rcan-validate node)
+- **`castor/rcan/node_resolver.py`** — `NodeResolver` with 4-step federated resolution:
+  1. Local SQLite cache (XDG data dir, TTL-based)
+  2. rcan.dev `/api/v1/resolve/:rrn` (federated endpoint)
+  3. Direct authoritative node (X-Resolved-By header)
+  4. Stale cache fallback when network fails
+- **`castor/rcan/node_broadcaster.py`** — `NodeBroadcaster` + `NodeConfig` for fleet nodes
+  - Serves `/.well-known/rcan-node.json` manifest
+  - mDNS broadcast via `_rcan-registry._tcp`
+- **`castor verification <rrn>`** — check robot verification tier from rcan.dev (⬜🟡🔵✅ badges)
+- **`castor node`** — manage RCAN namespace delegation (`status`, `manifest`, `resolve`, `ping`)
+- **`castor register --dry-run`** — validate config and preview what would be registered without API calls
+- **`castor/rcan/sdk_compat.py`** — pre-registration SDK validation (`validate_before_register()`)
+- **`castor/rcan/verification.py`** — `VerificationTier` enum + `VerificationStatus` dataclass
+- **`castor doctor`** — `check_rcan_registry_reachable()` + `check_rrn_valid()` as first-class checks (run after system checks, before optional hardware)
+- RRN address space expanded: 8-digit sequences → 8-16 digits, prefix `[A-Z0-9]{2,8}`
+
+#### Test Coverage Added — §17
+- `tests/test_node_resolver.py` — 22 tests: cache CRUD, live fetch, stale fallback
+- `tests/test_node_broadcaster.py` — 8 tests: manifest structure, lifecycle
+- `tests/test_secret_provider.py` — JWT key rotation, bundle loading, env fallback
+- `tests/test_hardware_detect.py` — Hailo-8, OAK-D, I2C, platform detection
+- `tests/test_telemetry.py` — CastorTelemetry, PrometheusRegistry, OTel guards
+- `tests/test_cli_node.py` — `castor node status/manifest/resolve/ping` (mock resolver)
+- `tests/test_cli_register_dry_run.py` — `castor register --dry-run` does not call API
 
 #### Compliance
 - `castor compliance` — generate structured compliance reports (text/JSON)
@@ -46,6 +65,11 @@ The complete RCAN robot safety stack is now production-ready:
 - Full ruff lint + format compliance
 - RCAN SDK integration tests (rcan-py + rcan-validate)
 - Node resolver + broadcaster unit tests (mock urllib)
+
+#### Fixed
+- SBOM generation: heredoc `<< EOF` invalid YAML in `release.yml` — extracted to `.github/scripts/generate_sbom.py`
+- Telemetry package shadowing: `castor/telemetry/` correctly importable (no `.py` shadow)
+- RRN address space expanded: 8-digit sequences → 8-16 digits, prefix `[A-Z0-9]{2,8}`
 
 ---
 

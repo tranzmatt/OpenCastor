@@ -668,19 +668,28 @@ def check_rrn_valid(rrn: Optional[str] = None) -> tuple[str, str, str]:
 
 
 def run_all_checks(config_path: Optional[str] = None) -> list[tuple[bool, str, str]]:
-    """Run all checks and return list of (ok, name, detail) tuples."""
+    """Run all checks and return list of (ok, name, detail) tuples.
+
+    Check order (first-class RCAN checks run after system checks):
+      1. System: CPU temp, GPU memory, RAM, swap, disk
+      2. RCAN:   registry reachability, RRN validation, compliance version
+      3. Optional: BLE driver, memory DB size, Signal channel
+    """
     checks = [
+        # ── System checks ─────────────────────────────────────────────────────
         check_cpu_temperature,
         check_gpu_memory,
         check_memory_usage,
         check_swap_usage,
         lambda: check_disk_space("/"),
+        # ── RCAN first-class checks (§17) ─────────────────────────────────────
+        check_rcan_registry_reachable,
+        check_rrn_valid,
+        lambda: check_rcan_compliance_version(config_path),
+        # ── Optional / hardware checks ────────────────────────────────────────
         check_ble_driver,
         check_memory_db_size,
         check_signal_channel,
-        check_rcan_compliance_version,
-        check_rcan_registry_reachable,
-        check_rrn_valid,
     ]
     results = []
     for fn in checks:
