@@ -895,228 +895,6 @@ def cmd_compliance(args) -> None:
     sys.exit(0 if l1_pass else 1)
 
 
-def cmd_streaming(args) -> None:
-    """castor streaming — manage the continuous vision inference loop."""
-
-    sub = getattr(args, "streaming_cmd", "status")
-
-    if sub == "status":
-        # Check if a loop is recorded in the state file
-        import json
-        from pathlib import Path
-
-        state_file = Path.home() / ".opencastor" / "streaming_state.json"
-        if state_file.exists():
-            s = json.loads(state_file.read_text())
-            print(f"Streaming loop: {'running' if s.get('running') else 'stopped'}")
-            print(f"  FPS:            {s.get('fps', '?')}")
-            print(f"  Min confidence: {s.get('min_confidence', '?')}")
-            print(f"  Frames:         {s.get('frames', '?')}")
-        else:
-            print("No active streaming loop (start with: castor streaming start)")
-
-    elif sub == "start":
-        fps = getattr(args, "fps", 2.0)
-        min_conf = getattr(args, "min_confidence", 0.75)
-        dry_run = getattr(args, "dry_run", False)
-        print(f"Streaming loop: fps={fps} min_confidence={min_conf} dry_run={dry_run}")
-        print(
-            "To embed in a running castor gateway, set agent.streaming.enabled: true in your RCAN YAML."
-        )
-        print("For standalone test run: this will start a loop that requires a running provider.")
-
-    elif sub == "stop":
-        from pathlib import Path
-
-        state_file = Path.home() / ".opencastor" / "streaming_state.json"
-        if state_file.exists():
-            state_file.unlink()
-            print("Streaming state cleared. The gateway will stop the loop on next restart.")
-        else:
-            print("No active streaming loop found.")
-
-    else:
-        print(f"Unknown streaming subcommand: {sub}")
-
-
-def cmd_doctor(args) -> None:
-    """castor doctor — system health check."""
-    from castor.doctor import print_report, run_doctor
-
-    full = getattr(args, "full", False)
-    report = run_doctor(full=full)
-    print_report(report)
-    import sys
-
-    if not report.all_ok and not full:
-        # Exit non-zero if failures (not warnings) — useful for CI
-        if report.fail_count > 0:
-            sys.exit(1)
-
-
-def cmd_agents(args) -> None:
-    """castor agents — list registered agent configs."""
-    cfg = _find_default_config()
-    if cfg:
-        import yaml as _yaml
-
-        with open(cfg) as f:
-            data = _yaml.safe_load(f)
-        agents = data.get("agents", {})
-        if agents:
-            for name, conf in agents.items():
-                print(f"  {name}: {conf}")
-        else:
-            print("No agents configured in", cfg)
-    else:
-        print("No RCAN config found.")
-
-
-def cmd_update(args: argparse.Namespace) -> None:
-    """castor update — check for and apply updates from PyPI."""
-    from castor.updater import do_upgrade, get_version_info
-
-    try:
-        from rich.console import Console
-
-        con = Console()
-        HAS_RICH = True
-    except ImportError:
-        con = None
-        HAS_RICH = False
-
-    info = get_version_info()
-
-    if HAS_RICH:
-        status = (
-            "[green]✅ up to date[/green]"
-            if info.up_to_date
-            else f"[yellow]⚠ update available → {info.latest}[/yellow]"
-        )
-        con.print(f"\nOpenCastor [bold]{info.current}[/bold]  {status}")
-        if not info.up_to_date:
-            con.print(f"  Release notes: {info.release_url}", style="dim")
-    else:
-        print(f"Current: {info.current}  Latest: {info.latest}")
-
-    if info.up_to_date:
-        if not getattr(args, "check", False):
-            if HAS_RICH:
-                con.print("[dim]Already on latest.[/dim]")
-            else:
-                print("Already on latest.")
-        return
-
-    if getattr(args, "check", False):
-        return  # --check only, don't prompt
-
-    yes = getattr(args, "yes", False)
-    rc = do_upgrade(yes=yes)
-    if rc == 0:
-        if HAS_RICH:
-            con.print("[green]✅ Upgrade complete. Restart castor to use the new version.[/green]")
-        else:
-            print("✅ Upgrade complete.")
-
-
-# ── Placeholder subcommands (not yet fully implemented) ──────────────────────
-
-
-def cmd_approvals(args) -> None:
-    """castor approvals — placeholder."""
-    print("castor approvals: coming soon.")
-
-
-def cmd_audit(args) -> None:
-    """castor audit — placeholder."""
-    print("castor audit: coming soon.")
-
-
-def cmd_backup(args) -> None:
-    """castor backup — placeholder."""
-    print("castor backup: coming soon.")
-
-
-def cmd_benchmark(args) -> None:
-    """castor benchmark — placeholder."""
-    print("castor benchmark: coming soon.")
-
-
-def cmd_calibrate(args) -> None:
-    """castor calibrate — placeholder."""
-    print("castor calibrate: coming soon.")
-
-
-def cmd_configure(args) -> None:
-    """castor configure — placeholder."""
-    print("castor configure: coming soon.")
-
-
-def cmd_daemon(args) -> None:
-    """castor daemon — placeholder."""
-    print("castor daemon: coming soon.")
-
-
-def cmd_demo(args) -> None:
-    """castor demo — placeholder."""
-    print("castor demo: coming soon.")
-
-
-def cmd_deploy(args) -> None:
-    """castor deploy — placeholder."""
-    print("castor deploy: coming soon.")
-
-
-def cmd_diff(args) -> None:
-    """castor diff — placeholder."""
-    print("castor diff: coming soon.")
-
-
-def cmd_export(args) -> None:
-    """castor export — placeholder."""
-    print("castor export: coming soon.")
-
-
-def cmd_export_finetune(args) -> None:
-    """castor export finetune — placeholder."""
-    print("castor export finetune: coming soon.")
-
-
-def cmd_fix(args) -> None:
-    """castor fix — placeholder."""
-    print("castor fix: coming soon.")
-
-
-def cmd_hub(args) -> None:
-    """castor hub — placeholder."""
-    print("castor hub: coming soon.")
-
-
-def cmd_improve(args) -> None:
-    """castor improve — placeholder."""
-    print("castor improve: coming soon.")
-
-
-def cmd_install_service(args) -> None:
-    """castor install service — placeholder."""
-    print("castor install service: coming soon.")
-
-
-def cmd_learn(args) -> None:
-    """castor learn — placeholder."""
-    print("castor learn: coming soon.")
-
-
-def cmd_lint(args) -> None:
-    """castor lint — placeholder."""
-    print("castor lint: coming soon.")
-
-
-def cmd_login(args) -> None:
-    """castor login — placeholder."""
-    print("castor login: coming soon.")
-
-
 def cmd_logs(args) -> None:
     """castor logs — placeholder."""
     print("castor logs: coming soon.")
@@ -1250,6 +1028,124 @@ def cmd_watch(args) -> None:
 def _cmd_monitor(args) -> None:
     """Internal monitor placeholder."""
     pass
+
+
+# ── Auto-generated placeholders ──────────────────────────────────────────────
+
+
+def cmd_agents(args) -> None:
+    """castor agents."""
+    print("castor agents: not yet implemented.")
+
+
+def cmd_approvals(args) -> None:
+    """castor approvals."""
+    print("castor approvals: not yet implemented.")
+
+
+def cmd_audit(args) -> None:
+    """castor audit."""
+    print("castor audit: not yet implemented.")
+
+
+def cmd_backup(args) -> None:
+    """castor backup."""
+    print("castor backup: not yet implemented.")
+
+
+def cmd_benchmark(args) -> None:
+    """castor benchmark."""
+    print("castor benchmark: not yet implemented.")
+
+
+def cmd_calibrate(args) -> None:
+    """castor calibrate."""
+    print("castor calibrate: not yet implemented.")
+
+
+def cmd_configure(args) -> None:
+    """castor configure."""
+    print("castor configure: not yet implemented.")
+
+
+def cmd_daemon(args) -> None:
+    """castor daemon."""
+    print("castor daemon: not yet implemented.")
+
+
+def cmd_demo(args) -> None:
+    """castor demo."""
+    print("castor demo: not yet implemented.")
+
+
+def cmd_deploy(args) -> None:
+    """castor deploy."""
+    print("castor deploy: not yet implemented.")
+
+
+def cmd_diff(args) -> None:
+    """castor diff."""
+    print("castor diff: not yet implemented.")
+
+
+def cmd_doctor(args) -> None:
+    """castor doctor."""
+    print("castor doctor: not yet implemented.")
+
+
+def cmd_export(args) -> None:
+    """castor export."""
+    print("castor export: not yet implemented.")
+
+
+def cmd_export_finetune(args) -> None:
+    """castor export finetune."""
+    print("castor export finetune: not yet implemented.")
+
+
+def cmd_fix(args) -> None:
+    """castor fix."""
+    print("castor fix: not yet implemented.")
+
+
+def cmd_hub(args) -> None:
+    """castor hub."""
+    print("castor hub: not yet implemented.")
+
+
+def cmd_improve(args) -> None:
+    """castor improve."""
+    print("castor improve: not yet implemented.")
+
+
+def cmd_install_service(args) -> None:
+    """castor install service."""
+    print("castor install service: not yet implemented.")
+
+
+def cmd_learn(args) -> None:
+    """castor learn."""
+    print("castor learn: not yet implemented.")
+
+
+def cmd_lint(args) -> None:
+    """castor lint."""
+    print("castor lint: not yet implemented.")
+
+
+def cmd_login(args) -> None:
+    """castor login."""
+    print("castor login: not yet implemented.")
+
+
+def cmd_streaming(args) -> None:
+    """castor streaming."""
+    print("castor streaming: not yet implemented.")
+
+
+def cmd_update(args) -> None:
+    """castor update."""
+    print("castor update: not yet implemented.")
 
 
 def main() -> None:
@@ -2504,6 +2400,7 @@ def main() -> None:
         "discover": cmd_discover,
         "memory": cmd_memory,
         "fleet": cmd_fleet,
+        "logs": cmd_logs,
         "streaming": cmd_streaming,
         "doctor": cmd_doctor,
         "update": cmd_update,
@@ -2513,7 +2410,6 @@ def main() -> None:
         "demo": cmd_demo,
         "test-hardware": cmd_test_hardware,
         "calibrate": cmd_calibrate,
-        "logs": cmd_logs,
         "backup": cmd_backup,
         "restore": cmd_restore,
         "migrate": cmd_migrate,
