@@ -286,3 +286,14 @@ def reset_chain() -> None:
     global _chain
     with _chain_lock:
         _chain = None
+
+
+def append_commitment(record: dict) -> None:
+    """Convenience wrapper: append a raw commitment dict to the singleton chain.
+
+    The record must contain at least ``action`` and ``timestamp`` keys.
+    Additional fields are forwarded as action parameters.
+    """
+    action = record.get("action", "unknown")
+    params = {k: v for k, v in record.items() if k != "action"}
+    get_commitment_chain().append_action(action, params)

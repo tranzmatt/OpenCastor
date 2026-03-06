@@ -30,8 +30,8 @@ except ImportError:
     HAS_PROMETHEUS = False
 
 ROOT_REGISTRY_URL = "https://rcan.dev"
-RRN_DELEGATED_RE = re.compile(r"^RRN-([A-Z]{2,6})-(\d{8})$")
-RRN_LEGACY_RE = re.compile(r"^RRN-(\d{8})$")
+RRN_DELEGATED_RE = re.compile(r"^RRN-([A-Z0-9]{2,8})-(\d{8,16})$")
+RRN_LEGACY_RE = re.compile(r"^RRN-(\d{8,16})$")
 DEFAULT_TTL = 3600
 CACHE_DB_NAME = "rcan_resolve_cache.db"
 

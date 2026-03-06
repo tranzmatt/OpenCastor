@@ -460,6 +460,21 @@ def _find_default_config() -> str | None:
     return candidates[0] if candidates else None
 
 
+def cmd_verification(args) -> None:
+    """Check verification tier for an RRN."""
+    from castor.rcan.verification import get_tier_from_rrn
+
+    status = get_tier_from_rrn(args.rrn)
+    if status:
+        print(f"{status.display} — {args.rrn}")
+        if status.evidence_url:
+            print(f"  Evidence: {status.evidence_url}")
+        if status.verified_at:
+            print(f"  Verified: {status.verified_at}")
+    else:
+        print(f"⬜ Unknown — could not fetch tier for {args.rrn}")
+
+
 def cmd_inspect(args) -> None:
     """Query a robot's live RCAN profile, safety state, and telemetry."""
     import json as _json
@@ -721,6 +736,20 @@ def cmd_register(args) -> None:
             except Exception:
                 print("\n   Register at: https://rcan.dev/registry")
             sys.exit(0)
+
+    # SDK compat pre-registration check
+    from castor.rcan.sdk_compat import validate_before_register
+
+    ok, issues = validate_before_register(config, strict=False)
+    if issues:
+        for issue in issues:
+            print(f"  ⚠️  {issue}", file=sys.stderr)
+    if not ok:
+        print(
+            "❌ Pre-registration validation failed. Fix issues above before registering.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Register
     print(
@@ -2566,6 +2595,15 @@ def main() -> None:
     )
     p_inspect.add_argument("--json", action="store_true", dest="output_json", help="JSON output")
 
+    # castor verification
+    p_verification = sub.add_parser(
+        "verification",
+        help="Check verification tier for an RRN via rcan.dev",
+        epilog="Example: castor verification RRN-AB-00000042",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_verification.add_argument("rrn", help="Robot Registry Number (e.g. RRN-AB-00000042)")
+
     # castor register
     p_register = sub.add_parser(
         "register",
@@ -3397,6 +3435,7 @@ def main() -> None:
         "doctor": cmd_doctor,
         "update": cmd_update,
         "inspect": cmd_inspect,
+        "verification": cmd_verification,
         "register": cmd_register,
         "compliance": cmd_compliance,
         "demo": cmd_demo,
