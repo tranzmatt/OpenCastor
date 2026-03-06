@@ -2008,6 +2008,27 @@ def cmd_lint(args) -> None:
     print_lint_report(issues)
 
 
+def _update_env_var(env_file: str, key: str, value: str) -> None:
+    """Write or update KEY=VALUE in an .env file, preserving other lines."""
+    from pathlib import Path as _Path
+
+    p = _Path(env_file)
+    lines = p.read_text().splitlines() if p.exists() else []
+    prefix = f"{key}="
+    new_line = f"{key}={value}"
+    updated = False
+    result = []
+    for line in lines:
+        if line.startswith(prefix):
+            result.append(new_line)
+            updated = True
+        else:
+            result.append(line)
+    if not updated:
+        result.append(new_line)
+    p.write_text("\n".join(result) + "\n")
+
+
 def cmd_login(args) -> None:
     """castor login — authenticate with AI provider services."""
     service = getattr(args, "service", "huggingface")

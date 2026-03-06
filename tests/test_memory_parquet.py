@@ -196,7 +196,8 @@ def test_export_parquet_raises_without_pyarrow(mem, tmp_path, monkeypatch):
     """export_parquet() raises ImportError when pyarrow is not available."""
     import castor.memory as memory_module
 
-    monkeypatch.setattr(memory_module, "_probe_pyarrow", lambda: False)
+    import castor.memory.episode as _ep_mod
+    monkeypatch.setattr(_ep_mod, "_probe_pyarrow", lambda: False)
     out = str(tmp_path / "episodes.parquet")
     with pytest.raises(ImportError, match="pyarrow required"):
         mem.export_parquet(out)
