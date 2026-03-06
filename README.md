@@ -21,6 +21,47 @@
 
 ---
 
+## RCAN-Swarm Safety 🤖🤝🤖
+
+OpenCastor implements **RCAN-Swarm Safe** — the ability to operate alongside other networked robots with cryptographic identity verification and full audit trails.
+
+### What this means in practice
+
+- **Peer verification**: Before accepting any command from another robot, verify their RRN and certification tier via `castor node resolve <rrn>`
+- **No spoofing**: Every robot's identity is anchored to a globally unique RRN registered at rcan.dev
+- **Offline resilience**: Local cache means the swarm keeps working even if the central registry is temporarily unreachable
+- **Full audit**: Every action in a swarm interaction is logged to the commitment chain — who did what, when, with what confidence
+- **Human-in-the-loop**: Configure HITL gates to require human approval for safety-critical swarm commands
+
+### Quick example
+
+```python
+from rcan import NodeClient
+
+# Verify a peer robot before accepting its commands
+client = NodeClient()
+peer = client.resolve("RRN-000000000042")
+tier = peer['record'].get('verification_tier', 'community')
+
+if tier in ('certified', 'accredited'):
+    print(f"✅ Peer verified: {tier}")
+    # Safe to accept commands
+else:
+    print(f"⚠️  Peer not certified: {tier}")
+    # Require additional verification
+```
+
+### RCAN-Swarm Safe requirements
+- ✅ Valid RCAN config with RRN
+- ✅ Commitment chain enabled
+- ✅ HITL gate for swarm commands
+- ✅ Confidence gate ≥ 0.7
+- ✅ Verification tier ≥ `verified`
+
+> See the full [RCAN Swarm Safety guide](https://rcan.dev/use-cases/swarm/) for architecture details and a complete code walkthrough.
+
+---
+
 ## 🚀 Install in 10 Seconds
 
 ```bash
