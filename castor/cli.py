@@ -382,7 +382,9 @@ def cmd_snapshot(args) -> None:
 
 def cmd_fleet(args) -> None:
     """Handle castor fleet subcommands."""
-    import yaml, json as _json
+    import json as _json
+
+    import yaml
 
     fleet_cmd = getattr(args, "fleet_cmd", None)
     if fleet_cmd is None:
@@ -456,7 +458,6 @@ def _find_default_config() -> str | None:
 def cmd_inspect(args) -> None:
     """Query a robot's live RCAN profile, safety state, and telemetry."""
     import json as _json
-    import sys
 
     output: dict = {}
     rrn = args.rrn
@@ -466,6 +467,7 @@ def cmd_inspect(args) -> None:
     if rrn:
         try:
             import asyncio
+
             from rcan.registry import RegistryClient
 
             async def _lookup():
@@ -509,8 +511,8 @@ def cmd_inspect(args) -> None:
         gateway_url = "http://localhost:8080"
 
     try:
-        import urllib.request
         import os
+        import urllib.request
         token = os.environ.get("OPENCASTOR_API_TOKEN", "")
         req = urllib.request.Request(
             f"{gateway_url}/api/status",
@@ -565,7 +567,6 @@ def cmd_inspect(args) -> None:
     # --- Human-readable output ---
     try:
         from rich.console import Console
-        from rich.table import Table
         con = Console()
         HAS_RICH = True
     except ImportError:
@@ -579,7 +580,7 @@ def cmd_inspect(args) -> None:
             import re
             print(re.sub(r"\[/?[a-z_ ]+\]", "", text))
 
-    _pr(f"\n🤖 [bold]castor inspect[/bold]" + (f" {rrn}" if rrn else "") + "\n")
+    _pr("\n🤖 [bold]castor inspect[/bold]" + (f" {rrn}" if rrn else "") + "\n")
 
     if "registry" in output:
         reg = output["registry"]
@@ -693,13 +694,14 @@ def cmd_register(args) -> None:
                 webbrowser.open(url)
                 print(f"\n   Opened: {url}")
             except Exception:
-                print(f"\n   Register at: https://rcan.dev/registry")
+                print("\n   Register at: https://rcan.dev/registry")
             sys.exit(0)
 
     # Register
     print(f"\n📡 Registering {manufacturer}/{model} {version} with rcan.dev...", end=" ", flush=True)
     try:
         import asyncio
+
         from rcan.registry import RegistryClient
 
         async def _register():
@@ -719,7 +721,7 @@ def cmd_register(args) -> None:
 
         if rrn:
             print("✅")
-            print(f"\n🤖 Robot registered!")
+            print("\n🤖 Robot registered!")
             print(f"   RRN:  {rrn}")
             print(f"   URI:  {result.get('uri', '')}")
             print(f"   View: https://rcan.dev/registry/{rrn}\n")
@@ -748,7 +750,7 @@ def cmd_register(args) -> None:
         sys.exit(1)
     except Exception as e:
         print(f"❌  Registration failed: {e}")
-        print(f"   Try manually at: https://rcan.dev/registry")
+        print("   Try manually at: https://rcan.dev/registry")
         sys.exit(1)
 
 
@@ -792,8 +794,8 @@ def cmd_compliance(args) -> None:
     chain_errors: list[str] = []
     if check_commitments:
         try:
+
             from castor.rcan.commitment_chain import get_commitment_chain
-            from pathlib import Path
             cc = get_commitment_chain()
             chain_ok, chain_count, chain_errors = cc.verify_log()
         except Exception as e:
@@ -821,8 +823,6 @@ def cmd_compliance(args) -> None:
     # Human-readable output
     try:
         from rich.console import Console
-        from rich.table import Table
-        from rich.panel import Panel
         con = Console()
         HAS_RICH = True
     except ImportError:
@@ -1716,49 +1716,6 @@ def cmd_memory(args) -> None:
         run_replay_cli(args)
     else:
         print(f"Unknown memory command: {memory_cmd}")
-
-
-def cmd_fleet(args) -> None:
-    """Multi-robot fleet management."""
-    fleet_subcmd = getattr(args, "fleet_subcmd", None)
-
-    if fleet_subcmd == "status":
-        # Proxy to gateway fleet API
-        import json as _json
-        import urllib.request
-
-        gateway = getattr(args, "gateway", "http://127.0.0.1:8000")
-        ruri = args.ruri
-        try:
-            with urllib.request.urlopen(f"{gateway}/api/fleet/{ruri}/status", timeout=5) as r:
-                print(_json.dumps(_json.loads(r.read()), indent=2))
-        except Exception as exc:
-            print(f"  Error: {exc}")
-        return
-
-    if fleet_subcmd == "command":
-        import json as _json
-        import urllib.request
-
-        gateway = getattr(args, "gateway", "http://127.0.0.1:8000")
-        ruri = args.ruri
-        payload = _json.dumps({"instruction": args.instruction}).encode()
-        req = urllib.request.Request(
-            f"{gateway}/api/fleet/{ruri}/command",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=10) as r:
-                print(_json.dumps(_json.loads(r.read()), indent=2))
-        except Exception as exc:
-            print(f"  Error: {exc}")
-        return
-
-    from castor.fleet import fleet_status
-
-    fleet_status(timeout=float(getattr(args, "timeout", 5)))
 
 
 def cmd_deploy(args) -> None:
@@ -4260,8 +4217,6 @@ def main() -> None:
         "update": cmd_update,
         "learn": cmd_learn,
         "improve": cmd_improve,
-        "memory": cmd_memory,
-        "fleet": cmd_fleet,
         "agents": cmd_agents,
         "export": cmd_export,
         "export-finetune": cmd_export_finetune,

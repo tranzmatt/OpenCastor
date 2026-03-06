@@ -23,14 +23,10 @@ from __future__ import annotations
 import json
 import logging
 import os
-import subprocess
-import sys
 import threading
-import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
-from urllib.parse import parse_qs, urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -579,8 +575,10 @@ class WizardHandler(BaseHTTPRequestHandler):
                     self._json({"rrn": rrn})
                 else:
                     # Open browser fallback
-                    m = state.get("manufacturer", ""); mod = state.get("modelName", "")
-                    v = state.get("version", "v1"); d = state.get("deviceId", "")
+                    m = state.get("manufacturer", "")
+                    mod = state.get("modelName", "")
+                    v = state.get("version", "v1")
+                    d = state.get("deviceId", "")
                     url = (f"https://rcan.dev/registry/register"
                            f"?manufacturer={m}&model={mod}&version={v}&device_id={d}&source=wizard-web")
                     self._json({"browser_url": url, "error": "Open the link to complete registration"})
@@ -612,9 +610,9 @@ def start_wizard(port: int = PORT, open_browser: bool = True) -> None:
     server = HTTPServer(("127.0.0.1", port), WizardHandler)
     url = f"http://localhost:{port}"
 
-    print(f"\n🤖 OpenCastor Web Wizard")
+    print("\n🤖 OpenCastor Web Wizard")
     print(f"   {url}")
-    print(f"   Press Ctrl+C to exit\n")
+    print("   Press Ctrl+C to exit\n")
 
     if open_browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()

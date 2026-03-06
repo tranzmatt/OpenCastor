@@ -166,7 +166,7 @@ class CommitmentChain:
         try:
             import json
             lines = self._log_path.read_text().strip().splitlines()
-            return [json.loads(l) for l in lines[-n:] if l.strip()]
+            return [json.loads(line) for line in lines[-n:] if line.strip()]
         except Exception:
             return []
 
@@ -187,7 +187,7 @@ class CommitmentChain:
         if not self._log_path.exists():
             return None
         try:
-            import json, hashlib
+            import json
             with open(self._log_path, "rb") as f:
                 # Read last non-empty line efficiently
                 f.seek(0, 2)
