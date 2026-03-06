@@ -380,6 +380,116 @@ def cmd_snapshot(args) -> None:
             print()
 
 
+def cmd_compliance(args) -> None:
+    """Check RCAN v1.2 conformance for a robot config."""
+    import json as _json
+    import sys
+
+    config_path = args.config
+    output_json = getattr(args, "output_json", False)
+    check_commitments = getattr(args, "commitments", False)
+
+    # Load config
+    try:
+        import yaml
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+    except FileNotFoundError:
+        print(f"❌ Config not found: {config_path}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Failed to load config: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    from castor.rcan.sdk_bridge import check_compliance
+
+    issues = check_compliance(config)
+
+    # Categorise by level
+    l1 = [i for i in issues if i.startswith("L1")]
+    l2 = [i for i in issues if i.startswith("L2")]
+    l3 = [i for i in issues if i.startswith("L3")]
+
+    l1_pass = len(l1) == 0
+    l2_pass = l1_pass and len(l2) == 0
+    l3_pass = l2_pass and len(l3) == 0
+
+    # Commitment chain verification
+    chain_ok: bool | None = None
+    chain_count = 0
+    chain_errors: list[str] = []
+    if check_commitments:
+        try:
+            from castor.rcan.commitment_chain import get_commitment_chain
+            from pathlib import Path
+            cc = get_commitment_chain()
+            chain_ok, chain_count, chain_errors = cc.verify_log()
+        except Exception as e:
+            chain_errors = [str(e)]
+            chain_ok = False
+
+    if output_json:
+        result = {
+            "config": config_path,
+            "rcan_version": "1.2",
+            "L1": {"pass": l1_pass, "issues": l1},
+            "L2": {"pass": l2_pass, "issues": l2},
+            "L3": {"pass": l3_pass, "issues": l3},
+            "overall": "L3" if l3_pass else "L2" if l2_pass else "L1" if l1_pass else "FAIL",
+        }
+        if check_commitments:
+            result["commitment_chain"] = {
+                "valid": chain_ok,
+                "records": chain_count,
+                "errors": chain_errors,
+            }
+        print(_json.dumps(result, indent=2))
+        sys.exit(0 if l1_pass else 1)
+
+    # Human-readable output
+    try:
+        from rich.console import Console
+        from rich.table import Table
+        from rich.panel import Panel
+        con = Console()
+        HAS_RICH = True
+    except ImportError:
+        con = None
+        HAS_RICH = False
+
+    def _tick(ok): return "✅" if ok else "❌"
+    def _pr(text, style=None):
+        if HAS_RICH and con:
+            con.print(text, style=style)
+        else:
+            print(text)
+
+    _pr(f"\n🤖 [bold]RCAN Conformance Check[/bold] — {config_path}\n")
+
+    for level, level_issues, level_pass in [
+        ("L1", l1, l1_pass),
+        ("L2", l2, l2_pass),
+        ("L3", l3, l3_pass),
+    ]:
+        level_label = f"{_tick(level_pass)} [bold]{level}[/bold]"
+        _pr(level_label)
+        if level_issues:
+            for issue in level_issues:
+                _pr(f"   ⚠️  {issue}", style="yellow")
+        else:
+            _pr(f"   All {level} checks passed", style="green")
+
+    if check_commitments:
+        _pr(f"\n{_tick(chain_ok)} Commitment chain: {chain_count} records", )
+        for err in chain_errors:
+            _pr(f"   ⚠️  {err}", style="yellow")
+
+    overall = "L3" if l3_pass else "L2" if l2_pass else "L1" if l1_pass else "FAIL"
+    color = "green" if l3_pass else "yellow" if l2_pass else "red"
+    _pr(f"\n[{color}]Result: {overall}[/{color}] ({len(issues)} issue(s))\n")
+    sys.exit(0 if l1_pass else 1)
+
+
 def cmd_doctor(args) -> None:
     """Run system health checks."""
     from castor.doctor import print_report, run_all_checks
@@ -2673,6 +2783,31 @@ def main() -> None:
         help="Attempt to auto-fix common issues (e.g. missing .env, large memory DB)",
     )
 
+    # castor compliance
+    p_compliance = sub.add_parser(
+        "compliance",
+        help="Check RCAN v1.2 conformance (L1/L2/L3) for a robot config",
+        epilog="Example: castor compliance --config bob.rcan.yaml",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_compliance.add_argument(
+        "--config", default="robot.rcan.yaml", help="RCAN config file to check"
+    )
+    p_compliance.add_argument(
+        "--level",
+        choices=["L1", "L2", "L3"],
+        default=None,
+        help="Only check up to this conformance level",
+    )
+    p_compliance.add_argument(
+        "--json", action="store_true", dest="output_json", help="Output results as JSON"
+    )
+    p_compliance.add_argument(
+        "--commitments",
+        action="store_true",
+        help="Also verify the on-disk commitment chain log",
+    )
+
     # castor demo
     p_demo = sub.add_parser(
         "demo",
@@ -3636,6 +3771,7 @@ def main() -> None:
         "dashboard-tui": cmd_dashboard_tui,
         "token": cmd_token,
         "discover": cmd_discover,
+        "compliance": cmd_compliance,
         "doctor": cmd_doctor,
         "demo": cmd_demo,
         "test-hardware": cmd_test_hardware,

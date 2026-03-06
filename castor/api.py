@@ -3819,6 +3819,22 @@ def _print_gateway_qr(host: str, port: str):
 def _execute_action(action: dict):
     """Translate an action dict into driver commands."""
     action_type = action.get("type", "")
+
+    # Seal a CommitmentRecord for every action (RCAN §16 audit trail)
+    try:
+        from castor.rcan.commitment_chain import get_commitment_chain
+        _cc = get_commitment_chain()
+        if _cc.enabled:
+            _robot_uri = str(state.ruri) if state.ruri else ""
+            _cc.append_action(
+                action_type=action_type,
+                params={k: v for k, v in action.items() if k != "type"},
+                robot_uri=_robot_uri,
+                confidence=action.get("confidence"),
+                model_identity=action.get("model_identity"),
+            )
+    except Exception as _ce:
+        logger.debug("CommitmentRecord skipped (non-fatal): %s", _ce)
     if action_type == "move":
         state.driver.move(
             action.get("linear", 0.0),
