@@ -863,1873 +863,16 @@ def cmd_compliance(args) -> None:
 
 
 def cmd_doctor(args) -> None:
-    """Run system health checks."""
-    from castor.doctor import print_report, run_all_checks
-
-    print("\n  OpenCastor Doctor\n")
-    results = run_all_checks(config_path=args.config)
-    print_report(results)
-    print()
-
-    if getattr(args, "auto_fix", False):
-        from castor.doctor import run_auto_fix
-
-        run_auto_fix(results, config_path=args.config)
-
-    # RCAN v1.2 spec compliance check
-    try:
-        import yaml
-        config_path = getattr(args, "config", None) or "robot.rcan.yaml"
-        with open(config_path) as f:
-            config = yaml.safe_load(f)
-        from castor.rcan.sdk_bridge import check_compliance
-        issues = check_compliance(config)
-        print("  RCAN v1.2 Compliance\n")
-        if issues:
-            for issue in issues:
-                print(f"    ⚠  {issue}")
-        else:
-            print("    ✅ Fully compliant with RCAN v1.2 spec")
-        print()
-    except FileNotFoundError:
-        pass
-    except Exception as exc:
-        print(f"  RCAN compliance check skipped: {exc}\n")
-
-    # Peripheral scan section
-    try:
-        from castor.peripherals import print_scan_table, scan_all
-
-        print("  Connected Peripherals\n")
-        peripherals = scan_all()
-        print_scan_table(peripherals, color=True)
-    except Exception as exc:
-        print(f"  Peripheral scan skipped: {exc}\n")
-
-
-def cmd_demo(args) -> None:
-    """Run a simulated perception-action loop (no hardware/API keys)."""
-    from castor.demo import run_demo
-
-    run_demo(
-        steps=args.steps,
-        delay=args.delay,
-        layout=getattr(args, "layout", "full"),
-        no_color=getattr(args, "no_color", False),
-    )
-
-
-def cmd_test_hardware(args) -> None:
-    """Test each motor/servo individually."""
-    from castor.test_hardware import run_test
-
-    if not os.path.exists(args.config):
-        print(f"\n  Config not found: {args.config}")
-        print("  Run `castor wizard` to create one first.\n")
-        return
-
-    run_test(config_path=args.config, skip_confirm=args.yes)
-
-
-def cmd_calibrate(args) -> None:
-    """Interactive servo/motor calibration."""
-    from castor.calibrate import run_calibration
-
-    if not os.path.exists(args.config):
-        print(f"\n  Config not found: {args.config}")
-        print("  Run `castor wizard` to create one first.\n")
-        return
-
-    run_calibration(config_path=args.config)
-
-
-def cmd_logs(args) -> None:
-    """View structured, colored OpenCastor logs."""
-    from castor.logs import view_logs
-
-    view_logs(
-        follow=args.follow,
-        level=args.level,
-        module=args.module,
-        lines=args.lines,
-        no_color=args.no_color,
-    )
-
-
-def cmd_backup(args) -> None:
-    """Back up OpenCastor configs and credentials."""
-    from castor.backup import create_backup, print_backup_summary
-
-    archive = create_backup(output_path=args.output)
-    if archive:
-        # Get list of files for summary
-        import tarfile
-
-        with tarfile.open(archive, "r:gz") as tar:
-            files = [m.name for m in tar.getmembers()]
-        print_backup_summary(archive, files)
-
-
-def cmd_restore(args) -> None:
-    """Restore OpenCastor configs from a backup archive."""
-    from castor.backup import print_restore_summary, restore_backup
-
-    if args.dry_run:
-        restore_backup(args.archive, dry_run=True)
-    else:
-        restored = restore_backup(args.archive)
-        if restored:
-            print_restore_summary(restored)
-
-
-def cmd_migrate(args) -> None:
-    """Migrate an RCAN config to the current schema version."""
-    from castor.migrate import migrate_file
-
-    migrate_file(args.config, dry_run=args.dry_run)
-
-
-def cmd_upgrade(args) -> None:
-    """Upgrade OpenCastor and run a health check."""
-    import subprocess
-
-    print("\n  Upgrading OpenCastor...\n")
-    result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--upgrade", "opencastor"],
-        capture_output=not args.verbose,
-    )
-
-    if result.returncode == 0:
-        print("  Upgrade complete. Running health check...\n")
-        from castor.doctor import print_report, run_all_checks
-
-        results = run_all_checks()
-        print_report(results)
-    else:
-        print("  Upgrade failed. Check pip output above.\n")
-        if not args.verbose:
-            print("  Re-run with --verbose to see details.")
-
-    print()
-
-
-def cmd_install_service(args) -> None:
-    """Generate a systemd service unit file for OpenCastor."""
-    if sys.platform != "linux":
-        print("\n  Warning: generating a systemd unit from a non-Linux host.\n")
-    import getpass
-
-    user = getpass.getuser()
-    work_dir = os.getcwd()
-    config = os.path.abspath(args.config)
-    host = args.host
-    port = str(args.port)
-
-    # Resolve the castor executable
-    exe = os.path.join(os.path.dirname(sys.executable), "castor")
-    if not os.path.exists(exe):
-        exe = f"{sys.executable} -m castor.cli"
-
-    env_file = os.path.join(work_dir, ".env")
-
-    unit = f"""\
-[Unit]
-Description=OpenCastor Gateway
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User={user}
-WorkingDirectory={work_dir}
-EnvironmentFile={env_file}
-ExecStart={exe} gateway --config {config} --host {host} --port {port}
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-"""
-
-    out_path = "/tmp/opencastor.service"
-    with open(out_path, "w") as f:
-        f.write(unit)
-
-    print(f"\n  Service file written to {out_path}\n")
-    print("  Contents:\n")
-    for line in unit.splitlines():
-        print(f"    {line}")
-    print()
-    print("  Install with:")
-    print(f"    sudo cp {out_path} /etc/systemd/system/opencastor.service")
-    print("    sudo systemctl daemon-reload")
-    print("    sudo systemctl enable opencastor")
-    print("    sudo systemctl start opencastor")
-    print()
-
-
-def cmd_status(args) -> None:
-    """Show which providers and channels are ready."""
-    from castor.auth import (
-        list_available_channels,
-        list_available_providers,
-        load_dotenv_if_available,
-    )
-    from castor.safety.authorization import DEFAULT_AUDIT_LOG_PATH
-
-    load_dotenv_if_available()
-
-    print("\n  OpenCastor Status\n")
-
-    print("  AI Providers:")
-    for name, ready in list_available_providers().items():
-        icon = "+" if ready else "-"
-        label = "ready" if ready else "no key"
-        print(f"    [{icon}] {name:12s} {label}")
-
-    print("\n  Messaging Channels:")
-    for name, ready in list_available_channels().items():
-        icon = "+" if ready else "-"
-        label = "ready" if ready else "not configured"
-        print(f"    [{icon}] {name:12s} {label}")
-
-    # Show plugin-registered components from the component registry
-    from castor.registry import get_registry
-
-    registry = get_registry()
-    plugin_providers = registry.list_plugin_providers()
-    plugin_drivers = registry.list_plugin_drivers()
-    plugin_channels = registry.list_plugin_channels()
-    if plugin_providers or plugin_drivers or plugin_channels:
-        print("\n  Plugin Components:")
-        for name in plugin_providers:
-            print(f"    [+] provider  {name}")
-        for name in plugin_drivers:
-            print(f"    [+] driver    {name}")
-        for name in plugin_channels:
-            print(f"    [+] channel   {name}")
-
-    audit_path = DEFAULT_AUDIT_LOG_PATH.expanduser()
-    print(f"\n  Audit Log: {audit_path}")
-    print()
-
-
-# ---------------------------------------------------------------------------
-# New command handlers (batch 3)
-# ---------------------------------------------------------------------------
-
-
-def cmd_shell(args) -> None:
-    """Launch an interactive command shell with robot objects."""
-    from castor.shell import launch_shell
-
-    if not os.path.exists(args.config):
-        print(f"\n  Config not found: {args.config}")
-        print("  Run `castor wizard` to create one first.\n")
-        return
-
-    launch_shell(config_path=args.config)
-
-
-def cmd_watch(args) -> None:
-    """Launch a live Rich telemetry dashboard."""
-    from castor.watch import launch_watch
-
-    launch_watch(gateway_url=args.gateway, refresh=args.refresh)
-
-
-def cmd_fix(args) -> None:
-    """Run doctor and attempt to auto-fix common issues."""
-    from castor.fix import run_fix
-
-    run_fix(config_path=args.config)
-
-
-def cmd_repl(args) -> None:
-    """Drop into a Python REPL with robot objects pre-loaded."""
-    from castor.repl import launch_repl
-
-    if not os.path.exists(args.config):
-        print(f"\n  Config not found: {args.config}")
-        print("  Run `castor wizard` to create one first.\n")
-        return
-
-    launch_repl(config_path=args.config)
-
-
-def cmd_record(args) -> None:
-    """Record a perception-action session to a JSONL file."""
-    if not os.path.exists(args.config):
-        print(f"\n  Config not found: {args.config}")
-        print("  Run `castor wizard` to create one first.\n")
-        return
-
-    import time
-
-    from castor.main import Camera, get_driver, load_config
-    from castor.providers import get_provider
-    from castor.record import SessionRecorder
-
-    config = load_config(args.config)
-    brain = get_provider(config["agent"])
-    camera = Camera(config)
-    driver = get_driver(config) if not args.simulate else None
-
-    recorder = SessionRecorder(args.output)
-    print(f"\n  Recording to {args.output} (Ctrl+C to stop)...\n")
-
-    try:
-        while True:
-            t0 = time.time()
-            frame = camera.capture_jpeg()
-            thought = brain.think(frame, "Describe what you see and decide an action.")
-
-            action = thought.action or {}
-            latency = (time.time() - t0) * 1000
-
-            recorder.record_step(
-                frame_size=len(frame),
-                instruction="Describe what you see and decide an action.",
-                thought_text=thought.raw_text,
-                action=action,
-                latency_ms=latency,
-            )
-
-            # Execute action
-            if driver and action.get("type") == "move":
-                driver.move(action.get("linear", 0), action.get("angular", 0))
-                time.sleep(0.5)
-                driver.stop()
-
-            print(f"  Step {recorder._step}: {thought.raw_text[:60]}... ({latency:.0f}ms)")
-            time.sleep(1.0)
-
-    except KeyboardInterrupt:
-        print("\n  Stopping recording...")
-    finally:
-        recorder.close()
-        if driver:
-            driver.stop()
-            driver.close()
-        camera.close()
-
-
-def cmd_replay(args) -> None:
-    """Replay a recorded session from a JSONL file, or list/replay sessions via API (#328)."""
-    from castor.record import replay_session
-
-    # ── validate: require either a recording file or --url ──────────────────
-    url = getattr(args, "url", None)
-    if not getattr(args, "recording", None) and not url:
-        print(
-            "Usage: castor replay <recording.jsonl>  OR  castor replay --url <gateway>",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    # ── server replay mode (--url supplied, no local file) ──────────────────
-    if url and not getattr(args, "recording", None):
-        import requests as _req
-
-        token = getattr(args, "token", None) or os.getenv("OPENCASTOR_API_TOKEN", "")
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
-        base = url.rstrip("/")
-
-        if getattr(args, "list", False):
-            r = _req.get(f"{base}/api/memory/episodes", headers=headers, timeout=10)
-            if not r.ok:
-                print(f"Error {r.status_code}: {r.text[:200]}", file=sys.stderr)
-                sys.exit(1)
-            eps = r.json().get("episodes", [])
-            if not eps:
-                print("No episodes recorded.")
-                return
-            for ep in eps[-50:]:
-                ts = str(ep.get("ts", ""))[:19]
-                act = (ep.get("action") or {}).get("type", "—")
-                instr = str(ep.get("instruction", ""))[:60]
-                print(f"  {ep.get('id', '?')[:8]}  {ts}  [{act:10s}]  {instr}")
-            return
-
-        start_id = getattr(args, "start", None)
-        end_id = getattr(args, "end", None)
-        last_n = getattr(args, "last", None)
-
-        if last_n is not None:
-            r = _req.get(f"{base}/api/memory/episodes", headers=headers, timeout=10)
-            if not r.ok:
-                print(f"Error {r.status_code}: {r.text[:200]}", file=sys.stderr)
-                sys.exit(1)
-            eps = r.json().get("episodes", [])[-last_n:]
-            if len(eps) < 2:
-                print("Not enough episodes for replay.", file=sys.stderr)
-                sys.exit(1)
-            start_id = eps[0]["id"]
-            end_id = eps[-1]["id"]
-
-        if not start_id or not end_id:
-            print("Provide --start and --end IDs, or --last N for API replay.", file=sys.stderr)
+    """castor doctor — system health check."""
+    from castor.doctor import print_report, run_doctor
+    full = getattr(args, "full", False)
+    report = run_doctor(full=full)
+    print_report(report)
+    import sys
+    if not report.all_ok and not full:
+        # Exit non-zero if failures (not warnings) — useful for CI
+        if report.fail_count > 0:
             sys.exit(1)
-
-        speed = getattr(args, "speed", 1.0) or 1.0
-        dry_run = getattr(args, "dry_run", False)
-        params = {
-            "start_id": start_id,
-            "end_id": end_id,
-            "speed_factor": speed,
-            "dry_run": dry_run,
-        }
-        r = _req.post(f"{base}/api/memory/trajectory", params=params, headers=headers, timeout=120)
-        if not r.ok:
-            print(f"Error {r.status_code}: {r.text[:200]}", file=sys.stderr)
-            sys.exit(1)
-        result = r.json()
-        if dry_run:
-            print(f"Dry run: {result['episode_count']} episodes over {result['duration_s']:.1f}s")
-            for ep in result.get("episodes", []):
-                print(f"  {ep.get('id', '?')[:8]}  {ep.get('action', {})}")
-        else:
-            print(
-                f"Replayed {result.get('executed', 0)}/{result.get('episode_count', 0)} episodes"
-                f" in {result.get('duration_s', 0):.1f}s (speed×{speed})"
-            )
-        return
-
-    # ── local file replay mode (original behaviour) ──────────────────────────
-    replay_session(
-        recording_path=args.recording,
-        execute=args.execute,
-        config_path=args.config,
-    )
-
-
-def cmd_benchmark(args) -> None:
-    """Profile a single perception-action loop iteration, or benchmark multiple providers."""
-    providers = getattr(args, "providers", None)
-
-    # New provider-comparison mode: activated when --providers is supplied
-    if providers is not None:
-        from castor.commands.benchmark import cmd_provider_benchmark
-
-        cmd_provider_benchmark(
-            providers=providers if providers else None,
-            rounds=getattr(args, "rounds", 3),
-            config_path=args.config if os.path.exists(args.config) else None,
-            output=getattr(args, "output", None),
-        )
-        return
-
-    # Legacy single-config hardware benchmark
-    if not os.path.exists(args.config):
-        print(f"\n  Config not found: {args.config}")
-        print("  Run `castor wizard` to create one first.\n")
-        return
-
-    from castor.benchmark import run_benchmark
-
-    run_benchmark(
-        config_path=args.config,
-        iterations=args.iterations,
-        simulate=args.simulate,
-    )
-
-
-def cmd_lint(args) -> None:
-    """Deep config validation beyond JSON schema."""
-    from castor.lint import print_lint_report, run_lint
-
-    if not os.path.exists(args.config):
-        print(f"\n  Config not found: {args.config}")
-        return
-
-    issues = run_lint(args.config)
-    print_lint_report(issues, args.config)
-
-
-def cmd_validate(args) -> None:
-    """Run RCAN conformance checks."""
-    import json as _json
-
-    import yaml
-
-    from castor.conformance import ConformanceChecker
-
-    config_path = args.config
-
-    # --- Config file existence check ---
-    if not os.path.exists(config_path):
-        print(f"\n  Config not found: {config_path}")
-        print("  Run `castor wizard` to create one first.\n")
-        raise SystemExit(1)
-
-    # --- Load YAML ---
-    try:
-        with open(config_path) as f:
-            config = yaml.safe_load(f) or {}
-    except Exception as exc:
-        print(f"\n  Error loading config: {exc}\n")
-        raise SystemExit(1) from exc
-
-    # --- JSON schema validation (reuse doctor.py logic) ---
-    from castor.doctor import check_rcan_config
-
-    schema_ok, _, schema_detail = check_rcan_config(config_path)
-
-    # --- Run conformance checks ---
-    checker = ConformanceChecker(config, config_path=config_path)
-    if getattr(args, "category", None):
-        try:
-            results = checker.run_category(args.category)
-        except ValueError as exc:
-            print(f"\n  {exc}")
-            print("  Valid categories: safety, provider, protocol, performance, hardware\n")
-            raise SystemExit(1) from exc
-    else:
-        results = checker.run_all()
-
-    summary = checker.summary(results)
-
-    # --- JSON output ---
-    if getattr(args, "json", False):
-        output = {
-            "config": config_path,
-            "schema_valid": schema_ok,
-            "schema_detail": schema_detail,
-            "results": [
-                {
-                    "check_id": r.check_id,
-                    "category": r.category,
-                    "status": r.status,
-                    "detail": r.detail,
-                    "fix": r.fix,
-                }
-                for r in results
-            ],
-            "summary": summary,
-        }
-        print(_json.dumps(output, indent=2))
-        _validate_exit(summary, getattr(args, "strict", False))
-        return
-
-    # --- Human-readable output ---
-    _SEP = "─" * 42
-
-    print()
-    print("  castor validate — RCAN Conformance Check")
-    print(f"  Config: {config_path}")
-    if not schema_ok:
-        print(f"  ⚠️  Schema: {schema_detail}")
-    print()
-
-    STATUS_ICONS = {"pass": "✅", "warn": "⚠️ ", "fail": "❌"}
-
-    # Group by category
-    categories_seen: list[str] = []
-    by_cat: dict[str, list] = {}
-    for r in results:
-        if r.category not in by_cat:
-            by_cat[r.category] = []
-            categories_seen.append(r.category)
-        by_cat[r.category].append(r)
-
-    CAT_LABELS = {
-        "safety": "SAFETY",
-        "provider": "PROVIDER",
-        "protocol": "PROTOCOL",
-        "performance": "PERFORMANCE",
-        "hardware": "HARDWARE",
-    }
-
-    for cat in categories_seen:
-        label = CAT_LABELS.get(cat, cat.upper())
-        print(f"  {label} {_SEP[len(label) + 2 :]}")
-        for r in by_cat[cat]:
-            icon = STATUS_ICONS.get(r.status, "?")
-            check_col = f"{r.check_id:<35}"
-            print(f"  {icon}  {check_col} {r.detail}")
-            if r.fix and r.status != "pass":
-                print(f"       {'':35} Fix: {r.fix}")
-        print()
-
-    # Summary line
-    print(f"  {_SEP}")
-    score = summary["score"]
-    passes = summary["pass"]
-    warns = summary["warn"]
-    fails = summary["fail"]
-    print(f"  Score: {score}/100   ✅ {passes}  ⚠️  {warns}  ❌ {fails}")
-    print()
-
-    if fails == 0 and warns == 0:
-        print("  Your robot config is fully RCAN conformant. 🎉")
-    elif fails == 0:
-        print("  Your robot config is RCAN conformant (with warnings).")
-    else:
-        print(f"  Your robot config has {fails} conformance failure(s). Please fix them.")
-
-    print()
-    _validate_exit(summary, getattr(args, "strict", False))
-
-
-def _validate_exit(summary: dict, strict: bool) -> None:
-    """Exit with appropriate code based on results."""
-    if summary["fail"] > 0:
-        raise SystemExit(1)
-    if strict and summary["warn"] > 0:
-        raise SystemExit(1)
-
-
-def _improve_toggle(args) -> bool:
-    """Handle --enable/--disable for self-improving loop. Returns True if handled."""
-    if not (getattr(args, "enable", False) or getattr(args, "disable", False)):
-        return False
-
-    import glob
-
-    import yaml
-
-    config_path = getattr(args, "config", None)
-    if not config_path:
-        # Auto-detect: look for *.rcan.yaml in cwd
-        candidates = glob.glob("*.rcan.yaml")
-        if len(candidates) == 1:
-            config_path = candidates[0]
-        elif len(candidates) > 1:
-            print("  Multiple RCAN configs found. Use --config to specify one:")
-            for c in candidates:
-                print(f"    {c}")
-            return True
-        else:
-            print("  No RCAN config found. Use --config <path> or run from your project directory.")
-            return True
-
-    # Load existing config
-    try:
-        with open(config_path) as f:
-            config = yaml.safe_load(f) or {}
-    except FileNotFoundError:
-        print(f"  Config not found: {config_path}")
-        return True
-
-    if args.enable:
-        learner = config.setdefault("learner", {})
-        learner["enabled"] = True
-        # Set sensible defaults if not already configured
-        learner.setdefault("provider", "huggingface")
-        learner.setdefault("model", "Qwen/Qwen2.5-7B-Instruct")
-        learner.setdefault("cadence", "every_5")
-        learner.setdefault("cadence_n", 5)
-        learner.setdefault("max_retries", 3)
-        learner.setdefault("auto_apply_config", True)
-        learner.setdefault("auto_apply_behavior", False)
-        learner.setdefault("auto_apply_code", False)
-
-        with open(config_path, "w") as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-
-        provider = learner["provider"]
-        model = learner["model"]
-        cadence = learner.get("cadence_n", 5)
-        print(f"\n  ✅ Self-improving loop enabled in {config_path}")
-        print(f"     Provider: {provider}/{model}")
-        print(f"     Cadence: every {cadence} episode(s)")
-        print("     Auto-apply: config=yes, behavior=no, code=no")
-        print()
-        print("  Tip: Customize provider/model/cadence in the learner section of your config,")
-        print("  or re-run `castor wizard` for the interactive setup.")
-
-    elif args.disable:
-        if "learner" in config:
-            config["learner"]["enabled"] = False
-        else:
-            config["learner"] = {"enabled": False}
-
-        with open(config_path, "w") as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-
-        print(f"\n  ⏸️  Self-improving loop disabled in {config_path}")
-        print("  Episode recording will stop. Existing history is preserved.")
-        print("  Re-enable anytime with: castor improve --enable")
-
-    return True
-
-
-def cmd_improve(args) -> None:
-    """Self-improving loop — analyze episodes and apply improvements."""
-    if _improve_toggle(args):
-        return
-
-    try:
-        from castor.learner import ALMAConsolidation, EpisodeStore, SisyphusLoop
-    except ImportError:
-        print("Error: castor.learner module not found. Upgrade OpenCastor.")
-        return
-
-    store = EpisodeStore()
-
-    if args.status:
-        # Show improvement stats
-        from castor.learner.apply_stage import ApplyStage
-
-        applier = ApplyStage()
-        history = applier.get_history()
-        print("\n  🧠 Self-Improving Loop Status")
-        print(f"  {'=' * 40}")
-        print(f"  Episodes stored:        {len(store.list_recent(9999))}")
-        print(f"  Improvements applied:   {len([h for h in history if h.get('applied')])}")
-        print(f"  Improvements rejected:  {len([h for h in history if not h.get('applied')])}")
-        print()
-        return
-
-    if args.improvements:
-        from castor.learner.apply_stage import ApplyStage
-
-        applier = ApplyStage()
-        history = applier.get_history()
-        if not history:
-            print("  No improvements applied yet.")
-            return
-        print("\n  Applied Improvements:")
-        print(f"  {'=' * 50}")
-        for h in history[-20:]:
-            status = "✅" if h.get("applied") else "❌"
-            print(
-                f"  {status} {h.get('id', '?')[:8]} | {h.get('type', '?'):<15} | {h.get('rationale', '')[:40]}"
-            )
-        print()
-        return
-
-    if args.rollback:
-        from castor.learner.apply_stage import ApplyStage
-
-        applier = ApplyStage()
-        success = applier.rollback(args.rollback)
-        if success:
-            print(f"  ✅ Rolled back improvement {args.rollback}")
-        else:
-            print(f"  ❌ Could not rollback {args.rollback} (not found or already rolled back)")
-        return
-
-    # Run the Sisyphus loop
-    config = {}
-    if args.config:
-        import yaml
-
-        with open(args.config) as f:
-            config = yaml.safe_load(f) or {}
-
-    episodes = store.list_recent(args.episodes)
-    if not episodes:
-        print("  No episodes recorded yet. Run the robot first, then come back.")
-        print("  Episodes are automatically recorded during `castor run`.")
-        return
-
-    print(f"\n  🔄 Sisyphus Loop — Analyzing {len(episodes)} episodes...")
-    print()
-
-    if args.batch:
-        # ALMA batch consolidation
-        alma = ALMAConsolidation(config=config.get("learner", {}))
-        patches = alma.consolidate(episodes)
-        print(f"  Found {len(patches)} cross-episode patterns")
-        for p in patches:
-            print(f"    → {p.type}: {p.rationale[:60]}")
-    else:
-        # Per-episode analysis
-        loop = SisyphusLoop(config=config.get("learner", {}))
-        for ep in episodes:
-            result = loop.run_episode(ep)
-            status = "✅ improved" if result.applied else "⏭️ no action"
-            print(f"  Episode {ep.id[:8]}: {status}")
-            if result.patch and result.applied:
-                print(f"    Patch: {result.patch.type} — {result.patch.rationale[:50]}")
-
-    print("\n  Done. Run `castor improve --status` to see stats.")
-
-
-def cmd_learn(args) -> None:
-    """Interactive step-by-step tutorial."""
-    from castor.learn import run_learn
-
-    run_learn(lesson=args.lesson)
-
-
-def cmd_swarm(args) -> None:
-    """Multi-robot swarm management sub-commands."""
-    from castor.commands.swarm import (
-        cmd_swarm_command,
-        cmd_swarm_status,
-        cmd_swarm_stop,
-        cmd_swarm_sync,
-    )
-
-    subcmd = getattr(args, "swarm_subcmd", None) or "status"
-    output_json = getattr(args, "json", False)
-    swarm_cfg = getattr(args, "swarm_config", None)
-    timeout = float(getattr(args, "timeout", 3.0))
-
-    if subcmd == "status":
-        cmd_swarm_status(config_path=swarm_cfg, output_json=output_json, timeout=timeout)
-    elif subcmd == "command":
-        instruction = getattr(args, "instruction", "")
-        node = getattr(args, "node", None)
-        cmd_swarm_command(
-            instruction,
-            node=node,
-            config_path=swarm_cfg,
-            output_json=output_json,
-            timeout=timeout,
-        )
-    elif subcmd == "stop":
-        cmd_swarm_stop(config_path=swarm_cfg, output_json=output_json, timeout=timeout)
-    elif subcmd == "sync":
-        config_path_arg = getattr(args, "config_path", None) or "config/swarm.yaml"
-        cmd_swarm_sync(
-            config_path_arg,
-            swarm_config_path=swarm_cfg,
-            output_json=output_json,
-            timeout=timeout,
-        )
-    elif subcmd == "update":
-        from castor.commands.update import cmd_swarm_update
-
-        cmd_swarm_update(args)
-    else:
-        print(f"  Unknown swarm sub-command: {subcmd}")
-        print("  Available: status, command, stop, sync, update")
-
-
-def cmd_update_check(args) -> None:
-    """Check PyPI for a newer version of OpenCastor."""
-    from castor.update_check import print_update_status
-
-    print_update_status()
-
-
-def cmd_profile(args) -> None:
-    """Manage named config profiles."""
-    from castor.profiles import (
-        list_profiles,
-        print_profiles,
-        remove_profile,
-        save_profile,
-        use_profile,
-    )
-
-    action = args.action
-
-    if action == "list":
-        profiles = list_profiles()
-        print_profiles(profiles)
-    elif action == "save":
-        if not args.name:
-            print("\n  Usage: castor profile save NAME --config FILE\n")
-            return
-        save_profile(args.name, args.config)
-        print(f"\n  Profile '{args.name}' saved from {args.config}\n")
-    elif action == "use":
-        if not args.name:
-            print("\n  Usage: castor profile use NAME\n")
-            return
-        try:
-            use_profile(args.name)
-            print(f"\n  Profile '{args.name}' activated -> robot.rcan.yaml\n")
-        except FileNotFoundError:
-            print(f"\n  Profile not found: {args.name}\n")
-    elif action == "remove":
-        if not args.name:
-            print("\n  Usage: castor profile remove NAME\n")
-            return
-        if remove_profile(args.name):
-            print(f"\n  Profile '{args.name}' removed.\n")
-        else:
-            print(f"\n  Profile not found: {args.name}\n")
-    else:
-        print("\n  Usage: castor profile {list|save|use|remove}\n")
-
-
-def cmd_test(args) -> None:
-    """Run the test suite via pytest."""
-    import subprocess
-
-    cmd = [sys.executable, "-m", "pytest", "tests/"]
-    if args.verbose:
-        cmd.append("-v")
-    if args.keyword:
-        cmd.extend(["-k", args.keyword])
-
-    print("\n  Running OpenCastor tests...\n")
-    result = subprocess.run(cmd)
-    sys.exit(result.returncode)
-
-
-def cmd_diff(args) -> None:
-    """Compare two RCAN config files."""
-    from castor.diff import diff_configs, print_diff
-
-    if not os.path.exists(args.config):
-        print(f"\n  File not found: {args.config}\n")
-        return
-    if not os.path.exists(args.baseline):
-        print(f"\n  File not found: {args.baseline}\n")
-        return
-
-    diffs = diff_configs(args.config, args.baseline)
-    print_diff(diffs, args.config, args.baseline)
-
-
-def cmd_quickstart(args) -> None:
-    """One-command setup: wizard -> demo -> dashboard."""
-    import subprocess
-
-    print("\n  OpenCastor QuickStart\n")
-
-    # Step 1: Run wizard in simple mode
-    print("  Step 1: Running setup wizard...\n")
-    wizard_args = [sys.executable, "-m", "castor.cli", "wizard", "--simple", "--accept-risk"]
-    result = subprocess.run(wizard_args)
-    if result.returncode != 0:
-        print("\n  Wizard failed. Run `castor doctor` to diagnose.\n")
-        return
-
-    # Step 2: Run demo
-    print("\n  Step 2: Running demo...\n")
-    demo_args = [sys.executable, "-m", "castor.cli", "demo", "--steps", "3"]
-    subprocess.run(demo_args)
-
-    print("\n  QuickStart complete!")
-    print("  Next: castor run --config robot.rcan.yaml\n")
-
-
-def cmd_plugins(args) -> None:
-    """List or install plugins."""
-    subcmd = getattr(args, "plugin_subcmd", None)
-    if subcmd == "install":
-        _cmd_plugin_install(args)
-    elif subcmd == "list-entry-points":
-        _cmd_plugin_list_entry_points()
-    else:
-        from castor.plugins import list_plugins, load_plugins, print_plugins
-
-        load_plugins()
-        plugins = list_plugins()
-        print_plugins(plugins)
-        # Also show entry-point plugins
-        _cmd_plugin_list_entry_points()
-
-
-def _cmd_plugin_list_entry_points() -> None:
-    """Show all installed entry-point plugins discovered via importlib.metadata."""
-    from castor.registry import get_registry
-
-    registry = get_registry()
-    entries = registry.discover_plugins()
-
-    try:
-        from rich.console import Console
-        from rich.table import Table
-
-        console = Console()
-        if not entries:
-            console.print("  [dim]No entry-point plugins discovered.[/]")
-            return
-        table = Table(title="Entry-Point Plugins", show_header=True)
-        table.add_column("Group", style="cyan")
-        table.add_column("Name", style="bold")
-        table.add_column("Package", style="dim")
-        for e in sorted(entries, key=lambda x: (x.group, x.name)):
-            table.add_row(e.group, e.name, e.package)
-        console.print(table)
-    except ImportError:
-        if not entries:
-            print("  No entry-point plugins discovered.")
-            return
-        print("\n  Entry-Point Plugins:")
-        print(f"  {'Group':<35}  {'Name':<20}  Package")
-        print(f"  {'-' * 35}  {'-' * 20}  -------")
-        for e in sorted(entries, key=lambda x: (x.group, x.name)):
-            print(f"  {e.group:<35}  {e.name:<20}  {e.package}")
-
-
-def _cmd_plugin_install(args) -> None:
-    """Install a plugin from a URL (git clone) or a local .py path."""
-    import json
-    import shutil
-    import subprocess
-    import urllib.parse
-
-    source = args.source
-    plugins_dir = os.path.expanduser("~/.opencastor/plugins")
-    provenance_file = os.path.join(plugins_dir, "_provenance.json")
-    os.makedirs(plugins_dir, exist_ok=True)
-
-    # Load existing provenance
-    provenance: dict = {}
-    if os.path.exists(provenance_file):
-        try:
-            with open(provenance_file) as f:
-                provenance = json.load(f)
-        except Exception:
-            pass
-
-    # Determine install type
-    is_url = (
-        source.startswith("http://") or source.startswith("https://") or source.startswith("git@")
-    )
-
-    if is_url:
-        # Clone the repository into plugins_dir/<repo-name>/
-        repo_name = urllib.parse.urlparse(source).path.rstrip("/").rsplit("/", 1)[-1]
-        repo_name = repo_name.removesuffix(".git")
-        dest = os.path.join(plugins_dir, repo_name)
-
-        if os.path.exists(dest):
-            print(f"  Updating existing plugin '{repo_name}' from {source}...")
-            result = subprocess.run(["git", "-C", dest, "pull"], capture_output=True, text=True)
-        else:
-            print(f"  Cloning plugin '{repo_name}' from {source}...")
-            result = subprocess.run(
-                ["git", "clone", "--depth=1", source, dest],
-                capture_output=True,
-                text=True,
-            )
-
-        if result.returncode != 0:
-            print(f"  [ERROR] git failed: {result.stderr.strip()}")
-            raise SystemExit(1)
-
-        print(f"  Plugin '{repo_name}' installed to {dest}")
-        provenance[repo_name] = {"source": source, "type": "git", "path": dest}
-    else:
-        # Copy a local .py file
-        if not os.path.isfile(source):
-            print(f"  [ERROR] File not found: {source}")
-            raise SystemExit(1)
-        if not source.endswith(".py"):
-            print(f"  [ERROR] Plugin must be a .py file (got: {source})")
-            raise SystemExit(1)
-
-        plugin_name = os.path.basename(source)[:-3]
-        dest = os.path.join(plugins_dir, os.path.basename(source))
-        shutil.copy2(source, dest)
-        print(f"  Plugin '{plugin_name}' installed to {dest}")
-        provenance[plugin_name] = {"source": os.path.abspath(source), "type": "local", "path": dest}
-
-    # Persist provenance record
-    with open(provenance_file, "w") as f:
-        json.dump(provenance, f, indent=2)
-
-    print(f"  Provenance recorded in {provenance_file}")
-    print("  Run 'castor plugins' to see all installed plugins.\n")
-
-
-def cmd_plugin(args) -> None:
-    """plugin install <url-or-path> -- install a plugin with provenance tracking."""
-    subcommand = getattr(args, "plugin_subcommand", None)
-    if subcommand == "install":
-        from castor.plugins import install_plugin
-
-        source = args.source
-        success = install_plugin(source)
-        if success:
-            print(f"  Plugin installed from: {source}")
-            print("  Provenance recorded in ~/.opencastor/plugins.lock")
-        else:
-            print(f"  Failed to install plugin from: {source}")
-            raise SystemExit(1)
-    else:
-        print("Usage: castor plugin install <url-or-path>")
-        raise SystemExit(1)
-
-
-def cmd_login(args) -> None:
-    """Authenticate with AI providers (Hugging Face, etc.)."""
-    service = args.service.lower()
-
-    if service in ("huggingface", "hf"):
-        _login_huggingface(args)
-    elif service == "ollama":
-        _login_ollama(args)
-    elif service in ("anthropic", "claude"):
-        _login_anthropic(args)
-    else:
-        print(f"  Unknown service: {service}")
-        print("  Supported: anthropic (claude), huggingface (hf), ollama")
-
-
-def _login_anthropic(args) -> None:
-    """Handle Anthropic authentication via setup-token or API key."""
-    import getpass
-    import shutil
-    import subprocess
-
-    print("\n  Anthropic Authentication")
-    print("  ========================")
-    print()
-    print("  [1] Setup-token (uses Claude Max/Pro subscription — no per-token billing)")
-    print("  [2] Paste an existing setup-token")
-    print("  [3] API key (pay-as-you-go from console.anthropic.com)")
-    print()
-
-    choice = input("  Selection [1]: ").strip() or "1"
-    token = None
-
-    if choice == "1":
-        # Generate a fresh setup-token via Claude CLI
-        if not shutil.which("claude"):
-            print("  ❌ Claude CLI not found. Install it first:")
-            print("     npm install -g @anthropic-ai/claude-code")
-            print()
-            print("  Or choose [2] to paste a token generated on another machine.")
-            return
-
-        print()
-        print("  Generating a setup-token via Claude CLI...")
-        print("  (This creates a token specific to OpenCastor — won't affect OpenClaw)")
-        print()
-        try:
-            result = subprocess.run(
-                ["claude", "setup-token"],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            output = result.stdout.strip()
-            # The token is usually the last line of output
-            for line in reversed(output.split("\n")):
-                line = line.strip()
-                if line.startswith("sk-ant-oat01-") and len(line) >= 80:
-                    token = line
-                    break
-
-            if not token:
-                print("  ⚠️  Could not extract token from claude output.")
-                if output:
-                    print(f"  Output: {output[:200]}")
-                print("  Try [2] to paste the token manually.")
-                return
-
-        except subprocess.TimeoutExpired:
-            print("  ⚠️  claude setup-token timed out. Try running it manually.")
-            return
-        except Exception as e:
-            print(f"  ⚠️  Error running claude setup-token: {e}")
-            return
-
-    elif choice == "2":
-        print()
-        print("  Paste a setup-token (starts with sk-ant-oat01-).")
-        print("  Generate one with: claude setup-token")
-        print()
-        token = getpass.getpass("  Setup-token: ").strip()
-        if not token:
-            print("  Cancelled.")
-            return
-        if not (token.startswith("sk-ant-oat01-") and len(token) >= 80):
-            print("  ⚠️  Token doesn't match expected format (sk-ant-oat01-...).")
-            confirm = input("  Save anyway? [y/N]: ").strip().lower()
-            if confirm not in ("y", "yes"):
-                print("  Cancelled.")
-                return
-
-    elif choice == "3":
-        print()
-        token = getpass.getpass("  ANTHROPIC_API_KEY: ").strip()
-        if not token:
-            print("  Cancelled.")
-            return
-    else:
-        print("  Invalid selection.")
-        return
-
-    # Save token to OpenCastor's own store (~/.opencastor/anthropic-token)
-    from castor.providers.anthropic_provider import AnthropicProvider
-
-    saved_path = AnthropicProvider.save_token(token)
-    is_setup_token = token.startswith("sk-ant-oat01-")
-    label = "setup-token (subscription)" if is_setup_token else "API key"
-    print(f"  ✅ {label} saved to {saved_path}")
-
-    # Validate
-    try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=token)
-        resp = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=10,
-            messages=[{"role": "user", "content": "hi"}],
-        )
-        if resp.content:
-            print("  ✅ Authentication verified!")
-    except Exception as e:
-        print(f"  ⚠️  Could not verify: {e}")
-
-
-def _write_env_key(key: str, value: str) -> None:
-    """Write or update a key in ~/.opencastor/env (and local .env for compat)."""
-    env_dir = os.path.expanduser("~/.opencastor")
-    os.makedirs(env_dir, mode=0o700, exist_ok=True)
-
-    for env_path in [os.path.join(env_dir, "env"), os.path.join(os.getcwd(), ".env")]:
-        lines = []
-        found = False
-        if os.path.exists(env_path):
-            with open(env_path) as f:
-                for line in f:
-                    if line.startswith(f"{key}="):
-                        lines.append(f"{key}={value}\n")
-                        found = True
-                    else:
-                        lines.append(line)
-        if not found:
-            lines.append(f"{key}={value}\n")
-        with open(env_path, "w") as f:
-            f.writelines(lines)
-
-    # Secure the primary env file
-    try:
-        os.chmod(os.path.join(env_dir, "env"), 0o600)
-    except OSError:
-        pass
-
-
-def _login_huggingface(args) -> None:
-    """Handle Hugging Face authentication and model discovery."""
-    import getpass
-
-    try:
-        from huggingface_hub import HfApi
-        from huggingface_hub import login as hf_login
-    except ImportError:
-        print("  Missing dependency: huggingface-hub")
-        print("  Install with: pip install huggingface-hub")
-        return
-
-    token = args.token or os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
-
-    if not token:
-        print()
-        print("  🤗 Hugging Face Login")
-        print("  ─────────────────────")
-        print("  Get your token at: https://huggingface.co/settings/tokens")
-        print("  Recommended: 'Read' scope is sufficient for inference.")
-        print()
-        token = getpass.getpass("  HF Token: ").strip()
-
-    if not token:
-        print("  No token provided. Aborted.")
-        return
-
-    try:
-        hf_login(token=token, add_to_git_credential=False)
-        api = HfApi(token=token)
-        user = api.whoami()
-        username = user.get("name", user.get("fullname", "unknown"))
-        print(f"\n  ✅ Authenticated as: {username}")
-        print("     Token saved to: ~/.cache/huggingface/token")
-
-        # Also save to .env if it exists
-        env_path = os.path.join(os.getcwd(), ".env")
-        _update_env_var(env_path, "HF_TOKEN", token)
-
-    except Exception as e:
-        print(f"\n  ❌ Login failed: {e}")
-        return
-
-    if args.list_models:
-        _list_hf_models(api, args.task)
-
-
-def _update_env_var(env_path: str, key: str, value: str) -> None:
-    """Add or update a variable in a .env file."""
-    lines = []
-    found = False
-    if os.path.exists(env_path):
-        with open(env_path) as f:
-            lines = f.readlines()
-        for i, line in enumerate(lines):
-            if line.startswith(f"{key}="):
-                lines[i] = f"{key}={value}\n"
-                found = True
-                break
-
-    if not found:
-        lines.append(f"{key}={value}\n")
-
-    with open(env_path, "w") as f:
-        f.writelines(lines)
-    print(f"     Also saved to: {env_path}")
-
-
-def _login_ollama(args) -> None:
-    """Handle Ollama connection setup and model discovery."""
-    from castor.providers.ollama_provider import (
-        DEFAULT_HOST,
-        OllamaConnectionError,
-        OllamaProvider,
-    )
-
-    host = args.token or os.getenv("OLLAMA_HOST") or DEFAULT_HOST
-
-    print()
-    print("  🦙 Ollama Setup")
-    print("  ───────────────")
-    print(f"  Host: {host}")
-    print()
-
-    # Test connection
-    try:
-        provider = OllamaProvider({"provider": "ollama", "ollama_host": host})
-        provider._ping()
-        print("  ✅ Connected to Ollama")
-    except OllamaConnectionError as exc:
-        print(f"  ❌ {exc}")
-        print()
-        print("  To install Ollama: https://ollama.ai/download")
-        print("  To start Ollama:   ollama serve")
-        return
-
-    # Save host to .env if non-default
-    if host != DEFAULT_HOST:
-        env_path = os.path.join(os.getcwd(), ".env")
-        _update_env_var(env_path, "OLLAMA_HOST", host)
-
-    # List models
-    if args.list_models:
-        try:
-            models = provider.list_models()
-            if models:
-                print(f"\n  📦 Available models ({len(models)}):\n")
-                for m in models:
-                    size_gb = m["size"] / (1024**3) if m["size"] else 0
-                    print(f"    • {m['name']:<30s} {size_gb:.1f} GB")
-            else:
-                print("\n  No models found. Pull one with:")
-                print("    ollama pull llava:13b")
-            print()
-        except Exception as e:
-            print(f"\n  Error listing models: {e}\n")
-
-    print("  Use in your RCAN config:")
-    print("    agent:")
-    print('      provider: "ollama"')
-    print('      model: "llava:13b"')
-    print()
-
-
-def _list_hf_models(api, task: str, limit: int = 15) -> None:
-    """Print trending models for a task."""
-    print(f"\n  📦 Trending {task} models on Hugging Face:\n")
-    try:
-        models = api.list_models(task=task, sort="trending", direction=-1, limit=limit)
-        for i, m in enumerate(models, 1):
-            downloads = f"{m.downloads:,}" if m.downloads else "?"
-            likes = m.likes or 0
-            print(f"  {i:>3}. {m.id}")
-            print(f"       ↓ {downloads} downloads  ♥ {likes} likes")
-        print()
-        print("  Use any model ID in your RCAN config:")
-        print("    agent:")
-        print('      provider: "huggingface"')
-        print('      model: "meta-llama/Llama-3.3-70B-Instruct"')
-        print()
-    except Exception as e:
-        print(f"  Error listing models: {e}")
-
-
-def cmd_daemon(args) -> None:
-    """Manage the OpenCastor systemd auto-start service."""
-    import subprocess
-
-    from castor.daemon import (
-        daemon_logs,
-        daemon_status,
-        disable_daemon,
-        enable_daemon,
-    )
-
-    action = getattr(args, "action", "status") or "status"
-
-    if action == "enable":
-        config = getattr(args, "config", "robot.rcan.yaml")
-        user = getattr(args, "user", None)
-        print(f"\n  Installing OpenCastor daemon service for: {config}")
-        result = enable_daemon(config, user=user)
-        if result["ok"]:
-            print(f"  ✓ Service installed: {result['service_path']}")
-            print("  ✓ Enabled and started — robot will auto-start on boot")
-            print("\n  Run `castor daemon status` to check.")
-        else:
-            print(f"  ✗ Failed: {result['message']}")
-            print("  Hint: Try running with sudo or check your systemd setup.")
-        print()
-
-    elif action == "disable":
-        print("\n  Disabling OpenCastor daemon service...")
-        result = disable_daemon()
-        print("  ✓ Service stopped and disabled")
-        print("  The robot will no longer auto-start on boot.")
-        print()
-
-    elif action == "status":
-        status = daemon_status()
-        if not status.get("available"):
-            print(f"\n  ⚠  {status.get('message', 'systemd not available')}\n")
-            return
-        installed = status.get("installed")
-        enabled = status.get("enabled")
-        running = status.get("running")
-        pid = status.get("pid")
-        started = status.get("started", "")
-
-        print("\n  OpenCastor Daemon Status")
-        print("  " + "─" * 30)
-        print(f"  Installed : {'yes — ' + status.get('service_path', '') if installed else 'no'}")
-        print(f"  Enabled   : {'yes (starts on boot)' if enabled else 'no'}")
-        print(
-            f"  Running   : {'yes (PID ' + pid + ')' if (running and pid) else ('yes' if running else 'no')}"
-        )
-        if started:
-            print(f"  Started   : {started}")
-        if not installed:
-            print("\n  Run `castor daemon enable --config <file>` to install.")
-        print()
-
-    elif action == "logs":
-        lines = getattr(args, "lines", 50)
-        print(f"\n  Last {lines} lines of daemon journal:\n")
-        print(daemon_logs(lines))
-
-    elif action == "restart":
-        print("\n  Restarting OpenCastor daemon service...")
-        result = subprocess.run(
-            ["sudo", "systemctl", "restart", "castor-gateway"],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            print("  ✓ Service restarted")
-        else:
-            print(f"  ✗ Restart failed: {result.stderr}")
-        print()
-
-
-def cmd_scan(args) -> None:
-    """Auto-detect connected hardware peripherals."""
-    import json as _json
-
-    from castor.peripherals import print_scan_table, scan_all
-
-    i2c_bus = getattr(args, "i2c_bus", 1)
-    peripherals = scan_all(i2c_buses=[i2c_bus])
-
-    if getattr(args, "json", False):
-        print(
-            _json.dumps(
-                [
-                    {
-                        "name": p.name,
-                        "category": p.category,
-                        "interface": p.interface,
-                        "device_path": p.device_path,
-                        "usb_id": p.usb_id,
-                        "i2c_address": p.i2c_address,
-                        "driver_hint": p.driver_hint,
-                        "rcan_snippet": p.rcan_snippet,
-                        "confidence": p.confidence,
-                    }
-                    for p in peripherals
-                ],
-                indent=2,
-            )
-        )
-    else:
-        print_scan_table(peripherals, color=not getattr(args, "no_color", False))
-
-
-def cmd_hub(args) -> None:
-    """Community recipe hub — browse, share, and install configs."""
-    from castor.hub import (
-        CATEGORIES,
-        DIFFICULTY,
-        get_recipe,
-        install_recipe,
-        list_recipes,
-        print_recipe_card,
-    )
-
-    action = args.action
-
-    if action == "categories":
-        print("\n  📂 Recipe Categories:\n")
-        for key, label in CATEGORIES.items():
-            print(f"     {key:<15} {label}")
-        print("\n  🎯 Difficulty Levels:\n")
-        for key, label in DIFFICULTY.items():
-            print(f"     {key:<15} {label}")
-        print()
-        return
-
-    if action == "browse":
-        recipes = list_recipes(
-            category=args.category,
-            difficulty=args.difficulty,
-            provider=args.provider,
-        )
-        if not recipes:
-            print("\n  No recipes found.")
-            print("  Be the first! Run: castor hub share --config your_robot.rcan.yaml\n")
-            return
-        print(f"\n  🤖 Community Recipes ({len(recipes)} found):\n")
-        for r in recipes:
-            print_recipe_card(r, verbose=args.verbose)
-        print("\n  Install one: castor hub install <recipe-id>\n")
-        return
-
-    if action == "search":
-        query = args.query
-        if not query:
-            print("  Usage: castor hub search 'your query'")
-            return
-        recipes = list_recipes(search=query)
-        if not recipes:
-            print(f"\n  No recipes matching '{query}'.")
-            return
-        print(f"\n  🔍 Results for '{query}' ({len(recipes)} found):\n")
-        for r in recipes:
-            print_recipe_card(r, verbose=args.verbose)
-        print()
-        return
-
-    if action == "show":
-        recipe_id = args.query
-        if not recipe_id:
-            print("  Usage: castor hub show <recipe-id>")
-            return
-        recipe = get_recipe(recipe_id)
-        if not recipe:
-            print(f"  Recipe not found: {recipe_id}")
-            return
-        print_recipe_card(recipe, verbose=True)
-
-        # Show README if exists
-        from pathlib import Path
-
-        readme = Path(recipe["_dir"]) / "README.md"
-        if readme.exists():
-            print(f"\n  {'─' * 60}")
-            print(readme.read_text()[:2000])
-        print()
-        return
-
-    if action == "install":
-        recipe_id = args.query
-        if not recipe_id:
-            print("  Usage: castor hub install <recipe-id>")
-            return
-        dest = install_recipe(recipe_id, dest=args.output or ".")
-        if dest:
-            print(f"\n  ✅ Recipe installed: {dest}")
-            print(f"     Run: castor run --config {dest}\n")
-        else:
-            print(f"  Recipe not found: {recipe_id}")
-        return
-
-    if action == "share":
-        if not args.config:
-            print("  Usage: castor hub share --config robot.rcan.yaml [--docs BUILD.md ...]")
-            return
-        _interactive_share(args)
-        return
-
-    if action == "rate":
-        recipe_id = args.query
-        rating = getattr(args, "rating", None)
-        if not recipe_id or rating is None:
-            print("  Usage: castor hub rate <recipe-id> --rating <1-5>")
-            return
-        _submit_rating(recipe_id, rating)
-        return
-
-    # --- Hub Index commands (Issue #123) ---
-    if action == "list":
-        from castor.commands.hub import cmd_hub_list
-
-        cmd_hub_list(args)
-        return
-
-    if action == "publish":
-        from castor.commands.hub import cmd_hub_publish
-
-        cmd_hub_publish(args)
-        return
-
-    # Fallback
-    print("  Usage: castor hub {browse|search|show|install|share|rate|categories|list|publish}")
-    print("  Run: castor hub --help for details")
-
-
-def _interactive_share(args) -> None:
-    """Interactive recipe sharing wizard."""
-
-    from castor.hub import (
-        CATEGORIES,
-        DIFFICULTY,
-        create_recipe_manifest,
-        package_recipe,
-    )
-
-    print("\n  🤖 Share Your Robot Recipe")
-    print("  ─────────────────────────")
-    print("  Your config and docs will be scrubbed of PII before sharing.\n")
-
-    name = input("  Recipe name: ").strip() or "my-robot"
-    description = input("  Short description: ").strip() or "A robot config that works"
-    author = input("  Your name/handle (or Enter for Anonymous): ").strip() or "Anonymous"
-
-    print("\n  Categories:")
-    for i, (_key, label) in enumerate(CATEGORIES.items(), 1):
-        print(f"    [{i}] {label}")
-    cat_choice = input("  Category [10]: ").strip()
-    cat_keys = list(CATEGORIES.keys())
-    try:
-        category = cat_keys[int(cat_choice) - 1]
-    except (ValueError, IndexError):
-        category = "custom"
-
-    print("\n  Difficulty:")
-    for i, (_key, label) in enumerate(DIFFICULTY.items(), 1):
-        print(f"    [{i}] {label}")
-    diff_choice = input("  Difficulty [2]: ").strip()
-    diff_keys = list(DIFFICULTY.keys())
-    try:
-        difficulty = diff_keys[int(diff_choice) - 1]
-    except (ValueError, IndexError):
-        difficulty = "intermediate"
-
-    hardware_str = input("  Hardware (comma-separated): ").strip()
-    hardware = [h.strip() for h in hardware_str.split(",") if h.strip()] or ["unspecified"]
-
-    ai_provider = input("  AI provider (e.g. anthropic, huggingface): ").strip() or "unknown"
-    ai_model = input("  AI model (e.g. claude-opus-4-6): ").strip() or "unknown"
-
-    budget = input("  Approximate budget (e.g. $150, or Enter to skip): ").strip() or None
-    tags_str = input("  Tags (comma-separated, e.g. patrol,outdoor,camera): ").strip()
-    tags = [t.strip() for t in tags_str.split(",") if t.strip()] or []
-
-    print()
-    use_case = input("  Use case (one-liner about what this robot does): ").strip() or None
-
-    manifest = create_recipe_manifest(
-        name=name,
-        description=description,
-        author=author,
-        category=category,
-        difficulty=difficulty,
-        hardware=hardware,
-        ai_provider=ai_provider,
-        ai_model=ai_model,
-        tags=tags,
-        budget=budget,
-        use_case=use_case,
-    )
-
-    recipe_dir = package_recipe(
-        config_path=args.config,
-        output_dir=args.output or ".",
-        docs=args.docs,
-        manifest=manifest,
-        dry_run=args.dry_run,
-    )
-
-    if args.dry_run:
-        print("\n  ℹ️  Dry run — no files written.")
-    elif getattr(args, "submit", False):
-        from castor.hub import SubmitError, submit_recipe_pr
-
-        print(f"\n  ✅ Recipe packaged at: {recipe_dir}")
-        print("  📤 Submitting PR to GitHub...\n")
-        try:
-            pr_url = submit_recipe_pr(recipe_dir, manifest)
-            print(f"\n  🎉 Pull request created: {pr_url}")
-            print("     A maintainer will review your recipe shortly.")
-        except SubmitError as exc:
-            print(f"\n  ❌ Submission failed: {exc}")
-            print(f"\n  Your recipe is still saved at: {recipe_dir}")
-            print("  You can submit manually by opening a PR on GitHub.")
-    else:
-        print(f"\n  ✅ Recipe packaged at: {recipe_dir}")
-        print("  Next steps:")
-        print(f"    1. Review the scrubbed files in {recipe_dir}/")
-        print("    2. Edit README.md with tips, photos, and lessons learned")
-        print(f"    3. Submit a PR: castor hub share --config {args.config} --submit")
-        print("       Or manually at https://github.com/craigm26/OpenCastor")
-    print()
-
-
-def _submit_rating(recipe_id: str, rating: int) -> None:
-    """Submit a star rating for a recipe via GitHub issue."""
-    import shutil
-
-    stars = "⭐" * rating
-    print(f"\n  {stars} Rating {rating}/5 for recipe: {recipe_id}")
-
-    if not shutil.which("gh"):
-        print("\n  GitHub CLI (gh) not found.")
-        print("  Install: https://cli.github.com — then re-run this command.")
-        print(
-            f"\n  Or open an issue manually: https://github.com/craigm26/OpenCastor/issues/new"
-            f"?title=Recipe+Rating:+{recipe_id}&body=Rating:+{rating}/5"
-        )
-        return
-
-    try:
-        import subprocess
-
-        body = (
-            f"**Recipe ID:** `{recipe_id}`\n"
-            f"**Rating:** {rating}/5 {stars}\n\n"
-            "_Submitted via `castor hub rate`_"
-        )
-        result = subprocess.run(
-            [
-                "gh",
-                "issue",
-                "create",
-                "--repo",
-                "craigm26/OpenCastor",
-                "--title",
-                f"[Rating] {recipe_id}: {rating}/5 stars",
-                "--label",
-                "recipe-rating",
-                "--body",
-                body,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode == 0:
-            print(f"\n  ✅ Rating submitted: {result.stdout.strip()}")
-        else:
-            print(f"\n  ⚠️  Could not submit via gh: {result.stderr.strip()}")
-            print(f"  Your rating ({rating}/5) was NOT recorded remotely.")
-    except Exception as exc:
-        print(f"\n  ❌ Error: {exc}")
-    print()
-
-
-def cmd_safety(args) -> None:
-    """List safety protocol rules."""
-    from castor.safety.protocol import SafetyProtocol
-
-    proto = SafetyProtocol(config_path=getattr(args, "config", None))
-    rules = proto.list_rules()
-    cat_filter = getattr(args, "category", None)
-    if cat_filter:
-        rules = [r for r in rules if r["category"] == cat_filter]
-
-    if not rules:
-        print("No rules found.")
-        return
-
-    # Print table
-    print(f"{'ID':<15} {'Category':<12} {'Severity':<10} {'Enabled':<8} Description")
-    print("-" * 80)
-    for r in rules:
-        enabled = "✓" if r["enabled"] else "✗"
-        print(
-            f"{r['rule_id']:<15} {r['category']:<12} {r['severity']:<10} {enabled:<8} {r['description']}"
-        )
-
-
-def _cmd_monitor(args) -> None:
-    """Show sensor readings."""
-    from castor.safety.monitor import cli_monitor
-
-    cli_monitor(args)
-
-
-def cmd_audit(args) -> None:
-    """View or verify the audit log."""
-    from castor.audit import get_audit, print_audit
-
-    audit = get_audit()
-
-    if getattr(args, "verify", False):
-        valid, broken_idx = audit.verify_chain()
-        if valid:
-            print("✅ Audit chain integrity verified — no tampering detected.")
-        else:
-            print(f"❌ Audit chain BROKEN at entry index {broken_idx}!")
-        return
-
-    entries = audit.read(
-        since=args.since,
-        event=args.event,
-        limit=args.limit,
-    )
-    print_audit(entries)
-
-
-# ---------------------------------------------------------------------------
-# Parser setup
-# ---------------------------------------------------------------------------
-
-
-
-
-
-
-def cmd_approvals(args) -> None:
-    """castor approvals — not yet implemented."""
-    print("castor approvals: coming in a future release.")
-
-
-def cmd_configure(args) -> None:
-    """castor configure — not yet implemented."""
-    print("castor configure: coming in a future release.")
-
-
-def cmd_deploy(args) -> None:
-    """castor deploy — not yet implemented."""
-    print("castor deploy: coming in a future release.")
-
-
-def cmd_export(args) -> None:
-    """castor export — not yet implemented."""
-    print("castor export: coming in a future release.")
-
-
-def cmd_export_finetune(args) -> None:
-    """castor export finetune — not yet implemented."""
-    print("castor export finetune: coming in a future release.")
-
-
-def cmd_memory(args) -> None:
-    """castor memory — not yet implemented."""
-    print("castor memory: coming in a future release.")
-
-
-def cmd_network(args) -> None:
-    """castor network — not yet implemented."""
-    print("castor network: coming in a future release.")
-
-
-def cmd_privacy(args) -> None:
-    """castor privacy — not yet implemented."""
-    print("castor privacy: coming in a future release.")
-
-
-def cmd_schedule(args) -> None:
-    """castor schedule — not yet implemented."""
-    print("castor schedule: coming in a future release.")
-
-
-def cmd_search(args) -> None:
-    """castor search — not yet implemented."""
-    print("castor search: coming in a future release.")
 
 def cmd_agents(args) -> None:
     """castor agents — list registered agent configs."""
@@ -2786,6 +929,194 @@ def cmd_update(args: argparse.Namespace) -> None:
             con.print("[green]✅ Upgrade complete. Restart castor to use the new version.[/green]")
         else:
             print("✅ Upgrade complete.")
+
+
+# ── Placeholder subcommands (not yet fully implemented) ──────────────────────
+
+def cmd_approvals(args) -> None:
+    """castor approvals — placeholder."""
+    print("castor approvals: coming soon.")
+
+def cmd_audit(args) -> None:
+    """castor audit — placeholder."""
+    print("castor audit: coming soon.")
+
+def cmd_backup(args) -> None:
+    """castor backup — placeholder."""
+    print("castor backup: coming soon.")
+
+def cmd_benchmark(args) -> None:
+    """castor benchmark — placeholder."""
+    print("castor benchmark: coming soon.")
+
+def cmd_calibrate(args) -> None:
+    """castor calibrate — placeholder."""
+    print("castor calibrate: coming soon.")
+
+def cmd_configure(args) -> None:
+    """castor configure — placeholder."""
+    print("castor configure: coming soon.")
+
+def cmd_daemon(args) -> None:
+    """castor daemon — placeholder."""
+    print("castor daemon: coming soon.")
+
+def cmd_demo(args) -> None:
+    """castor demo — placeholder."""
+    print("castor demo: coming soon.")
+
+def cmd_deploy(args) -> None:
+    """castor deploy — placeholder."""
+    print("castor deploy: coming soon.")
+
+def cmd_diff(args) -> None:
+    """castor diff — placeholder."""
+    print("castor diff: coming soon.")
+
+def cmd_export(args) -> None:
+    """castor export — placeholder."""
+    print("castor export: coming soon.")
+
+def cmd_export_finetune(args) -> None:
+    """castor export finetune — placeholder."""
+    print("castor export finetune: coming soon.")
+
+def cmd_fix(args) -> None:
+    """castor fix — placeholder."""
+    print("castor fix: coming soon.")
+
+def cmd_hub(args) -> None:
+    """castor hub — placeholder."""
+    print("castor hub: coming soon.")
+
+def cmd_improve(args) -> None:
+    """castor improve — placeholder."""
+    print("castor improve: coming soon.")
+
+def cmd_install_service(args) -> None:
+    """castor install service — placeholder."""
+    print("castor install service: coming soon.")
+
+def cmd_learn(args) -> None:
+    """castor learn — placeholder."""
+    print("castor learn: coming soon.")
+
+def cmd_lint(args) -> None:
+    """castor lint — placeholder."""
+    print("castor lint: coming soon.")
+
+def cmd_login(args) -> None:
+    """castor login — placeholder."""
+    print("castor login: coming soon.")
+
+def cmd_logs(args) -> None:
+    """castor logs — placeholder."""
+    print("castor logs: coming soon.")
+
+def cmd_memory(args) -> None:
+    """castor memory — placeholder."""
+    print("castor memory: coming soon.")
+
+def cmd_migrate(args) -> None:
+    """castor migrate — placeholder."""
+    print("castor migrate: coming soon.")
+
+def cmd_network(args) -> None:
+    """castor network — placeholder."""
+    print("castor network: coming soon.")
+
+def cmd_plugin(args) -> None:
+    """castor plugin — placeholder."""
+    print("castor plugin: coming soon.")
+
+def cmd_plugins(args) -> None:
+    """castor plugins — placeholder."""
+    print("castor plugins: coming soon.")
+
+def cmd_privacy(args) -> None:
+    """castor privacy — placeholder."""
+    print("castor privacy: coming soon.")
+
+def cmd_profile(args) -> None:
+    """castor profile — placeholder."""
+    print("castor profile: coming soon.")
+
+def cmd_quickstart(args) -> None:
+    """castor quickstart — placeholder."""
+    print("castor quickstart: coming soon.")
+
+def cmd_record(args) -> None:
+    """castor record — placeholder."""
+    print("castor record: coming soon.")
+
+def cmd_repl(args) -> None:
+    """castor repl — placeholder."""
+    print("castor repl: coming soon.")
+
+def cmd_replay(args) -> None:
+    """castor replay — placeholder."""
+    print("castor replay: coming soon.")
+
+def cmd_restore(args) -> None:
+    """castor restore — placeholder."""
+    print("castor restore: coming soon.")
+
+def cmd_safety(args) -> None:
+    """castor safety — placeholder."""
+    print("castor safety: coming soon.")
+
+def cmd_scan(args) -> None:
+    """castor scan — placeholder."""
+    print("castor scan: coming soon.")
+
+def cmd_schedule(args) -> None:
+    """castor schedule — placeholder."""
+    print("castor schedule: coming soon.")
+
+def cmd_search(args) -> None:
+    """castor search — placeholder."""
+    print("castor search: coming soon.")
+
+def cmd_shell(args) -> None:
+    """castor shell — placeholder."""
+    print("castor shell: coming soon.")
+
+def cmd_status(args) -> None:
+    """castor status — placeholder."""
+    print("castor status: coming soon.")
+
+def cmd_swarm(args) -> None:
+    """castor swarm — placeholder."""
+    print("castor swarm: coming soon.")
+
+def cmd_test(args) -> None:
+    """castor test — placeholder."""
+    print("castor test: coming soon.")
+
+def cmd_test_hardware(args) -> None:
+    """castor test hardware — placeholder."""
+    print("castor test hardware: coming soon.")
+
+def cmd_update_check(args) -> None:
+    """castor update check — placeholder."""
+    print("castor update check: coming soon.")
+
+def cmd_upgrade(args) -> None:
+    """castor upgrade — placeholder."""
+    print("castor upgrade: coming soon.")
+
+def cmd_validate(args) -> None:
+    """castor validate — placeholder."""
+    print("castor validate: coming soon.")
+
+def cmd_watch(args) -> None:
+    """castor watch — placeholder."""
+    print("castor watch: coming soon.")
+
+
+def _cmd_monitor(args) -> None:
+    """Internal monitor placeholder."""
+    pass
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -4032,11 +2363,11 @@ def main() -> None:
         "discover": cmd_discover,
         "memory": cmd_memory,
         "fleet": cmd_fleet,
+        "doctor": cmd_doctor,
         "update": cmd_update,
         "inspect": cmd_inspect,
         "register": cmd_register,
         "compliance": cmd_compliance,
-        "doctor": cmd_doctor,
         "demo": cmd_demo,
         "test-hardware": cmd_test_hardware,
         "calibrate": cmd_calibrate,

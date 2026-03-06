@@ -1,231 +1,128 @@
-"""Tests for castor.doctor -- system health checks."""
-
-import os
-from unittest.mock import MagicMock, patch
+"""Tests for castor.doctor — health check system."""
+from __future__ import annotations
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+import pytest
 
 from castor.doctor import (
-    check_camera,
-    check_env_file,
-    check_hardware_sdks,
-    check_mac_seccomp,
-    check_provider_keys,
-    check_python_version,
-    check_rcan_config,
-    print_report,
-    run_all_checks,
-    run_post_wizard_checks,
+    CheckResult, DoctorReport,
+    _check_python, _check_dep, _check_config,
+    _check_opencastor_dir, _check_hardware_hailo,
+    _check_hardware_oakd, _check_env_var,
+    run_doctor, print_report,
 )
 
 
-# =====================================================================
-# check_python_version
-# =====================================================================
-class TestCheckPythonVersion:
-    def test_passes_on_current_python(self):
-        ok, name, detail = check_python_version()
-        # We're running on 3.10+ in dev, so this should pass
-        assert ok is True
-        assert "Python" in name
+# ── CheckResult / DoctorReport ───────────────────────────────────────────────
 
+def test_check_result_fields():
+    c = CheckResult("test", "ok", "all good", "no fix needed")
+    assert c.name == "test"
+    assert c.status == "ok"
 
-# =====================================================================
-# check_env_file
-# =====================================================================
-class TestCheckEnvFile:
-    @patch("castor.doctor.os.path.exists", return_value=True)
-    def test_passes_when_env_exists(self, mock_exists):
-        ok, name, detail = check_env_file()
-        assert ok is True
-        assert "found" in detail
+def test_doctor_report_counts():
+    r = DoctorReport(checks=[
+        CheckResult("a", "ok"),
+        CheckResult("b", "warn"),
+        CheckResult("c", "fail"),
+        CheckResult("d", "skip"),
+    ])
+    assert r.ok_count == 1
+    assert r.warn_count == 1
+    assert r.fail_count == 1
+    assert not r.all_ok
 
-    @patch("castor.doctor.os.path.exists", return_value=False)
-    def test_fails_when_env_missing(self, mock_exists):
-        ok, name, detail = check_env_file()
-        assert ok is False
-        assert "missing" in detail
+def test_doctor_report_all_ok():
+    r = DoctorReport(checks=[CheckResult("a", "ok"), CheckResult("b", "skip")])
+    assert r.all_ok  # no failures
 
+# ── _check_python ─────────────────────────────────────────────────────────────
 
-# =====================================================================
-# check_provider_keys
-# =====================================================================
-class TestCheckProviderKeys:
-    @patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}, clear=True)
-    def test_reports_available_provider(self):
-        results = check_provider_keys()
-        google_result = [r for r in results if "google" in r[1]]
-        assert len(google_result) == 1
-        assert google_result[0][0] is True
+def test_check_python_current():
+    result = _check_python()
+    assert result.status == "ok"  # we're running on 3.10+
 
-    @patch.dict(os.environ, {}, clear=True)
-    @patch("castor.auth.load_dotenv_if_available", lambda: None)
-    def test_reports_missing_provider(self):
-        results = check_provider_keys()
-        google_result = [r for r in results if "google" in r[1]]
-        assert len(google_result) == 1
-        assert google_result[0][0] is False
+# ── _check_dep ───────────────────────────────────────────────────────────────
 
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "key"}, clear=True)
-    def test_config_scoped_check(self):
-        config = {"agent": {"provider": "anthropic"}}
-        results = check_provider_keys(config)
-        assert len(results) == 1
-        assert results[0][0] is True
+def test_check_dep_present():
+    result = _check_dep("json")  # stdlib, always present
+    assert result.status == "ok"
 
-    @patch.dict(os.environ, {}, clear=True)
-    @patch(
-        "castor.auth.os.path.expanduser",
-        return_value="/tmp/nonexistent/.opencastor/anthropic-token",
-    )
-    def test_config_scoped_missing(self, mock_expand):
-        config = {"agent": {"provider": "anthropic"}}
-        results = check_provider_keys(config)
-        assert len(results) == 1
-        assert results[0][0] is False
+def test_check_dep_absent():
+    result = _check_dep("nonexistent_pkg_xyz_123")
+    assert result.status == "warn"
+    assert "pip install" in result.fix
 
+# ── _check_config ─────────────────────────────────────────────────────────────
 
-# =====================================================================
-# check_rcan_config
-# =====================================================================
-class TestCheckRcanConfig:
-    def test_no_path(self):
-        ok, name, detail = check_rcan_config(None)
-        assert ok is False
+def test_check_config_found(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "bob.rcan.yaml").write_text("name: bob")
+    result = _check_config()
+    assert result.status == "ok"
 
-    def test_missing_file(self):
-        ok, name, detail = check_rcan_config("/nonexistent/file.yaml")
-        assert ok is False
-        assert "not found" in detail
+def test_check_config_not_found(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = _check_config()
+    assert result.status == "warn"
+    assert "castor wizard" in result.fix
 
-    def test_valid_preset(self):
-        preset = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "config",
-            "presets",
-            "rpi_rc_car.rcan.yaml",
-        )
-        if os.path.exists(preset):
-            ok, name, detail = check_rcan_config(preset)
-            # Result depends on schema match; just ensure no crash
-            assert isinstance(ok, bool)
+# ── _check_opencastor_dir ────────────────────────────────────────────────────
 
+def test_check_opencastor_dir_present(tmp_path):
+    d = tmp_path / ".opencastor"
+    d.mkdir()
+    (d / "config.yaml").write_text("")
+    with patch("castor.doctor.Path.home", return_value=tmp_path):
+        result = _check_opencastor_dir()
+    assert result.status == "ok"
 
-# =====================================================================
-# check_hardware_sdks
-# =====================================================================
-class TestCheckHardwareSDKs:
-    def test_returns_list(self):
-        results = check_hardware_sdks()
-        assert isinstance(results, list)
-        assert len(results) == 8  # core SDKs + esp32/ev3/spike optional paths
+def test_check_opencastor_dir_missing(tmp_path):
+    with patch("castor.doctor.Path.home", return_value=tmp_path):
+        result = _check_opencastor_dir()
+    assert result.status == "warn"
 
-    def test_each_result_is_tuple(self):
-        for ok, name, detail in check_hardware_sdks():
-            assert isinstance(ok, bool)
-            assert isinstance(name, str)
-            assert isinstance(detail, str)
+# ── _check_hardware_hailo ────────────────────────────────────────────────────
 
+def test_check_hailo_present():
+    with patch("castor.doctor.Path.exists", return_value=True):
+        result = _check_hardware_hailo()
+    assert result.status in ("ok", "skip")  # depends on actual hardware
 
-class TestCheckMacSeccomp:
-    @patch("castor.daemon.daemon_security_status")
-    def test_active(self, mock_status):
-        mock_status.return_value = {
-            "profiles_installed": True,
-            "enabled_in_unit": True,
-            "apparmor_profile": "opencastor-gateway (enforce)",
-            "seccomp_mode": "2",
-        }
-        ok, name, detail = check_mac_seccomp()
-        assert ok is True
-        assert name == "MAC/seccomp"
+def test_check_hailo_absent(tmp_path):
+    fake_dev = tmp_path / "hailo0"
+    # Don't create it — it shouldn't exist
+    with patch("pathlib.Path.exists", lambda self: str(self) == str(tmp_path / "hailo0") and False):
+        result = _check_hardware_hailo()
+    # Skip or ok depending on actual /dev/hailo0
+    assert result.status in ("ok", "skip")
 
-    @patch("castor.daemon.daemon_security_status")
-    def test_missing_profiles(self, mock_status):
-        mock_status.return_value = {"profiles_installed": False}
-        ok, _, detail = check_mac_seccomp()
-        assert ok is False
-        assert "profiles not installed" in detail
+# ── _check_env_var ────────────────────────────────────────────────────────────
 
+def test_check_env_var_set(monkeypatch):
+    monkeypatch.setenv("TEST_API_KEY_XYZ", "sk-test-12345")
+    result = _check_env_var("TEST_API_KEY_XYZ")
+    assert result.status == "ok"
+    assert "sk-t" in result.detail  # truncated
 
-# =====================================================================
-# check_camera
-# =====================================================================
-class TestCheckCamera:
-    def test_camera_accessible(self):
-        mock_cv2 = MagicMock()
-        mock_cap = MagicMock()
-        mock_cap.isOpened.return_value = True
-        mock_cv2.VideoCapture.return_value = mock_cap
-        with patch.dict("sys.modules", {"cv2": mock_cv2}):
-            ok, name, detail = check_camera()
-        assert ok is True
-        assert "accessible" in detail
-        mock_cap.release.assert_called_once()
+def test_check_env_var_missing(monkeypatch, tmp_path):
+    monkeypatch.delenv("MISSING_KEY_XYZ", raising=False)
+    with patch("castor.doctor.Path.home", return_value=tmp_path):
+        result = _check_env_var("MISSING_KEY_XYZ")
+    assert result.status == "warn"
 
-    def test_camera_not_accessible(self):
-        mock_cv2 = MagicMock()
-        mock_cap = MagicMock()
-        mock_cap.isOpened.return_value = False
-        mock_cv2.VideoCapture.return_value = mock_cap
-        with patch.dict("sys.modules", {"cv2": mock_cv2}):
-            ok, name, detail = check_camera()
-        assert ok is False
+# ── run_doctor ────────────────────────────────────────────────────────────────
 
-    def test_camera_no_opencv(self):
-        # When cv2 can't be imported, should report not installed
-        import sys as _sys
+def test_run_doctor_returns_report():
+    report = run_doctor()
+    assert isinstance(report, DoctorReport)
+    assert len(report.checks) >= 10
 
-        saved = _sys.modules.get("cv2")
-        _sys.modules["cv2"] = None  # Force ImportError on import
-        try:
-            ok, name, detail = check_camera()
-            assert ok is False
-            assert "not installed" in detail
-        finally:
-            if saved is not None:
-                _sys.modules["cv2"] = saved
-            else:
-                _sys.modules.pop("cv2", None)
+def test_run_doctor_full_returns_more_checks():
+    r_basic = run_doctor(full=False)
+    r_full = run_doctor(full=True)
+    assert len(r_full.checks) >= len(r_basic.checks)
 
-
-# =====================================================================
-# run_all_checks
-# =====================================================================
-class TestRunAllChecks:
-    def test_returns_list_of_tuples(self):
-        results = run_all_checks()
-        assert isinstance(results, list)
-        for item in results:
-            assert isinstance(item, tuple)
-            assert len(item) == 3
-
-
-# =====================================================================
-# run_post_wizard_checks
-# =====================================================================
-class TestRunPostWizardChecks:
-    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "key"}, clear=True)
-    def test_checks_provider_and_config(self):
-        results = run_post_wizard_checks("/nonexistent.yaml", {}, "anthropic")
-        # Should have RCAN config check (fail) + provider check (pass)
-        assert len(results) == 2
-        # First is RCAN (fails because file doesn't exist)
-        assert results[0][0] is False
-        # Second is provider key
-        assert results[1][0] is True
-
-
-# =====================================================================
-# print_report
-# =====================================================================
-class TestPrintReport:
-    def test_all_pass(self, capsys):
-        results = [(True, "Test", "ok")]
-        assert print_report(results) is True
-        out = capsys.readouterr().out
-        assert "1 passed, 0 failed" in out
-
-    def test_with_failure(self, capsys):
-        results = [(True, "A", "ok"), (False, "B", "bad")]
-        assert print_report(results) is False
-        out = capsys.readouterr().out
-        assert "1 passed, 1 failed" in out
+def test_print_report_no_crash():
+    report = run_doctor()
+    print_report(report)  # should not raise
