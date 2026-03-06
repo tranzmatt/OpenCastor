@@ -30,9 +30,9 @@ done
 # ── Colors ─────────────────────────────────────────────
 if [ -t 1 ] && command -v tput &>/dev/null && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
   RED=$(tput setaf 1); GREEN=$(tput setaf 2); YELLOW=$(tput setaf 3)
-  BLUE=$(tput setaf 4); BOLD=$(tput bold); RESET=$(tput sgr0)
+  BLUE=$(tput setaf 4); CYAN=$(tput setaf 6); DIM=$(tput dim 2>/dev/null || echo ""); BOLD=$(tput bold); RESET=$(tput sgr0)
 else
-  RED=""; GREEN=""; YELLOW=""; BLUE=""; BOLD=""; RESET=""
+  RED=""; GREEN=""; YELLOW=""; BLUE=""; CYAN=""; DIM=""; BOLD=""; RESET=""
 fi
 
 info()  { echo "${BLUE}[INFO]${RESET} $*"; }
@@ -396,14 +396,23 @@ echo "  ${BOLD}OpenCastor installed successfully!${RESET}"
 echo ""
 echo "  ${BOLD}Quick Start:${RESET}"
 echo "    cd $INSTALL_DIR"
-echo "    castor run --config *.rcan.yaml"
+echo "    castor wizard          Interactive setup — picks hardware, model,"
+echo "                           config, and offers robot registration"
 echo ""
 echo "  ${BOLD}Useful Commands:${RESET}"
 echo "    castor wizard          Re-run the setup wizard anytime"
-echo "    castor --help          See all available commands"
+echo "    castor run             Start the robot runtime"
 echo "    castor status          Check robot & system status"
+echo "    castor inspect [rrn]   Query live robot profile + compliance"
+echo "    castor compliance      Check RCAN L1/L2/L3 conformance"
+echo "    castor fleet           Manage robot group policies"
 echo "    castor doctor          Diagnose common issues"
-echo "    castor dashboard       Open the web dashboard"
+echo "    castor --help          See all available commands"
+echo ""
+echo "  ${BOLD}Give your robot a global identity (free):${RESET}"
+echo "    ${CYAN}castor register --config <yourrobot>.rcan.yaml${RESET}"
+echo "    ${DIM}Gets you a globally unique RRN (Robot Registry Number)${RESET}"
+echo "    ${DIM}listed at rcan.dev — the open standard robot registry.${RESET}"
 echo ""
 echo "  ${BOLD}Verify Install:${RESET}  bash scripts/install-check.sh"
 echo ""

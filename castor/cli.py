@@ -1705,6 +1705,18 @@ def cmd_update(args) -> None:
 
     _cmd_update(args)
 
+def cmd_memory(args) -> None:
+    """Episode replay and memory management."""
+    memory_cmd = getattr(args, "memory_cmd", None)
+    if memory_cmd is None:
+        print("Usage: castor memory <replay>")
+        return
+    if memory_cmd == "replay":
+        from castor.memory.replay import run_replay_cli
+        run_replay_cli(args)
+    else:
+        print(f"Unknown memory command: {memory_cmd}")
+
 
 def cmd_fleet(args) -> None:
     """Multi-robot fleet management."""
@@ -3312,6 +3324,21 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
+    # castor memory
+    p_memory = sub.add_parser(
+        "memory",
+        help="Manage robot memory and episode consolidation",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Examples:\n  castor memory replay --since 2026-01-01 --dry-run",
+    )
+    memory_sub = p_memory.add_subparsers(dest="memory_cmd")
+    p_mem_replay = memory_sub.add_parser("replay", help="Replay historical episodes through updated consolidation pipeline")
+    p_mem_replay.add_argument("--since", default=None, metavar="DATE", help="Only replay episodes on/after this date (YYYY-MM-DD)")
+    p_mem_replay.add_argument("--episode-id", default=None, help="Replay a specific episode by ID")
+    p_mem_replay.add_argument("--episodes-dir", default=None, help="Path to L0-episodic/episodes/ directory")
+    p_mem_replay.add_argument("--dry-run", action="store_true", help="Simulate without writing changes")
+    p_mem_replay.add_argument("--verbose", "-v", action="store_true", help="Show each episode being replayed")
+
     # castor fleet
     p_fleet = sub.add_parser(
         "fleet",
@@ -4203,6 +4230,7 @@ def main() -> None:
         "dashboard-tui": cmd_dashboard_tui,
         "token": cmd_token,
         "discover": cmd_discover,
+        "memory": cmd_memory,
         "fleet": cmd_fleet,
         "inspect": cmd_inspect,
         "register": cmd_register,
@@ -4232,6 +4260,7 @@ def main() -> None:
         "update": cmd_update,
         "learn": cmd_learn,
         "improve": cmd_improve,
+        "memory": cmd_memory,
         "fleet": cmd_fleet,
         "agents": cmd_agents,
         "export": cmd_export,
