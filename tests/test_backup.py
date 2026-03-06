@@ -1,12 +1,8 @@
 """Tests for castor.backup — create_backup() and restore_backup() (issue #485)."""
 
-import os
 import tarfile
 
-import pytest
-
 from castor.backup import create_backup, restore_backup
-
 
 # ── create_backup() ───────────────────────────────────────────────────────────
 

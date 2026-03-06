@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
 from castor.confidence_gate import ConfidenceGate, ConfidenceGateEnforcer, GateOutcome
-
 
 # ---------------------------------------------------------------------------
 # Helpers

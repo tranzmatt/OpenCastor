@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # URI conversion
 # ---------------------------------------------------------------------------
@@ -44,6 +41,7 @@ def test_ruri_to_robot_uri_from_spec_string():
 
 def test_robot_uri_to_ruri():
     from rcan import RobotURI
+
     from castor.rcan.sdk_bridge import robot_uri_to_ruri
 
     robot_uri = RobotURI.parse("rcan://registry.rcan.dev/acme/arm/v2/unit-001")
@@ -55,7 +53,7 @@ def test_robot_uri_to_ruri():
 
 def test_roundtrip_uri():
     from castor.rcan.ruri import RURI
-    from castor.rcan.sdk_bridge import ruri_to_robot_uri, robot_uri_to_ruri
+    from castor.rcan.sdk_bridge import robot_uri_to_ruri, ruri_to_robot_uri
 
     original = RURI(manufacturer="acme", model="bot", instance="abc12345")
     robot_uri = ruri_to_robot_uri(original)
@@ -71,8 +69,9 @@ def test_roundtrip_uri():
 
 
 def test_parse_inbound_spec_format():
-    from castor.rcan.sdk_bridge import parse_inbound
     from rcan import RCANMessage
+
+    from castor.rcan.sdk_bridge import parse_inbound
 
     body = {
         "rcan": "1.2",
@@ -88,8 +87,8 @@ def test_parse_inbound_spec_format():
 
 
 def test_parse_inbound_opencastor_format():
+    from castor.rcan.message import RCANMessage as OCMessage
     from castor.rcan.sdk_bridge import parse_inbound
-    from castor.rcan.message import RCANMessage as OCMessage, MessageType
 
     body = {
         "type": 3,  # COMMAND
@@ -103,8 +102,9 @@ def test_parse_inbound_opencastor_format():
 
 def test_spec_message_to_opencastor():
     from rcan import RCANMessage
-    from castor.rcan.sdk_bridge import spec_message_to_opencastor
+
     from castor.rcan.message import MessageType
+    from castor.rcan.sdk_bridge import spec_message_to_opencastor
 
     spec_msg = RCANMessage(
         cmd="stop",
@@ -127,8 +127,9 @@ def test_spec_message_to_opencastor():
 
 
 def test_action_to_commitment_record():
-    from castor.rcan.sdk_bridge import action_to_commitment_record
     from rcan import CommitmentRecord
+
+    from castor.rcan.sdk_bridge import action_to_commitment_record
 
     record = action_to_commitment_record(
         action_type="move_forward",
@@ -179,9 +180,10 @@ def test_audit_entry_to_commitment_record():
 
 
 def test_opencastor_gate_to_rcan():
+    from rcan import ConfidenceGate
+
     from castor.confidence_gate import ConfidenceGate as OCGate
     from castor.rcan.sdk_bridge import opencastor_gate_to_rcan
-    from rcan import ConfidenceGate
 
     oc_gate = OCGate(scope="control", min_confidence=0.75, on_fail="block")
     rcan_gate = opencastor_gate_to_rcan(oc_gate)
@@ -191,6 +193,7 @@ def test_opencastor_gate_to_rcan():
 
 def test_rcan_gate_to_opencastor():
     from rcan import ConfidenceGate
+
     from castor.rcan.sdk_bridge import rcan_gate_to_opencastor
 
     rcan_gate = ConfidenceGate(threshold=0.8)

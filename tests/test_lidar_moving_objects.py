@@ -45,7 +45,9 @@ def driver_no_history(tmp_path, monkeypatch):
 
 
 def _pts(angle_dist_pairs):
-    return [{"angle_deg": float(a), "distance_mm": float(d), "quality": 15} for a, d in angle_dist_pairs]
+    return [
+        {"angle_deg": float(a), "distance_mm": float(d), "quality": 15} for a, d in angle_dist_pairs
+    ]
 
 
 def _inject_two_scans(driver):

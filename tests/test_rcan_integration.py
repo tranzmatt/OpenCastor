@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import importlib.util
-import subprocess
 import pathlib
+import subprocess
 
 import pytest
 
 HAS_RCAN = importlib.util.find_spec("rcan") is not None
-HAS_RCAN_CLI = HAS_RCAN and importlib.util.find_spec("rcan") is not None and (
-    subprocess.run(["which", "rcan-validate"], capture_output=True).returncode == 0
+HAS_RCAN_CLI = (
+    HAS_RCAN
+    and importlib.util.find_spec("rcan") is not None
+    and (subprocess.run(["which", "rcan-validate"], capture_output=True).returncode == 0)
 )
 
 FIXTURE_PATH = pathlib.Path(__file__).parent / "fixtures" / "sample.rcan.yaml"
@@ -26,10 +28,11 @@ def test_rcan_validate_sample_config():
         cwd=str(REPO_ROOT),
     )
     # rcan-validate may exit 1 for L2/L3 advisory warnings — only fail on hard errors (❌)
-    hard_errors = [l for l in result.stdout.splitlines() if l.strip().startswith("❌")]
+    hard_errors = [line for line in result.stdout.splitlines() if line.strip().startswith("❌")]
     assert not hard_errors, (
-        f"rcan-validate hard errors:\n" + "\n".join(hard_errors) +
-        f"\nfull stdout: {result.stdout}\nstderr: {result.stderr}"
+        "rcan-validate hard errors:\n"
+        + "\n".join(hard_errors)
+        + f"\nfull stdout: {result.stdout}\nstderr: {result.stderr}"
     )
 
 

@@ -4,6 +4,7 @@ from castor.action_validator import ActionValidator, init_from_config, validate_
 
 # ── basic instantiation ───────────────────────────────────────────────────────
 
+
 def test_action_validator_instantiates():
     av = ActionValidator()
     assert av is not None
@@ -26,6 +27,7 @@ def test_action_validator_known_types_includes_stop():
 
 # ── built-in validation ───────────────────────────────────────────────────────
 
+
 def test_validate_stop_action():
     av = ActionValidator()
     result = av.validate({"type": "stop"})
@@ -45,6 +47,7 @@ def test_validate_unknown_type_returns_result():
 
 
 # ── custom schema registration ────────────────────────────────────────────────
+
 
 def test_custom_schema_registered():
     av = ActionValidator(custom_schemas={"spray": {"type": "object", "required": ["type"]}})
@@ -94,6 +97,7 @@ def test_custom_schema_rejects_missing_required_field():
 
 # ── init_from_config ──────────────────────────────────────────────────
 
+
 def test_init_from_config_with_empty_config():
     av = init_from_config({})
     assert isinstance(av, ActionValidator)
@@ -113,14 +117,13 @@ def test_init_from_config_with_schemas():
 
 
 def test_init_from_config_source_is_rcan():
-    config = {
-        "action_schemas": {"my_action": {"type": "object", "required": ["type"]}}
-    }
+    config = {"action_schemas": {"my_action": {"type": "object", "required": ["type"]}}}
     av = init_from_config(config)
     assert av.schema_source_for("my_action") == "rcan_config"
 
 
 # ── validate_action convenience function ─────────────────────────────────────
+
 
 def test_validate_action_function_works():
     result = validate_action({"type": "stop"})

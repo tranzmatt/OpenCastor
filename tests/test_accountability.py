@@ -18,10 +18,10 @@ from castor.confidence_gate import ConfidenceGate, ConfidenceGateEnforcer, GateO
 from castor.providers.base import Thought
 from castor.thought_log import ThoughtLog
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_thought(**kwargs) -> Thought:
     """Return a Thought with sensible defaults, overridden by kwargs."""
@@ -40,6 +40,7 @@ def _make_thought(**kwargs) -> Thought:
 # ---------------------------------------------------------------------------
 # ConfidenceGateEnforcer tests
 # ---------------------------------------------------------------------------
+
 
 class TestConfidenceGateEnforcer:
     """Tests for ConfidenceGateEnforcer.evaluate()."""
@@ -109,6 +110,7 @@ class TestConfidenceGateEnforcer:
 # ThoughtLog tests
 # ---------------------------------------------------------------------------
 
+
 class TestThoughtLog:
     """Tests for ThoughtLog.record() and ThoughtLog.get()."""
 
@@ -172,7 +174,7 @@ class TestThoughtLog:
             log.record(t)
             # Verify JSONL file was written
             with open(path) as fh:
-                lines = [l.strip() for l in fh if l.strip()]
+                lines = [line.strip() for line in fh if line.strip()]
             assert len(lines) == 1
             entry = json.loads(lines[0])
             assert entry["id"] == t.id
@@ -195,12 +197,13 @@ class TestThoughtLog:
 # AuditLog.log_motor_command — ai sub-dict tests
 # ---------------------------------------------------------------------------
 
+
 class TestAuditLogMotorCommand:
     """Verify the ai sub-dict is present (and absent) in audit entries."""
 
     def _read_last_entry(self, log_path: str) -> dict:
         with open(log_path) as f:
-            lines = [l.strip() for l in f if l.strip()]
+            lines = [line.strip() for line in f if line.strip()]
         return json.loads(lines[-1])
 
     def test_ai_block_present_when_thought_provided(self):
@@ -263,6 +266,7 @@ class TestAuditLogMotorCommand:
 # gate_bypassed flag tests
 # ---------------------------------------------------------------------------
 
+
 class TestGateBypassedFlag:
     """Tests for the gate_bypassed field on the Thought dataclass."""
 
@@ -291,6 +295,7 @@ class TestGateBypassedFlag:
 # ---------------------------------------------------------------------------
 # Thought dataclass — basic field tests
 # ---------------------------------------------------------------------------
+
 
 class TestThoughtDataclass:
     """Verify new fields on the Thought dataclass."""

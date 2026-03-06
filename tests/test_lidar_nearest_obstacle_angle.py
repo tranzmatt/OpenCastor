@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+
 import pytest
 
 from castor.drivers.lidar_driver import LidarDriver
@@ -20,6 +21,7 @@ def driver(tmp_path):
 
 
 # ── Basic return-type tests ───────────────────────────────────────────────────
+
 
 def test_returns_dict(driver):
     result = driver.nearest_obstacle_angle()
@@ -47,6 +49,7 @@ def test_mode_is_str(driver):
 
 
 # ── Mock-mode value tests ─────────────────────────────────────────────────────
+
 
 def test_mock_angle_deg_is_float_or_none(driver):
     result = driver.nearest_obstacle_angle()
@@ -84,6 +87,7 @@ def test_distance_mm_positive_when_not_none(driver):
 
 # ── Stability tests ───────────────────────────────────────────────────────────
 
+
 def test_multiple_calls_dont_raise(driver):
     for _ in range(5):
         driver.nearest_obstacle_angle()
@@ -97,6 +101,7 @@ def test_never_raises(driver):
 
 
 # ── Consistency with obstacles() ──────────────────────────────────────────────
+
 
 def test_consistent_with_obstacles(driver):
     """distance_mm from nearest_obstacle_angle() should match min_distance_mm

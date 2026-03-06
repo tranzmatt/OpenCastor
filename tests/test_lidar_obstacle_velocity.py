@@ -14,6 +14,7 @@ def lidar():
 
 # ── basic return shape ────────────────────────────────────────────────────────
 
+
 def test_obstacles_with_velocity_returns_dict(lidar):
     result = lidar.obstacles_with_velocity()
     assert isinstance(result, dict)
@@ -50,6 +51,7 @@ def test_obstacles_with_velocity_mode_is_string(lidar):
 
 # ── velocity values ───────────────────────────────────────────────────────────
 
+
 def test_velocity_is_float_or_none(lidar):
     result = lidar.obstacles_with_velocity()
     for sector_data in result["sectors"].values():
@@ -76,6 +78,7 @@ def test_velocity_non_negative_or_negative(lidar):
 
 # ── persistence across calls ──────────────────────────────────────────────────
 
+
 def test_vel_prev_sectors_populated_after_call(lidar):
     lidar.obstacles_with_velocity()
     assert len(lidar._vel_prev_sectors) > 0
@@ -94,6 +97,7 @@ def test_vel_prev_sectors_is_tuple(lidar):
 
 
 # ── never raises ─────────────────────────────────────────────────────────────
+
 
 def test_obstacles_with_velocity_never_raises(lidar):
     try:

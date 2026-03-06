@@ -8,6 +8,7 @@ from castor.dashboard_memory_timeline import MemoryTimeline
 @pytest.fixture
 def timeline(tmp_path):
     import os
+
     os.environ["CASTOR_MEMORY_DB"] = str(tmp_path / "mem.db")
     tl = MemoryTimeline()
     yield tl
@@ -17,8 +18,10 @@ def timeline(tmp_path):
 @pytest.fixture
 def timeline_with_data(tmp_path):
     import os
+
     os.environ["CASTOR_MEMORY_DB"] = str(tmp_path / "mem.db")
     from castor.memory import EpisodeMemory
+
     mem = EpisodeMemory(db_path=str(tmp_path / "mem.db"))
     for i, at in enumerate(["move", "stop", "move", "wait", "stop"]):
         mem.log_episode(
@@ -35,12 +38,14 @@ def timeline_with_data(tmp_path):
 
 # ── class instantiation ───────────────────────────────────────────────────────
 
+
 def test_memory_timeline_instantiates():
     tl = MemoryTimeline()
     assert tl is not None
 
 
 # ── get_outcome_summary ───────────────────────────────────────────────────────
+
 
 def test_get_outcome_summary_returns_dict(timeline_with_data):
     result = timeline_with_data.get_outcome_summary(window_h=24)
@@ -67,6 +72,7 @@ def test_get_outcome_summary_never_raises(timeline):
 
 # ── get_latency_percentiles ───────────────────────────────────────────────────
 
+
 def test_get_latency_percentiles_returns_dict(timeline_with_data):
     result = timeline_with_data.get_latency_percentiles(window_h=24)
     assert isinstance(result, dict)
@@ -91,6 +97,7 @@ def test_get_latency_percentiles_has_p50(timeline_with_data):
 
 
 # ── window_h parameter ────────────────────────────────────────────────────────
+
 
 def test_outcome_summary_window_zero_returns_dict(timeline_with_data):
     result = timeline_with_data.get_outcome_summary(window_h=0)

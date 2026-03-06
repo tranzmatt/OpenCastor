@@ -1,13 +1,11 @@
 """Tests for MetricsRegistry.uptime_histogram() — Issue #431."""
+
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
-
-import pytest
+from datetime import datetime
 
 from castor.metrics import MetricsRegistry
-
 
 # ---------------------------------------------------------------------------
 # Helpers

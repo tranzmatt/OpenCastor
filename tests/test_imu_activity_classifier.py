@@ -1,6 +1,5 @@
 """Tests for IMUDriver.activity_classifier() — Issue #425."""
 
-import math
 import pytest
 
 from castor.drivers.imu_driver import IMUDriver

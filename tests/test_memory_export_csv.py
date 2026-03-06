@@ -32,6 +32,7 @@ def mem_with_data(mem):
 
 # ── basic return shape ────────────────────────────────────────────────────────
 
+
 def test_export_csv_returns_dict(mem_with_data, tmp_path):
     result = mem_with_data.export_csv(str(tmp_path / "out.csv"))
     assert isinstance(result, dict)
@@ -58,12 +59,22 @@ def test_export_csv_rows_written_count(mem_with_data, tmp_path):
 
 def test_export_csv_columns_list(mem_with_data, tmp_path):
     result = mem_with_data.export_csv(str(tmp_path / "out.csv"))
-    expected = ["id", "ts", "instruction", "raw_thought", "action_type",
-                "latency_ms", "outcome", "source", "tags"]
+    expected = [
+        "id",
+        "ts",
+        "instruction",
+        "raw_thought",
+        "action_type",
+        "latency_ms",
+        "outcome",
+        "source",
+        "tags",
+    ]
     assert result["columns"] == expected
 
 
 # ── file contents ─────────────────────────────────────────────────────────────
+
 
 def test_export_csv_has_header(mem_with_data, tmp_path):
     path = str(tmp_path / "out.csv")
@@ -71,8 +82,15 @@ def test_export_csv_has_header(mem_with_data, tmp_path):
     with open(path, newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
         assert set(reader.fieldnames) == {
-            "id", "ts", "instruction", "raw_thought", "action_type",
-            "latency_ms", "outcome", "source", "tags"
+            "id",
+            "ts",
+            "instruction",
+            "raw_thought",
+            "action_type",
+            "latency_ms",
+            "outcome",
+            "source",
+            "tags",
         }
 
 
@@ -105,6 +123,7 @@ def test_export_csv_instruction_correct(mem_with_data, tmp_path):
 
 # ── empty memory ─────────────────────────────────────────────────────────────
 
+
 def test_export_csv_empty_memory(mem, tmp_path):
     path = str(tmp_path / "out.csv")
     result = mem.export_csv(path)
@@ -122,6 +141,7 @@ def test_export_csv_empty_has_header_only(mem, tmp_path):
 
 # ── window_s and limit ────────────────────────────────────────────────────────
 
+
 def test_export_csv_limit_respected(mem_with_data, tmp_path):
     path = str(tmp_path / "out.csv")
     result = mem_with_data.export_csv(path, limit=2)
@@ -135,6 +155,7 @@ def test_export_csv_window_s_zero_returns_empty(mem_with_data, tmp_path):
 
 
 # ── error handling ────────────────────────────────────────────────────────────
+
 
 def test_export_csv_bad_path_returns_error(mem_with_data):
     result = mem_with_data.export_csv("/nonexistent_dir_xyz/out.csv")

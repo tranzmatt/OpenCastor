@@ -14,6 +14,7 @@ def registry():
 
 # ── basic return shape ────────────────────────────────────────────────────────
 
+
 def test_channel_rate_histogram_returns_dict(registry):
     result = registry.channel_rate_histogram()
     assert isinstance(result, dict)
@@ -25,6 +26,7 @@ def test_channel_rate_histogram_empty_when_no_channels(registry):
 
 
 # ── recording messages and reading histogram ──────────────────────────────────
+
 
 def test_channel_rate_histogram_contains_channel_after_two_records(registry):
     registry.record_channel_message("whatsapp")
@@ -74,6 +76,7 @@ def test_channel_rate_histogram_multiple_channels(registry):
 
 # ── percentile correctness ────────────────────────────────────────────────────
 
+
 def test_channel_interarrival_percentile_returns_none_for_single_message():
     tracker = ChannelInterArrivalTracker()
     tracker.record("ch")
@@ -107,6 +110,7 @@ def test_channel_interarrival_samples_bounded():
 
 # ── p50 <= p95 <= p99 ordering ────────────────────────────────────────────────
 
+
 def test_percentile_ordering(registry):
     for i in range(10):
         registry.record_channel_message("ordered")
@@ -119,6 +123,7 @@ def test_percentile_ordering(registry):
 
 
 # ── never raises ─────────────────────────────────────────────────────────────
+
 
 def test_channel_rate_histogram_never_raises(registry):
     try:

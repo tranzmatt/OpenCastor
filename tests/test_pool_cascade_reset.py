@@ -37,6 +37,7 @@ def _make_pool(strategy="cascade", reset_s=1.0):
 
 # ── basic cascade current ─────────────────────────────────────────────────────
 
+
 def test_pool_cascade_current_starts_at_zero():
     pool, p1, p2 = _make_pool()
     assert pool._cascade_current == 0
@@ -60,6 +61,7 @@ def test_pool_cascade_reset_s_default():
 
 
 # ── reset condition ───────────────────────────────────────────────────────────
+
 
 def test_cascade_reset_triggers_after_success_period():
     """After pool_cascade_reset_s of successful operation, cascade resets to primary."""
@@ -87,6 +89,7 @@ def test_cascade_no_reset_before_timeout():
 
 # ── health check reports cascade_index ───────────────────────────────────────
 
+
 def test_health_check_reports_cascade_index():
     pool, p1, p2 = _make_pool()
     pool._cascade_current = 1
@@ -102,6 +105,7 @@ def test_health_check_cascade_index_zero_by_default():
 
 # ── no reset when reset_s is zero ────────────────────────────────────────────
 
+
 def test_cascade_reset_disabled_when_zero():
     pool, p1, p2 = _make_pool(reset_s=0.0)
     pool._cascade_current = 1
@@ -114,6 +118,7 @@ def test_cascade_reset_disabled_when_zero():
 
 
 # ── think returns thought ─────────────────────────────────────────────────────
+
 
 def test_cascade_think_returns_thought():
     pool, p1, p2 = _make_pool()

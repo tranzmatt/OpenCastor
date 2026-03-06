@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
 
 from castor.memory import EpisodeMemory
@@ -75,7 +73,7 @@ def test_keep_flagged_true_preserves_flagged(mem):
     for _ in range(3):
         mem.log_episode(instruction="unflagged", action={"type": "stop"})
     # Delete all old episodes with keep_flagged=True
-    result = mem.retention_policy(max_age_s=0.0, keep_flagged=True)
+    mem.retention_policy(max_age_s=0.0, keep_flagged=True)
     # The flagged episode should still be present
     flagged = mem.query_flagged()
     assert len(flagged) >= 1

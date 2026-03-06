@@ -1,4 +1,5 @@
 """Tests for ProviderPool.reset_stats() — Issue #416."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -69,6 +70,7 @@ def test_reset_stats_cb_failures_cleared():
 def test_reset_stats_cb_open_until_cleared():
     pool, _, _ = _make_pool()
     import time
+
     pool._cb_open_until[0] = time.time() + 60
     pool.reset_stats()
     assert pool._cb_open_until == {}
@@ -77,6 +79,7 @@ def test_reset_stats_cb_open_until_cleared():
 def test_reset_stats_degraded_cleared():
     pool, _, _ = _make_pool()
     import time
+
     pool._degraded[0] = time.time()
     pool.reset_stats()
     assert pool._degraded == {}
@@ -85,6 +88,7 @@ def test_reset_stats_degraded_cleared():
 def test_reset_stats_burst_demoted_until_cleared():
     pool, _, _ = _make_pool()
     import time
+
     pool._burst_demoted_until[0] = time.time() + 30
     pool.reset_stats()
     assert pool._burst_demoted_until == {}

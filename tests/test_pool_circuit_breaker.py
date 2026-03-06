@@ -38,6 +38,7 @@ def _make_pool(threshold=3, cooldown_s=1.0):
 
 # ── config stored ─────────────────────────────────────────────────────────────
 
+
 def test_cb_threshold_stored():
     pool, _, _ = _make_pool(threshold=5)
     assert pool._cb_threshold == 5
@@ -65,6 +66,7 @@ def test_cb_open_until_initially_empty():
 
 # ── health check reports circuit_breaker ─────────────────────────────────────
 
+
 def test_health_check_has_circuit_breaker_key():
     pool, _, _ = _make_pool(threshold=2)
     health = pool.health_check()
@@ -91,6 +93,7 @@ def test_health_check_no_cb_key_when_disabled():
 
 # ── think works normally without failures ────────────────────────────────────
 
+
 def test_think_succeeds_normally():
     pool, p1, p2 = _make_pool(threshold=3)
     result = pool.think(None, "go")
@@ -98,6 +101,7 @@ def test_think_succeeds_normally():
 
 
 # ── circuit opens after consecutive failures ──────────────────────────────────
+
 
 def test_cb_opens_after_threshold_failures():
     pool, p1, _ = _make_pool(threshold=2, cooldown_s=60.0)
@@ -118,6 +122,7 @@ def test_cb_opens_after_threshold_failures():
 
 # ── failure count resets on success ──────────────────────────────────────────
 
+
 def test_cb_failure_count_resets_on_success():
     pool, p1, _ = _make_pool(threshold=5)
     pool._cb_failures[0] = 3
@@ -132,6 +137,7 @@ def test_cb_failure_count_resets_on_success():
 
 
 # ── providers dict in health check ───────────────────────────────────────────
+
 
 def test_health_check_cb_providers_dict():
     pool, _, _ = _make_pool(threshold=3)

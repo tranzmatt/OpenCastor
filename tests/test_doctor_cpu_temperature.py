@@ -1,12 +1,10 @@
 """Tests for doctor.check_cpu_temperature() (Issue #424)."""
 
-import sys
-from unittest.mock import mock_open, patch, MagicMock
+from unittest.mock import mock_open, patch
 
 import pytest
 
 from castor.doctor import check_cpu_temperature, run_all_checks
-
 
 # ------------------------------------------------------------------
 # Return shape

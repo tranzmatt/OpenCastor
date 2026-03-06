@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 def _make_pool(strategy="round_robin"):
     with patch("castor.providers.get_provider") as mock_factory:

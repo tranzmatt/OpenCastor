@@ -7,8 +7,7 @@ import zipfile
 import pytest
 import yaml
 
-from castor.export import export_bundle, _sanitize_config
-
+from castor.export import _sanitize_config, export_bundle
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -73,7 +72,9 @@ def test_export_bundle_json_format(tmp_path):
 def test_export_bundle_missing_config_raises(tmp_path):
     """export_bundle raises FileNotFoundError for a missing config."""
     with pytest.raises((FileNotFoundError, OSError)):
-        export_bundle(config_path=str(tmp_path / "nonexistent.yaml"), output_path=str(tmp_path / "out.zip"))
+        export_bundle(
+            config_path=str(tmp_path / "nonexistent.yaml"), output_path=str(tmp_path / "out.zip")
+        )
 
 
 # ── _sanitize_config() ────────────────────────────────────────────────────────

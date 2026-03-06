@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from castor.providers.base import Thought
 from castor.providers.pool_provider import ProviderPool
 
 
@@ -61,8 +60,14 @@ def test_each_provider_stat_has_required_fields():
     pool, _, _ = _make_pool()
     stats = pool.provider_stats()
     required_fields = {
-        "name", "index", "calls", "cost_usd_total",
-        "tokens_total", "avg_latency_ms", "degraded", "cb_open",
+        "name",
+        "index",
+        "calls",
+        "cost_usd_total",
+        "tokens_total",
+        "avg_latency_ms",
+        "degraded",
+        "cb_open",
     }
     for entry in stats["providers"]:
         for field in required_fields:

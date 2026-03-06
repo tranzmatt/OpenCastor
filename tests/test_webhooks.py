@@ -2,20 +2,17 @@
 
 import hashlib
 import hmac
-import json
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
-import pytest
-
 from castor.webhooks import (
-    _sign_payload,
-    _dispatch_one,
     WebhookDispatcher,
+    _dispatch_one,
+    _sign_payload,
 )
 
-
 # ── Helper ────────────────────────────────────────────────────────────────────
+
 
 def _make_response(status: int = 200):
     resp = MagicMock()
@@ -128,9 +125,11 @@ def test_webhook_dispatcher_routes_event():
     """Event in webhook.events → dispatches; event NOT in list → skips."""
     mock_resp = _make_response(200)
     with patch("castor.webhooks.urllib.request.urlopen", return_value=mock_resp) as mock_open:
-        dispatcher = WebhookDispatcher([
-            {"url": "https://example.com/hook", "events": ["startup", "error"], "retry": 0},
-        ])
+        dispatcher = WebhookDispatcher(
+            [
+                {"url": "https://example.com/hook", "events": ["startup", "error"], "retry": 0},
+            ]
+        )
         # Matching event
         results = dispatcher.emit_sync("startup", {})
         assert len(results) == 1
@@ -147,9 +146,11 @@ def test_webhook_dispatcher_wildcard_event():
     """events: ['*'] dispatches for any event."""
     mock_resp = _make_response(200)
     with patch("castor.webhooks.urllib.request.urlopen", return_value=mock_resp):
-        dispatcher = WebhookDispatcher([
-            {"url": "https://example.com/hook", "events": ["*"], "retry": 0},
-        ])
+        dispatcher = WebhookDispatcher(
+            [
+                {"url": "https://example.com/hook", "events": ["*"], "retry": 0},
+            ]
+        )
         results = dispatcher.emit_sync("estop", {})
         assert len(results) == 1
         assert results[0] is True
@@ -164,9 +165,16 @@ def test_webhook_dispatcher_adds_signature_header():
         return _make_response(200)
 
     with patch("castor.webhooks.urllib.request.urlopen", side_effect=fake_urlopen):
-        dispatcher = WebhookDispatcher([
-            {"url": "https://example.com/hook", "events": ["*"], "secret": "s3cret", "retry": 0},
-        ])
+        dispatcher = WebhookDispatcher(
+            [
+                {
+                    "url": "https://example.com/hook",
+                    "events": ["*"],
+                    "secret": "s3cret",
+                    "retry": 0,
+                },
+            ]
+        )
         dispatcher.emit_sync("startup", {})
 
     # urllib lowercases headers
@@ -187,9 +195,11 @@ def test_webhook_dispatcher_no_secret_no_header():
         return _make_response(200)
 
     with patch("castor.webhooks.urllib.request.urlopen", side_effect=fake_urlopen):
-        dispatcher = WebhookDispatcher([
-            {"url": "https://example.com/hook", "events": ["*"], "retry": 0},
-        ])
+        dispatcher = WebhookDispatcher(
+            [
+                {"url": "https://example.com/hook", "events": ["*"], "retry": 0},
+            ]
+        )
         dispatcher.emit_sync("startup", {})
 
     header_keys = {k.lower() for k in captured_req["headers"]}

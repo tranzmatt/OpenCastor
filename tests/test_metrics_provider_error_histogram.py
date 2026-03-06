@@ -6,7 +6,6 @@ import pytest
 
 from castor.metrics import MetricsRegistry, get_registry
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -94,20 +93,19 @@ class TestProviderErrorHistogramRecording:
 
     def test_buckets_non_decreasing(self, reg):
         """Bucket values must be monotonically non-decreasing."""
-        reg.record_provider_error("p1")       # count=1  → fits in <=1
+        reg.record_provider_error("p1")  # count=1  → fits in <=1
         reg.record_provider_error("p2")
-        reg.record_provider_error("p2")       # count=2  → fits in <=5 but not <=1
+        reg.record_provider_error("p2")  # count=2  → fits in <=5 but not <=1
         reg.record_provider_error("p3")
         for _ in range(10):
-            reg.record_provider_error("p3")   # count=11 → fits in <=50 but not <=10
+            reg.record_provider_error("p3")  # count=11 → fits in <=50 but not <=10
 
         result = reg.provider_error_histogram()
         ordered_labels = ["<=1", "<=5", "<=10", "<=50", "<=100", "<=500", "<=1000"]
         values = [result["buckets"][lbl] for lbl in ordered_labels]
         for i in range(len(values) - 1):
             assert values[i] <= values[i + 1], (
-                f"Bucket {ordered_labels[i]}={values[i]} > "
-                f"{ordered_labels[i+1]}={values[i + 1]}"
+                f"Bucket {ordered_labels[i]}={values[i]} > {ordered_labels[i + 1]}={values[i + 1]}"
             )
 
     def test_bucket_counts_reflect_thresholds(self, reg):

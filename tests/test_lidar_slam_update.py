@@ -11,6 +11,7 @@ def _driver():
 
 # ── basic return shape ────────────────────────────────────────────────────────
 
+
 def test_slam_update_returns_dict():
     d = _driver()
     result = d.slam_update()
@@ -57,6 +58,7 @@ def test_slam_update_reset_flag_false_by_default():
 
 # ── reset behaviour ───────────────────────────────────────────────────────────
 
+
 def test_slam_update_reset_true_returns_reset_flag():
     d = _driver()
     result = d.slam_update(reset=True)
@@ -80,6 +82,7 @@ def test_slam_update_after_reset_map_empty():
 
 
 # ── parameter propagation ─────────────────────────────────────────────────────
+
 
 def test_slam_update_custom_size_m():
     d = _driver()
@@ -105,6 +108,7 @@ def test_slam_update_cells_match_expected_formula():
 
 # ── persistence across calls ──────────────────────────────────────────────────
 
+
 def test_slam_update_map_persists_across_calls():
     d = _driver()
     d.slam_update()
@@ -120,6 +124,7 @@ def test_slam_update_no_exception_multiple_calls():
 
 
 # ── mock mode ────────────────────────────────────────────────────────────────
+
 
 def test_slam_update_mock_mode_reports_mode():
     d = _driver()

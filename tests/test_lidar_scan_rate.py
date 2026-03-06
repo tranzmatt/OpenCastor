@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+
 import pytest
 
 from castor.drivers.lidar_driver import LidarDriver
@@ -45,6 +46,7 @@ def driver_with_history(tmp_path):
 
 # ── Basic return-type tests ───────────────────────────────────────────────────
 
+
 def test_returns_dict(driver):
     result = driver.scan_rate()
     assert isinstance(result, dict)
@@ -72,6 +74,7 @@ def test_has_key_mode(driver):
 
 # ── Value constraints ─────────────────────────────────────────────────────────
 
+
 def test_scans_per_second_non_negative(driver):
     result = driver.scan_rate()
     assert result["scans_per_second"] >= 0.0
@@ -94,6 +97,7 @@ def test_mode_is_str(driver):
 
 # ── No-history / disabled-DB cases ───────────────────────────────────────────
 
+
 def test_no_history_returns_zero_rate(driver_no_history):
     result = driver_no_history.scan_rate()
     assert result["scans_per_second"] == 0.0
@@ -107,6 +111,7 @@ def test_never_raises(driver):
 
 
 # ── Consistency across calls ──────────────────────────────────────────────────
+
 
 def test_two_calls_consistent_types(driver_with_history):
     r1 = driver_with_history.scan_rate()

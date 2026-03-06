@@ -1,14 +1,9 @@
 """Tests for check_gpu_memory() in castor/doctor.py — Issue #406."""
 
-import subprocess
 import sys
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from castor.doctor import check_gpu_memory, run_all_checks
-
 
 # ---------------------------------------------------------------------------
 # Basic contract tests

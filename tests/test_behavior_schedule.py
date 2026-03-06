@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import threading
-import time
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 
 def _make_runner():
@@ -128,7 +125,9 @@ def test_schedule_no_mode_warns(caplog):
 
     with caplog.at_level(logging.WARNING, logger="OpenCastor.Behaviors"):
         runner._step_schedule({"steps": [{"type": "wait"}]})
-    assert any("neither" in r.message.lower() or "skipping" in r.message.lower() for r in caplog.records)
+    assert any(
+        "neither" in r.message.lower() or "skipping" in r.message.lower() for r in caplog.records
+    )
 
 
 # ── Integration: schedule via run_step_list (dispatch table) ─────────────────

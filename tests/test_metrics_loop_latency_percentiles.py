@@ -1,4 +1,5 @@
 """Tests for MetricsRegistry.loop_latency_percentiles() — Issue #417."""
+
 from __future__ import annotations
 
 import pytest
@@ -14,12 +15,14 @@ def reg():
 
 # ── 1. returns a dict ────────────────────────────────────────────────────────
 
+
 def test_returns_dict(reg):
     result = reg.loop_latency_percentiles()
     assert isinstance(result, dict)
 
 
 # ── 2. has expected keys ─────────────────────────────────────────────────────
+
 
 def test_has_expected_keys(reg):
     result = reg.loop_latency_percentiles()
@@ -28,12 +31,14 @@ def test_has_expected_keys(reg):
 
 # ── 3. sample_count is 0 when no samples ────────────────────────────────────
 
+
 def test_sample_count_zero_when_empty(reg):
     result = reg.loop_latency_percentiles()
     assert result["sample_count"] == 0
 
 
 # ── 4. percentiles are None when no samples ──────────────────────────────────
+
 
 def test_percentiles_none_when_empty(reg):
     result = reg.loop_latency_percentiles()
@@ -44,6 +49,7 @@ def test_percentiles_none_when_empty(reg):
 
 # ── 5. after one record_loop, sample_count is 1 ──────────────────────────────
 
+
 def test_sample_count_one_after_single_record(reg):
     reg.record_loop(50.0)
     result = reg.loop_latency_percentiles()
@@ -51,6 +57,7 @@ def test_sample_count_one_after_single_record(reg):
 
 
 # ── 6. after multiple calls, percentiles are numeric ─────────────────────────
+
 
 def test_percentiles_numeric_after_multiple_records(reg):
     for ms in [10.0, 20.0, 30.0, 40.0, 50.0, 100.0, 200.0]:
@@ -63,6 +70,7 @@ def test_percentiles_numeric_after_multiple_records(reg):
 
 # ── 7. p50 <= p95 <= p99 ─────────────────────────────────────────────────────
 
+
 def test_percentile_ordering(reg):
     for ms in range(1, 101):
         reg.record_loop(float(ms))
@@ -71,6 +79,7 @@ def test_percentile_ordering(reg):
 
 
 # ── 8. sample_count capped at 1000 ───────────────────────────────────────────
+
 
 def test_sample_count_capped_at_1000(reg):
     for i in range(1500):
@@ -81,6 +90,7 @@ def test_sample_count_capped_at_1000(reg):
 
 # ── 9. singleton works via get_registry ──────────────────────────────────────
 
+
 def test_singleton_via_get_registry():
     r = get_registry()
     result = r.loop_latency_percentiles()
@@ -90,6 +100,7 @@ def test_singleton_via_get_registry():
 
 # ── 10. never raises ─────────────────────────────────────────────────────────
 
+
 def test_never_raises(reg):
     try:
         reg.loop_latency_percentiles()
@@ -98,6 +109,7 @@ def test_never_raises(reg):
 
 
 # ── 11. reset MetricsRegistry gives fresh state ──────────────────────────────
+
 
 def test_fresh_registry_has_no_samples():
     r1 = MetricsRegistry()
@@ -109,6 +121,7 @@ def test_fresh_registry_has_no_samples():
 
 # ── 12. samples reflect recorded values correctly ────────────────────────────
 
+
 def test_single_value_all_percentiles_equal(reg):
     reg.record_loop(42.0)
     result = reg.loop_latency_percentiles()
@@ -118,6 +131,7 @@ def test_single_value_all_percentiles_equal(reg):
 
 
 # ── 13. cap trims to most-recent 1000 ────────────────────────────────────────
+
 
 def test_cap_keeps_last_1000_samples(reg):
     # Record 1200 samples; p99 should reflect the tail (higher values)

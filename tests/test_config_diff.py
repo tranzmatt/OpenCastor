@@ -35,12 +35,14 @@ def rcan_b(tmp_path):
 @pytest.fixture
 def rcan_identical(tmp_path, rcan_a):
     import shutil
+
     p = tmp_path / "a_copy.rcan.yaml"
     shutil.copy(rcan_a, str(p))
     return str(p)
 
 
 # ── basic return shape ────────────────────────────────────────────────────────
+
 
 def test_diff_configs_returns_list(rcan_a, rcan_b):
     result = diff_configs(rcan_a, rcan_b)
@@ -69,6 +71,7 @@ def test_diff_entry_has_three_elements(rcan_a, rcan_b):
 
 # ── detects specific changes ──────────────────────────────────────────────────
 
+
 def test_diff_detects_robot_name_change(rcan_a, rcan_b):
     result = diff_configs(rcan_a, rcan_b)
     paths = [entry[0] for entry in result]
@@ -92,6 +95,7 @@ def test_diff_values_in_tuple(rcan_a, rcan_b):
 
 
 # ── missing key handling ──────────────────────────────────────────────────────
+
 
 def test_diff_detects_missing_key(tmp_path):
     data_a = {"rcan_version": "1.1.0", "extra_key": "value"}
@@ -118,6 +122,7 @@ def test_diff_detects_added_key(tmp_path):
 
 
 # ── print_diff smoke test ─────────────────────────────────────────────────────
+
 
 def test_print_diff_does_not_raise(rcan_a, rcan_b, capsys):
     diffs = diff_configs(rcan_a, rcan_b)

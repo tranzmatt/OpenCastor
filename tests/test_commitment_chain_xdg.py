@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import importlib
-import os
 from pathlib import Path
-
-import pytest
 
 
 def _reload_path(monkeypatch, env: dict[str, str | None]) -> Path:

@@ -1,12 +1,10 @@
 """Tests for MetricsRegistry.error_rate_histogram() — Issue #421."""
+
 from __future__ import annotations
 
 import time
 
-import pytest
-
 from castor.metrics import MetricsRegistry
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -156,7 +154,7 @@ class TestErrorRateHistogramPerProvider:
         now = time.time()
         with reg._lock:
             reg._provider_error_times["edge"] = [
-                now - 5.0,   # within 60s window
+                now - 5.0,  # within 60s window
                 now - 200.0,  # outside 60s window
             ]
         result = reg.error_rate_histogram(window_s=60.0)

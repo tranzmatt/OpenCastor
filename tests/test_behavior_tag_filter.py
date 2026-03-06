@@ -15,6 +15,7 @@ def _make_runner(tags=None):
 
 # ── _step_tags_match ──────────────────────────────────────────────────────────
 
+
 def test_step_no_tags_always_runs():
     runner = _make_runner(tags=["rpi5"])
     assert runner._step_tags_match({"type": "wait"}) is True
@@ -48,6 +49,7 @@ def test_no_robot_tags_all_steps_run():
 
 # ── _robot_tags initialization ────────────────────────────────────────────────
 
+
 def test_robot_tags_set_from_config():
     runner = _make_runner(tags=["rpi5", "camera"])
     assert "rpi5" in runner._robot_tags
@@ -67,6 +69,7 @@ def test_robot_tags_from_tags_key():
 
 
 # ── tag filtering in run() loop (via _run_step_list) ─────────────────────────
+
 
 def test_tagged_step_skipped_in_step_list(caplog):
     import logging
@@ -126,8 +129,8 @@ def test_multiple_tags_some_match():
 
     runner._step_handlers["wait"] = fake_wait
     steps = [
-        {"type": "wait", "tags": ["camera"]},   # skip
-        {"type": "wait", "tags": ["lidar"]},    # run
+        {"type": "wait", "tags": ["camera"]},  # skip
+        {"type": "wait", "tags": ["lidar"]},  # run
         {"type": "wait", "tags": ["camera", "lidar"]},  # run (lidar matches)
     ]
     runner._run_step_list(steps, "test")

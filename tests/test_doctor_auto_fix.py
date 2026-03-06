@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import time
-
-import pytest
-
 
 # ── _fix_env_file ─────────────────────────────────────────────────────────────
 

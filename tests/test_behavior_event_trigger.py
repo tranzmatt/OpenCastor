@@ -16,6 +16,7 @@ def _make_runner():
 
 # ── dispatch table ─────────────────────────────────────────────────────────────
 
+
 def test_event_trigger_in_dispatch_table():
     runner = _make_runner()
     assert "event_trigger" in runner._step_handlers
@@ -28,8 +29,10 @@ def test_event_trigger_handler_callable():
 
 # ── missing event name ────────────────────────────────────────────────────────
 
+
 def test_event_trigger_no_event_key_skips(caplog):
     import logging
+
     runner = _make_runner()
     with caplog.at_level(logging.WARNING):
         runner._step_event_trigger({})
@@ -37,6 +40,7 @@ def test_event_trigger_no_event_key_skips(caplog):
 
 
 # ── set_event / clear_event ───────────────────────────────────────────────────
+
 
 def test_set_event_creates_event():
     runner = _make_runner()
@@ -70,6 +74,7 @@ def test_set_event_idempotent():
 
 # ── event_trigger fires when pre-set ─────────────────────────────────────────
 
+
 def test_event_trigger_fires_immediately_when_pre_set():
     runner = _make_runner()
     runner.set_event("go")
@@ -87,6 +92,7 @@ def test_event_trigger_does_not_stop_running_on_success():
 
 
 # ── timeout behaviour ─────────────────────────────────────────────────────────
+
 
 def test_event_trigger_timeout_stop_sets_running_false():
     runner = _make_runner()
@@ -108,6 +114,7 @@ def test_event_trigger_default_on_timeout_is_stop():
 
 # ── trigger from separate thread ──────────────────────────────────────────────
 
+
 def test_event_trigger_unblocked_by_thread():
     runner = _make_runner()
 
@@ -123,6 +130,7 @@ def test_event_trigger_unblocked_by_thread():
 
 
 # ── stop() clears events ──────────────────────────────────────────────────────
+
 
 def test_stop_unblocks_waiting_events():
     runner = _make_runner()

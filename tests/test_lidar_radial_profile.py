@@ -67,7 +67,7 @@ def test_radial_profile_sectors_contiguous():
     for i in range(len(sectors) - 1):
         assert abs(sectors[i]["end_deg"] - sectors[i + 1]["start_deg"]) < 1e-6, (
             f"sectors[{i}].end_deg={sectors[i]['end_deg']} != "
-            f"sectors[{i+1}].start_deg={sectors[i+1]['start_deg']}"
+            f"sectors[{i + 1}].start_deg={sectors[i + 1]['start_deg']}"
         )
 
 

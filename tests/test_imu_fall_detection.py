@@ -1,4 +1,5 @@
 """Tests for IMUDriver.fall_detection() (#404)."""
+
 import pytest
 
 from castor.drivers.imu_driver import IMUDriver

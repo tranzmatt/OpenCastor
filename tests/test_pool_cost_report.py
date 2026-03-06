@@ -1,4 +1,5 @@
 """Tests for ProviderPool.cost_report() — Issue #427."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -6,7 +7,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from castor.providers.pool_provider import ProviderPool
-
 
 # ---------------------------------------------------------------------------
 # Helpers

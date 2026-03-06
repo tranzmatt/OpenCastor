@@ -18,6 +18,7 @@ def _make_runner():
 
 # ── dispatch table ─────────────────────────────────────────────────────────────
 
+
 def test_log_step_in_dispatch_table():
     runner = _make_runner()
     assert "log_step" in runner._step_handlers
@@ -30,8 +31,10 @@ def test_log_step_handler_callable():
 
 # ── missing path ──────────────────────────────────────────────────────────────
 
+
 def test_log_step_no_path_skips(caplog):
     import logging
+
     runner = _make_runner()
     with caplog.at_level(logging.WARNING):
         runner._step_log_step({})
@@ -39,6 +42,7 @@ def test_log_step_no_path_skips(caplog):
 
 
 # ── basic file writing ────────────────────────────────────────────────────────
+
 
 def test_log_step_creates_file(tmp_path):
     runner = _make_runner()
@@ -96,6 +100,7 @@ def test_log_step_data_in_record(tmp_path):
 
 # ── $var substitution ────────────────────────────────────────────────────────
 
+
 def test_log_step_var_substitution(tmp_path):
     runner = _make_runner()
     runner._vars["speed"] = "fast"
@@ -128,6 +133,7 @@ def test_log_step_non_var_values_unchanged(tmp_path):
 
 # ── appending ─────────────────────────────────────────────────────────────────
 
+
 def test_log_step_appends_multiple_records(tmp_path):
     runner = _make_runner()
     path = str(tmp_path / "behavior.log")
@@ -141,8 +147,10 @@ def test_log_step_appends_multiple_records(tmp_path):
 
 # ── bad path ──────────────────────────────────────────────────────────────────
 
+
 def test_log_step_bad_path_logs_warning(caplog):
     import logging
+
     runner = _make_runner()
     with caplog.at_level(logging.WARNING):
         runner._step_log_step({"path": "/nonexistent_xyz/behavior.log"})

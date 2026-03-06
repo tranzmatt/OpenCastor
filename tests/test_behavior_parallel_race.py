@@ -1,4 +1,5 @@
 """Tests for BehaviorRunner._step_parallel_race (Issue #411)."""
+
 import threading
 import time
 from unittest.mock import MagicMock
@@ -77,13 +78,15 @@ def test_parallel_race_runs_inner_steps_concurrently(runner):
 
     runner._step_handlers["slow_step"] = slow_step
 
-    runner._step_parallel_race({
-        "inner_steps": [
-            {"type": "slow_step", "label": "a"},
-            {"type": "slow_step", "label": "b"},
-        ],
-        "timeout_s": 2.0,
-    })
+    runner._step_parallel_race(
+        {
+            "inner_steps": [
+                {"type": "slow_step", "label": "a"},
+                {"type": "slow_step", "label": "b"},
+            ],
+            "timeout_s": 2.0,
+        }
+    )
 
     # Both threads must have started (proven by both labels being in started list)
     # Give daemon threads a tiny window to record their start
@@ -106,9 +109,7 @@ def test_parallel_race_exits_on_first_completion(runner):
     runner._step_handlers["slow"] = slow_step
 
     start = time.monotonic()
-    runner._step_parallel_race({
-        "inner_steps": [{"type": "fast"}, {"type": "slow"}]
-    })
+    runner._step_parallel_race({"inner_steps": [{"type": "fast"}, {"type": "slow"}]})
     elapsed = time.monotonic() - start
 
     assert "fast" in results
@@ -117,8 +118,6 @@ def test_parallel_race_exits_on_first_completion(runner):
 
 def test_parallel_race_at_least_one_thread_finishes(runner):
     """finished count reported should be >= 1."""
-    import io
-    import logging
 
     results = []
 
@@ -127,9 +126,9 @@ def test_parallel_race_at_least_one_thread_finishes(runner):
 
     runner._step_handlers["instant"] = instant_step
 
-    runner._step_parallel_race({
-        "inner_steps": [{"type": "instant"}, {"type": "wait", "duration_s": 0.3}]
-    })
+    runner._step_parallel_race(
+        {"inner_steps": [{"type": "instant"}, {"type": "wait", "duration_s": 0.3}]}
+    )
 
     assert len(results) >= 1
 
@@ -162,10 +161,12 @@ def test_parallel_race_timeout_s_respected(runner):
     runner._step_handlers["very_slow"] = very_slow_step
 
     start = time.monotonic()
-    runner._step_parallel_race({
-        "inner_steps": [{"type": "very_slow"}, {"type": "very_slow"}],
-        "timeout_s": 0.2,
-    })
+    runner._step_parallel_race(
+        {
+            "inner_steps": [{"type": "very_slow"}, {"type": "very_slow"}],
+            "timeout_s": 0.2,
+        }
+    )
     elapsed = time.monotonic() - start
 
     # Should return within ~300 ms (timeout + small overhead), not 10 s
@@ -183,10 +184,12 @@ def test_parallel_race_zero_timeout_means_no_timeout(runner):
 
     runner._step_handlers["quick"] = quick_step
 
-    runner._step_parallel_race({
-        "inner_steps": [{"type": "quick"}],
-        "timeout_s": 0,
-    })
+    runner._step_parallel_race(
+        {
+            "inner_steps": [{"type": "quick"}],
+            "timeout_s": 0,
+        }
+    )
 
     assert "quick" in results
 

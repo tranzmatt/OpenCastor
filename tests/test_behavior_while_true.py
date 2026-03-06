@@ -15,6 +15,7 @@ def _make_runner():
 
 # ── dispatch table ────────────────────────────────────────────────────────────
 
+
 def test_while_true_in_dispatch_table():
     runner = _make_runner()
     assert "while_true" in runner._step_handlers
@@ -26,6 +27,7 @@ def test_while_true_handler_callable():
 
 
 # ── missing / empty inner_steps ───────────────────────────────────────────────
+
 
 def test_while_true_no_inner_steps_skips(caplog):
     import logging
@@ -47,6 +49,7 @@ def test_while_true_empty_inner_steps_skips(caplog):
 
 # ── max_iterations guard ──────────────────────────────────────────────────────
 
+
 def test_while_true_max_iterations_stops():
     runner = _make_runner()
     count = [0]
@@ -55,9 +58,7 @@ def test_while_true_max_iterations_stops():
         count[0] += 1
 
     runner._step_handlers["wait"] = fake_wait
-    runner._step_while_true(
-        {"inner_steps": [{"type": "wait", "seconds": 0}], "max_iterations": 5}
-    )
+    runner._step_while_true({"inner_steps": [{"type": "wait", "seconds": 0}], "max_iterations": 5})
     assert count[0] == 5
 
 
@@ -69,13 +70,12 @@ def test_while_true_max_iterations_one():
         count[0] += 1
 
     runner._step_handlers["wait"] = fake_wait
-    runner._step_while_true(
-        {"inner_steps": [{"type": "wait", "seconds": 0}], "max_iterations": 1}
-    )
+    runner._step_while_true({"inner_steps": [{"type": "wait", "seconds": 0}], "max_iterations": 1})
     assert count[0] == 1
 
 
 # ── timeout guard ─────────────────────────────────────────────────────────────
+
 
 def test_while_true_timeout_stops():
     runner = _make_runner()
@@ -92,6 +92,7 @@ def test_while_true_timeout_stops():
 
 
 # ── _running flag stops loop ──────────────────────────────────────────────────
+
 
 def test_while_true_stops_when_running_false():
     runner = _make_runner()
@@ -110,6 +111,7 @@ def test_while_true_stops_when_running_false():
 
 # ── returns None ──────────────────────────────────────────────────────────────
 
+
 def test_while_true_returns_none():
     runner = _make_runner()
     result = runner._step_while_true(
@@ -119,6 +121,7 @@ def test_while_true_returns_none():
 
 
 # ── dwell_s parameter ────────────────────────────────────────────────────────
+
 
 def test_while_true_dwell_s_does_not_raise():
     runner = _make_runner()
@@ -132,6 +135,7 @@ def test_while_true_dwell_s_does_not_raise():
 
 
 # ── multiple inner steps executed each iteration ─────────────────────────────
+
 
 def test_while_true_runs_all_inner_steps():
     runner = _make_runner()

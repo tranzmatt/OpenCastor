@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-
 # ── get_detector resolution ───────────────────────────────────────────────────
 
 
@@ -20,8 +19,8 @@ def test_get_detector_uses_env_hotword():
 
 
 def test_get_detector_recreates_on_phrase_change():
-    from castor.hotword import get_detector
     import castor.hotword as hw_mod
+    from castor.hotword import get_detector
 
     hw_mod._detector = None
     det1 = get_detector(wake_phrase="hey castor")
@@ -32,8 +31,8 @@ def test_get_detector_recreates_on_phrase_change():
 
 
 def test_get_detector_reuses_same_phrase():
-    from castor.hotword import get_detector
     import castor.hotword as hw_mod
+    from castor.hotword import get_detector
 
     hw_mod._detector = None
     det1 = get_detector(wake_phrase="alex")
@@ -47,7 +46,6 @@ def test_get_detector_reuses_same_phrase():
 
 def _call_hotword_start(config=None, env_hotword=""):
     """Helper to call the hotword_start endpoint logic directly."""
-    import asyncio
     import os
 
     if env_hotword:

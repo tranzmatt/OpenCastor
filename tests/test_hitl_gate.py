@@ -10,7 +10,6 @@ import pytest
 
 from castor.hitl_gate import HiTLGate, HiTLGateManager
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -70,9 +69,7 @@ async def test_approval_required_approve():
     result_holder = []
 
     async def run():
-        task = asyncio.create_task(
-            mgr.check(make_action("grip"), make_thought())
-        )
+        task = asyncio.create_task(mgr.check(make_action("grip"), make_thought()))
         await approve_soon()
         result_holder.append(await task)
 
@@ -99,9 +96,7 @@ async def test_approval_required_deny():
     result_holder = []
 
     async def run():
-        task = asyncio.create_task(
-            mgr.check(make_action("grip"), make_thought())
-        )
+        task = asyncio.create_task(mgr.check(make_action("grip"), make_thought()))
         await deny_soon()
         result_holder.append(await task)
 

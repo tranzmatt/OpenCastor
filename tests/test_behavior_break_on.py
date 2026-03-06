@@ -94,8 +94,10 @@ def test_break_on_empty_condition_always_breaks(runner):
 
 
 def test_break_on_eval_error_does_not_raise_break_loop(runner, caplog):
-    with patch.object(runner, "_eval_condition", side_effect=ValueError("bad")), \
-         caplog.at_level(logging.WARNING, logger="OpenCastor.Behaviors"):
+    with (
+        patch.object(runner, "_eval_condition", side_effect=ValueError("bad")),
+        caplog.at_level(logging.WARNING, logger="OpenCastor.Behaviors"),
+    ):
         # Must not raise _BreakLoop or any other exception
         runner._step_break_on({"condition": "bad_expr"})
     assert any("eval" in r.message.lower() or "error" in r.message.lower() for r in caplog.records)
@@ -108,13 +110,13 @@ def test_while_true_exits_on_break_on(runner):
     """while_true loop exits cleanly when break_on raises _BreakLoop."""
     behavior = {
         "name": "test_break",
-        "steps": [{
-            "type": "while_true",
-            "max_iterations": 100,
-            "inner_steps": [
-                {"type": "break_on", "condition": "1 > 0"}
-            ]
-        }]
+        "steps": [
+            {
+                "type": "while_true",
+                "max_iterations": 100,
+                "inner_steps": [{"type": "break_on", "condition": "1 > 0"}],
+            }
+        ],
     }
     with patch.object(runner, "_eval_condition", return_value=True):
         runner.run(behavior)
@@ -136,7 +138,7 @@ def test_while_true_break_on_exits_after_first_iteration(runner):
         "inner_steps": [
             {"type": "noop"},
             {"type": "break_on", "condition": "1 > 0"},
-        ]
+        ],
     }
     with patch.object(runner, "_eval_condition", return_value=True):
         runner._step_while_true(step)
@@ -162,7 +164,7 @@ def test_for_each_exits_on_break_on(runner):
         "inner_steps": [
             {"type": "noop"},
             {"type": "break_on", "condition": "1 > 0"},
-        ]
+        ],
     }
     with patch.object(runner, "_eval_condition", return_value=True):
         runner._step_for_each(step)
@@ -193,14 +195,14 @@ def test_repeat_until_exits_on_break_on(runner):
         "inner_steps": [
             {"type": "noop"},
             {"type": "break_on", "condition": "1 > 0"},
-        ]
+        ],
     }
 
     # _eval_condition: the repeat_until exit condition (4 args) vs break_on (1 arg)
     # We need break_on's _eval_condition(str) to return True.
     # repeat_until calls the static _eval_condition(sensor, field, op, value) which
     # is a different signature — patch the instance method to handle both.
-    original_static = BehaviorRunner._eval_condition.__func__ if hasattr(
+    BehaviorRunner._eval_condition.__func__ if hasattr(
         BehaviorRunner._eval_condition, "__func__"
     ) else None
 

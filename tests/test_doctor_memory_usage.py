@@ -8,6 +8,7 @@ from castor.doctor import check_memory_usage, run_all_checks
 
 # ── return shape ──────────────────────────────────────────────────────────────
 
+
 def test_check_memory_usage_returns_tuple():
     result = check_memory_usage()
     assert isinstance(result, tuple)
@@ -31,6 +32,7 @@ def test_check_memory_usage_third_element_is_string():
 
 # ── normal case (<85%) ────────────────────────────────────────────────────────
 
+
 def test_check_memory_usage_ok_low_usage():
     fake_meminfo = "MemTotal: 8000000 kB\nMemAvailable: 7000000 kB\n"
     with patch("builtins.open", mock_open(read_data=fake_meminfo)):
@@ -49,6 +51,7 @@ def test_check_memory_usage_detail_contains_percent():
 
 
 # ── warning case (>=85%) ──────────────────────────────────────────────────────
+
 
 def test_check_memory_usage_warn_high_usage():
     # 90% used: total=1000000, avail=100000
@@ -70,6 +73,7 @@ def test_check_memory_usage_warn_message_has_85(caplog):
 
 # ── fallback paths ────────────────────────────────────────────────────────────
 
+
 def test_check_memory_usage_no_proc_uses_fallback():
     """When /proc/meminfo unavailable, falls back to psutil or resource."""
     with patch("os.path.exists", return_value=False):
@@ -87,6 +91,7 @@ def test_check_memory_usage_psutil_fallback(monkeypatch):
     with patch("os.path.exists", return_value=False):
         try:
             import importlib.util
+
             if importlib.util.find_spec("psutil") is None:
                 pytest.skip("psutil not available")
             with patch("psutil.virtual_memory", return_value=vm):
@@ -98,6 +103,7 @@ def test_check_memory_usage_psutil_fallback(monkeypatch):
 
 # ── never raises ─────────────────────────────────────────────────────────────
 
+
 def test_check_memory_usage_never_raises():
     try:
         check_memory_usage()
@@ -106,6 +112,7 @@ def test_check_memory_usage_never_raises():
 
 
 # ── integration with run_all_checks ──────────────────────────────────────────
+
 
 def test_run_all_checks_includes_memory_usage():
     results = run_all_checks()

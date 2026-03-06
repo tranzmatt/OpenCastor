@@ -193,7 +193,6 @@ class TestHASPCA9685:
 
     def test_defaults_to_false_when_adafruit_missing(self):
         with patch.dict("sys.modules", {"adafruit_pca9685": None, "board": None, "busio": None}):
-
             import castor.calibrate as m
 
             # The module-level flag is set at import time; assert it's bool

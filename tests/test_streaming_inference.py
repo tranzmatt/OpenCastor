@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
 from castor.inference.streaming import (
-    StreamingInferenceLoop,
-    StreamingStats,
     _DEFAULT_FPS,
     _DEFAULT_MIN_CONFIDENCE,
     _MAX_FPS,
+    StreamingInferenceLoop,
+    StreamingStats,
 )
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -73,9 +72,7 @@ def test_not_running_initially():
 
 def test_from_config_reads_fps():
     config = {"agent": {"streaming": {"fps": 5, "min_confidence": 0.9}}}
-    loop = StreamingInferenceLoop.from_config(
-        config, AsyncMock(), AsyncMock(), AsyncMock()
-    )
+    loop = StreamingInferenceLoop.from_config(config, AsyncMock(), AsyncMock(), AsyncMock())
     assert loop.fps == 5.0
     assert loop.min_confidence == 0.9
 
@@ -88,9 +85,7 @@ def test_from_config_uses_defaults_when_missing():
 
 def test_from_config_dry_run():
     config = {"agent": {"streaming": {"dry_run": True}}}
-    loop = StreamingInferenceLoop.from_config(
-        config, AsyncMock(), AsyncMock(), AsyncMock()
-    )
+    loop = StreamingInferenceLoop.from_config(config, AsyncMock(), AsyncMock(), AsyncMock())
     assert loop.dry_run is True
 
 
@@ -194,7 +189,6 @@ async def test_stats_reset_on_restart():
     await loop.start()
     await asyncio.sleep(0.05)
     await loop.stop()
-    old_frames = loop.stats.frames_captured
     await loop.start()
     assert loop.stats.frames_captured == 0  # reset on restart
     await loop.stop()

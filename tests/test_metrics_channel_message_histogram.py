@@ -12,6 +12,7 @@ def registry():
 
 # ── basic return shape ────────────────────────────────────────────────────────
 
+
 def test_channel_message_histogram_returns_dict(registry):
     result = registry.channel_message_histogram()
     assert isinstance(result, dict)
@@ -34,6 +35,7 @@ def test_channel_message_histogram_empty_when_no_messages(registry):
 
 # ── bucket keys ───────────────────────────────────────────────────────────────
 
+
 def test_histogram_has_inf_bucket(registry):
     result = registry.channel_message_histogram()
     assert "+Inf" in result["buckets"]
@@ -48,6 +50,7 @@ def test_histogram_has_numeric_buckets(registry):
 
 
 # ── after recording messages ──────────────────────────────────────────────────
+
 
 def test_per_channel_count_after_recording(registry):
     registry.record_channel_message("whatsapp")
@@ -75,6 +78,7 @@ def test_inf_bucket_equals_total_channels(registry):
 
 # ── bucket cumulative counting ────────────────────────────────────────────────
 
+
 def test_bucket_1_includes_channels_with_1_message(registry):
     registry.record_channel_message("single")
     result = registry.channel_message_histogram()
@@ -98,6 +102,7 @@ def test_bucket_1_excludes_channels_with_10_messages(registry):
 
 # ── count increments with each call ──────────────────────────────────────────
 
+
 def test_count_increments_each_record(registry):
     registry.record_channel_message("slack")
     r1 = registry.channel_message_histogram()
@@ -107,6 +112,7 @@ def test_count_increments_each_record(registry):
 
 
 # ── never raises ─────────────────────────────────────────────────────────────
+
 
 def test_channel_message_histogram_never_raises(registry):
     try:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-
 # ── push_to_gateway function ──────────────────────────────────────────────────
 
 
@@ -24,7 +23,7 @@ def test_push_to_gateway_returns_false_empty_url(monkeypatch):
 
 def test_push_to_gateway_uses_env_url(monkeypatch):
     monkeypatch.setenv("CASTOR_PROMETHEUS_PUSHGATEWAY", "http://localhost:9091")
-    from castor.metrics import push_to_gateway, get_registry
+    from castor.metrics import push_to_gateway
 
     mock_resp = MagicMock()
     mock_resp.status = 200
@@ -50,8 +49,9 @@ def test_push_to_gateway_explicit_url():
 
 
 def test_push_to_gateway_http_error_returns_false():
-    from castor.metrics import push_to_gateway
     import urllib.error
+
+    from castor.metrics import push_to_gateway
 
     with patch(
         "urllib.request.urlopen",

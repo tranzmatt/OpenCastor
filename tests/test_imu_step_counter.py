@@ -12,6 +12,7 @@ def imu():
 
 # ── basic return shape ────────────────────────────────────────────────────────
 
+
 def test_step_counter_returns_dict(imu):
     result = imu.step_counter()
     assert isinstance(result, dict)
@@ -51,6 +52,7 @@ def test_step_counter_steps_non_negative(imu):
 
 # ── parameter passing ─────────────────────────────────────────────────────────
 
+
 def test_step_counter_custom_threshold(imu):
     result = imu.step_counter(threshold_g=1.5)
     assert abs(result["threshold_g"] - 1.5) < 1e-6
@@ -69,6 +71,7 @@ def test_step_counter_default_threshold_from_driver(imu):
 
 # ── mock mode always 0 steps ──────────────────────────────────────────────────
 
+
 def test_step_counter_mock_mode_returns_zero(imu):
     if imu._mode == "mock":
         result = imu.step_counter()
@@ -83,6 +86,7 @@ def test_step_counter_multiple_calls_stable_in_mock(imu):
 
 
 # ── reset_step_counter ────────────────────────────────────────────────────────
+
 
 def test_reset_step_counter_returns_none(imu):
     assert imu.reset_step_counter() is None
@@ -108,6 +112,7 @@ def test_reset_then_step_counter_returns_zero(imu):
 
 
 # ── never raises ─────────────────────────────────────────────────────────────
+
 
 def test_step_counter_never_raises(imu):
     try:

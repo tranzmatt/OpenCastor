@@ -1,8 +1,6 @@
 """Tests for BehaviorRunner._step_countdown (Issue #423)."""
 
-import threading
-import time
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -129,7 +127,6 @@ def test_countdown_speak_true_no_speaker_does_not_raise(runner):
 def test_countdown_stops_early_when_running_false(runner):
     """When _running is set to False mid-countdown, iteration stops early."""
     counts_seen = []
-    original_sleep = time.sleep
 
     def fake_sleep(s):
         # After the first sleep, stop the runner

@@ -127,9 +127,7 @@ def test_readings_within_window(imu):
     after = time.time()
     cutoff = before - window_s
     for entry in result["readings"]:
-        assert entry["ts"] >= cutoff, (
-            f"ts {entry['ts']} is older than cutoff {cutoff}"
-        )
+        assert entry["ts"] >= cutoff, f"ts {entry['ts']} is older than cutoff {cutoff}"
         assert entry["ts"] <= after + 1, (
             f"ts {entry['ts']} is in the future relative to call time {after}"
         )

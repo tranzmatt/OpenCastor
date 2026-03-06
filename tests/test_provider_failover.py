@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from castor.providers.failover import (
-    ProviderFailoverChain,
-    FallbackSpec,
     FailoverResult,
+    FallbackSpec,
+    ProviderFailoverChain,
 )
 
 
@@ -28,12 +28,16 @@ def make_async_provider(response: str = "ok", raises: Exception | None = None):
     """Create a mock async provider."""
     mock = MagicMock()
     if raises:
+
         async def _think(*a, **kw):
             raise raises
+
         mock.think = _think
     else:
+
         async def _think(*a, **kw):
             return response
+
         mock.think = _think
     return mock
 

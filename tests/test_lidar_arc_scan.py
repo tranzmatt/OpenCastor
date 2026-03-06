@@ -50,9 +50,7 @@ def test_arc_scan_readings_within_arc():
     d = _make_driver()
     result = d.arc_scan(start_deg=50.0, end_deg=150.0)
     for r in result["readings"]:
-        assert 50.0 <= r["angle_deg"] <= 150.0, (
-            f"angle {r['angle_deg']} outside arc [50, 150]"
-        )
+        assert 50.0 <= r["angle_deg"] <= 150.0, f"angle {r['angle_deg']} outside arc [50, 150]"
 
 
 def test_arc_scan_full_arc_returns_all_readings():

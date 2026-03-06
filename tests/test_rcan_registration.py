@@ -2,16 +2,10 @@
 
 from __future__ import annotations
 
-import asyncio
-import json
-import os
-from pathlib import Path
+import pathlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pathlib
 import pytest
-import yaml
-
 
 # ---------------------------------------------------------------------------
 # _print_manual_registration_url
@@ -168,18 +162,30 @@ async def test_registry_client_register_returns_rrn():
 
 
 def test_cli_register_subcommand_exists():
-    import subprocess, sys
+    import subprocess
+    import sys
+
     result = subprocess.run(
         [sys.executable, "-m", "castor.cli", "register", "--help"],
-        capture_output=True, text=True, cwd=str(pathlib.Path(__file__).parent.parent),
+        capture_output=True,
+        text=True,
+        cwd=str(pathlib.Path(__file__).parent.parent),
     )
     assert "rcan.dev" in result.stdout or "register" in result.stdout.lower()
 
 
 def test_cli_compliance_subcommand_exists():
-    import subprocess, sys
+    import subprocess
+    import sys
+
     result = subprocess.run(
         [sys.executable, "-m", "castor.cli", "compliance", "--help"],
-        capture_output=True, text=True, cwd=str(pathlib.Path(__file__).parent.parent),
+        capture_output=True,
+        text=True,
+        cwd=str(pathlib.Path(__file__).parent.parent),
     )
-    assert "conformance" in result.stdout.lower() or "rcan" in result.stdout.lower() or result.returncode == 0
+    assert (
+        "conformance" in result.stdout.lower()
+        or "rcan" in result.stdout.lower()
+        or result.returncode == 0
+    )

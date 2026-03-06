@@ -11,14 +11,15 @@ from castor.rate_limiting import (
     init_limiter,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 
-def make_limiter(endpoint: str = "/api/command", per_ip: int = 5, window_s: float = 60.0) -> RateLimiter:
-    config = RateLimitConfig(limits=[
-        EndpointLimit(endpoint=endpoint, per_ip=per_ip, per_user=0, window_s=window_s)
-    ])
+def make_limiter(
+    endpoint: str = "/api/command", per_ip: int = 5, window_s: float = 60.0
+) -> RateLimiter:
+    config = RateLimitConfig(
+        limits=[EndpointLimit(endpoint=endpoint, per_ip=per_ip, per_user=0, window_s=window_s)]
+    )
     return RateLimiter(config)
 
 
@@ -71,10 +72,12 @@ def test_reset_clears_counters():
 
 def test_per_endpoint_limits():
     """Different endpoints have independent counters."""
-    config = RateLimitConfig(limits=[
-        EndpointLimit(endpoint="/api/a", per_ip=2, per_user=0, window_s=60),
-        EndpointLimit(endpoint="/api/b", per_ip=2, per_user=0, window_s=60),
-    ])
+    config = RateLimitConfig(
+        limits=[
+            EndpointLimit(endpoint="/api/a", per_ip=2, per_user=0, window_s=60),
+            EndpointLimit(endpoint="/api/b", per_ip=2, per_user=0, window_s=60),
+        ]
+    )
     limiter = RateLimiter(config)
 
     # Exhaust /api/a
@@ -132,6 +135,7 @@ def test_get_limiter_returns_singleton():
 def test_get_limiter_returns_none_before_init(monkeypatch):
     """get_limiter returns None if never initialised."""
     import castor.rate_limiting as rl
+
     monkeypatch.setattr(rl, "_default_limiter", None)
     assert get_limiter() is None
 
@@ -141,9 +145,9 @@ def test_get_limiter_returns_none_before_init(monkeypatch):
 
 def test_per_user_limit():
     """Per-user limit is enforced independently from per-IP."""
-    config = RateLimitConfig(limits=[
-        EndpointLimit(endpoint="/api/cmd", per_ip=0, per_user=3, window_s=60)
-    ])
+    config = RateLimitConfig(
+        limits=[EndpointLimit(endpoint="/api/cmd", per_ip=0, per_user=3, window_s=60)]
+    )
     limiter = RateLimiter(config)
     for _ in range(3):
         limiter.check(endpoint="/api/cmd", user="alice")

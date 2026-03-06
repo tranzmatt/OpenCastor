@@ -4,14 +4,10 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from castor.rcan.commitment_chain import CommitmentChain, get_commitment_chain, reset_chain
-
 
 SECRET = "test-secret-for-chain"
 
@@ -172,16 +168,17 @@ def test_singleton_returns_same_instance(tmp_path):
 
 def test_disabled_when_rcan_missing(tmp_path):
     import sys
+
     # Temporarily hide the rcan package
     rcan_mod = sys.modules.pop("rcan", None)
     rcan_audit = sys.modules.pop("rcan.audit", None)
-    rcan_address = sys.modules.pop("rcan.address", None)
-    rcan_exceptions = sys.modules.pop("rcan.exceptions", None)
+    sys.modules.pop("rcan.address", None)
+    sys.modules.pop("rcan.exceptions", None)
     try:
         with patch.dict("sys.modules", {"rcan": None, "rcan.audit": None}):
             chain = CommitmentChain(secret=SECRET, log_path=tmp_path / "c.jsonl")
             # Should gracefully disable
-            result = chain.append_action("move", {})
+            chain.append_action("move", {})
             # Returns None or record — either is acceptable (non-fatal)
     finally:
         if rcan_mod:

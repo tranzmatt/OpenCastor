@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
-import statistics
 from unittest.mock import AsyncMock
 
 import pytest
 
-from castor.benchmarker import BenchmarkResult, run_benchmark, print_results
-
+from castor.benchmarker import BenchmarkResult, print_results, run_benchmark
 
 # ── BenchmarkResult stats ──────────────────────────────────────────────────────
 

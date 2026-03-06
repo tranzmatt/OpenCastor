@@ -1,4 +1,5 @@
 """Tests for ProviderPool.latency_percentiles() — Issue #414."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest

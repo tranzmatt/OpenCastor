@@ -12,6 +12,7 @@ def detector():
 
 # ── instantiation ─────────────────────────────────────────────────────────────
 
+
 def test_wakeword_detector_instantiates():
     d = WakeWordDetector()
     assert d is not None
@@ -40,6 +41,7 @@ def test_wakeword_detector_detections_start_zero(detector):
 
 
 # ── status() ─────────────────────────────────────────────────────────────────
+
 
 def test_status_returns_dict(detector):
     result = detector.status
@@ -72,6 +74,7 @@ def test_status_detections_zero_initially(detector):
 
 
 # ── start() / stop() ─────────────────────────────────────────────────────────
+
 
 def test_start_sets_active_true(detector):
     try:
@@ -119,6 +122,7 @@ def test_status_active_false_after_stop(detector):
 
 
 # ── callback ─────────────────────────────────────────────────────────────────
+
 
 def test_start_with_callback_does_not_raise(detector):
     called = []

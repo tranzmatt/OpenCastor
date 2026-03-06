@@ -12,6 +12,7 @@ def imu():
 
 # ── basic return shape ────────────────────────────────────────────────────────
 
+
 def test_calibrate_returns_dict(imu):
     result = imu.calibrate_step_threshold()
     assert isinstance(result, dict)
@@ -45,6 +46,7 @@ def test_calibrate_threshold_g_is_float_or_none(imu):
 
 # ── mock mode always calibrates ───────────────────────────────────────────────
 
+
 def test_calibrate_mock_mode_returns_calibrated_true(imu):
     if imu._mode == "mock":
         result = imu.calibrate_step_threshold()
@@ -72,6 +74,7 @@ def test_calibrate_mock_threshold_above_noise_floor(imu):
 
 # ── parameter passing ─────────────────────────────────────────────────────────
 
+
 def test_calibrate_custom_calibration_factor(imu):
     if imu._mode == "mock":
         result = imu.calibrate_step_threshold(calibration_factor=3.0)
@@ -85,6 +88,7 @@ def test_calibrate_custom_n_idle(imu):
 
 
 # ── updates _step_threshold ───────────────────────────────────────────────────
+
 
 def test_calibrate_updates_step_threshold(imu):
     imu.calibrate_step_threshold()
@@ -100,6 +104,7 @@ def test_calibrate_threshold_used_in_step_counter(imu):
 
 # ── state flags ───────────────────────────────────────────────────────────────
 
+
 def test_calibrate_sets_calibrated_attr(imu):
     imu.calibrate_step_threshold()
     assert hasattr(imu, "_calibrated")
@@ -112,6 +117,7 @@ def test_calibrate_initially_not_calibrated(imu):
 
 
 # ── never raises ─────────────────────────────────────────────────────────────
+
 
 def test_calibrate_never_raises(imu):
     try:

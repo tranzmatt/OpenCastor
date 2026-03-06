@@ -5,14 +5,12 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from collections import deque
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from castor.thought_log import ThoughtLog
-
 
 # ---------------------------------------------------------------------------
 # Helpers

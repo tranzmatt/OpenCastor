@@ -32,7 +32,12 @@ def test_rcan_validate_config():
     with open(FIXTURE_PATH) as f:
         config = yaml.safe_load(f)
 
-    valid, errors = validate_config(config)
+    result = validate_config(config)
+    # validate_config returns either a (bool, list) tuple or a ValidationResult object
+    if hasattr(result, "ok"):
+        valid, errors = result.ok, result.issues
+    else:
+        valid, errors = result
     assert valid, f"Validation failed: {errors}"
 
 

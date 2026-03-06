@@ -5,21 +5,19 @@ from __future__ import annotations
 import json
 import textwrap
 from io import StringIO
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from castor.compliance import (
-    ComplianceReport,
     SPEC_VERSION,
+    ComplianceReport,
     _get_opencastor_version,
     _get_rcan_py_version,
     generate_report,
     print_report_json,
     print_report_text,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -34,13 +32,33 @@ MINIMAL_CONFIG = textwrap.dedent(
 )
 
 PASSING_CHECKS = [
-    {"check_id": "safety.estop_configured", "status": "pass", "message": "E-stop configured", "detail": None},
-    {"check_id": "protocol.rcan_v12", "status": "pass", "message": "RCAN v1.2 compliant", "detail": None},
+    {
+        "check_id": "safety.estop_configured",
+        "status": "pass",
+        "message": "E-stop configured",
+        "detail": None,
+    },
+    {
+        "check_id": "protocol.rcan_v12",
+        "status": "pass",
+        "message": "RCAN v1.2 compliant",
+        "detail": None,
+    },
 ]
 
 FAILING_CHECKS = [
-    {"check_id": "safety.estop_configured", "status": "fail", "message": "E-stop not configured", "detail": "Add estop to config"},
-    {"check_id": "protocol.rcan_v12", "status": "pass", "message": "RCAN v1.2 compliant", "detail": None},
+    {
+        "check_id": "safety.estop_configured",
+        "status": "fail",
+        "message": "E-stop not configured",
+        "detail": "Add estop to config",
+    },
+    {
+        "check_id": "protocol.rcan_v12",
+        "status": "pass",
+        "message": "RCAN v1.2 compliant",
+        "detail": None,
+    },
 ]
 
 
@@ -120,14 +138,15 @@ def test_generate_report_uses_config(tmp_path):
     config_file = tmp_path / "robot.rcan.yaml"
     config_file.write_text(MINIMAL_CONFIG)
 
-    mock_checks = [
+    [
         MagicMock(check_id="c1", status="pass", message="ok", detail=None),
     ]
 
     with (
-        patch("castor.compliance._run_conformance_checks", return_value=[
-            {"check_id": "c1", "status": "pass", "message": "ok", "detail": None}
-        ]),
+        patch(
+            "castor.compliance._run_conformance_checks",
+            return_value=[{"check_id": "c1", "status": "pass", "message": "ok", "detail": None}],
+        ),
         patch("castor.compliance._get_rcan_py_version", return_value="0.1.0"),
         patch("castor.compliance._get_opencastor_version", return_value="2026.3.3.0"),
     ):

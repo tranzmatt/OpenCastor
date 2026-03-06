@@ -1,4 +1,5 @@
 """Tests for BehaviorRunner._step_wait_for_event (Issue #419)."""
+
 import threading
 import time
 from unittest.mock import MagicMock

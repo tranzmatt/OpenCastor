@@ -26,12 +26,14 @@ def mem_with_data(mem):
 
 # ── empty memory raises ───────────────────────────────────────────────────────
 
+
 def test_cluster_episodes_empty_raises(mem):
     with pytest.raises(ValueError, match="no episodes"):
         mem.cluster_episodes()
 
 
 # ── basic return shape ────────────────────────────────────────────────────────
+
 
 def test_cluster_episodes_returns_dict(mem_with_data):
     result = mem_with_data.cluster_episodes(n_clusters=3)
@@ -40,8 +42,15 @@ def test_cluster_episodes_returns_dict(mem_with_data):
 
 def test_cluster_episodes_has_required_keys(mem_with_data):
     result = mem_with_data.cluster_episodes(n_clusters=2)
-    for key in ("labels", "centroids", "episode_ids", "representative_ids",
-                "n_clusters", "n_episodes", "action_types"):
+    for key in (
+        "labels",
+        "centroids",
+        "episode_ids",
+        "representative_ids",
+        "n_clusters",
+        "n_episodes",
+        "action_types",
+    ):
         assert key in result, f"missing key: {key}"
 
 
@@ -82,6 +91,7 @@ def test_cluster_episodes_action_types_list(mem_with_data):
 
 # ── labels are valid cluster indices ─────────────────────────────────────────
 
+
 def test_cluster_episodes_labels_are_valid_indices(mem_with_data):
     result = mem_with_data.cluster_episodes(n_clusters=3)
     k = result["n_clusters"]
@@ -90,6 +100,7 @@ def test_cluster_episodes_labels_are_valid_indices(mem_with_data):
 
 
 # ── representative_ids ────────────────────────────────────────────────────────
+
 
 def test_cluster_episodes_representative_ids_has_entries(mem_with_data):
     result = mem_with_data.cluster_episodes(n_clusters=2)
@@ -104,6 +115,7 @@ def test_cluster_episodes_representative_ids_are_valid_episode_ids(mem_with_data
 
 
 # ── parameter edge cases ──────────────────────────────────────────────────────
+
 
 def test_cluster_episodes_n_clusters_1(mem_with_data):
     result = mem_with_data.cluster_episodes(n_clusters=1)
@@ -123,12 +135,14 @@ def test_cluster_episodes_unsupported_by_raises(mem_with_data):
 
 # ── limit param ───────────────────────────────────────────────────────────────
 
+
 def test_cluster_episodes_limit_restricts_episodes(mem_with_data):
     result = mem_with_data.cluster_episodes(n_clusters=2, limit=3)
     assert result["n_episodes"] <= 3
 
 
 # ── reproducibility ───────────────────────────────────────────────────────────
+
 
 def test_cluster_episodes_same_seed_reproducible(mem_with_data):
     r1 = mem_with_data.cluster_episodes(n_clusters=2, random_seed=42)

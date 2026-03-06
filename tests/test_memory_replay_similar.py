@@ -15,8 +15,12 @@ from castor.memory import EpisodeMemory
 def mem(tmp_path):
     db = str(tmp_path / "mem.db")
     m = EpisodeMemory(db_path=db, max_episodes=0)
-    m.log_episode(instruction="move forward quickly", raw_thought="go ahead", action={"type": "move"})
-    m.log_episode(instruction="turn left sharply", raw_thought="rotate left", action={"type": "move"})
+    m.log_episode(
+        instruction="move forward quickly", raw_thought="go ahead", action={"type": "move"}
+    )
+    m.log_episode(
+        instruction="turn left sharply", raw_thought="rotate left", action={"type": "move"}
+    )
     m.log_episode(instruction="stop the robot now", raw_thought="halt", action={"type": "stop"})
     return m
 
@@ -25,9 +29,13 @@ def mem(tmp_path):
 def mem_with_embeddings(tmp_path):
     db = str(tmp_path / "embed.db")
     m = EpisodeMemory(db_path=db, max_episodes=0)
-    ep1 = m.log_episode(instruction="drive forward", raw_thought="move ahead", action={"type": "move"})
+    ep1 = m.log_episode(
+        instruction="drive forward", raw_thought="move ahead", action={"type": "move"}
+    )
     ep2 = m.log_episode(instruction="rotate left", raw_thought="turn", action={"type": "move"})
-    ep3 = m.log_episode(instruction="emergency stop", raw_thought="halt now", action={"type": "stop"})
+    ep3 = m.log_episode(
+        instruction="emergency stop", raw_thought="halt now", action={"type": "stop"}
+    )
     embeddings = {ep1: [1.0, 0.0, 0.0], ep2: [0.0, 1.0, 0.0], ep3: [0.0, 0.0, 1.0]}
     con = sqlite3.connect(db)
     for ep_id, vec in embeddings.items():

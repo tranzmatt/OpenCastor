@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from castor.doctor import check_rcan_compliance_version, run_all_checks
 

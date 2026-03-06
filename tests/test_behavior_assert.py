@@ -97,7 +97,9 @@ def test_assert_fail_warn_does_not_stop(caplog):
     with caplog.at_level(logging.WARNING, logger="OpenCastor.Behaviors"):
         runner._step_assert({"condition": "0 > 1", "on_fail": "warn"})
     assert runner._running is True
-    assert any("failed" in r.message.lower() or "assert" in r.message.lower() for r in caplog.records)
+    assert any(
+        "failed" in r.message.lower() or "assert" in r.message.lower() for r in caplog.records
+    )
 
 
 # ── $var substitution ─────────────────────────────────────────────────────────
