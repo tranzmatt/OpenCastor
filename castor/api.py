@@ -1218,15 +1218,33 @@ async def get_peers():
 # ---------------------------------------------------------------------------
 @app.post("/rcan", dependencies=[Depends(verify_token)])
 async def rcan_message_endpoint(request: Request):
-    """Unified RCAN message endpoint.  Accepts an RCANMessage JSON body."""
+    """Unified RCAN message endpoint.
+
+    Accepts two formats:
+      - **RCAN v1.2 spec format** (rcan-py SDK): ``{"rcan": "1.2", "cmd": ..., "target": "rcan://...", ...}``
+      - **OpenCastor internal format**: ``{"msg_type": 3, "source": ..., ...}``
+
+    Spec-format messages are bridged to OpenCastor's router transparently.
+    """
     if not state.rcan_router:
         raise HTTPException(status_code=501, detail="RCAN router not initialized")
 
     body = await request.json()
     try:
-        from castor.rcan.message import RCANMessage
+        from castor.rcan.sdk_bridge import parse_inbound, spec_message_to_opencastor
 
-        msg = RCANMessage.from_dict(body)
+        parsed = parse_inbound(body)
+
+        # Spec format → bridge to OpenCastor message
+        try:
+            from rcan import RCANMessage as SpecMsg
+            if isinstance(parsed, SpecMsg):
+                msg = spec_message_to_opencastor(parsed)
+            else:
+                msg = parsed
+        except ImportError:
+            msg = parsed
+
         principal = getattr(request.state, "principal", None)
         response = state.rcan_router.route(msg, principal)
         return response.to_dict()

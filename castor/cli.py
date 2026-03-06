@@ -394,6 +394,26 @@ def cmd_doctor(args) -> None:
 
         run_auto_fix(results, config_path=args.config)
 
+    # RCAN v1.2 spec compliance check
+    try:
+        import yaml
+        config_path = getattr(args, "config", None) or "robot.rcan.yaml"
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+        from castor.rcan.sdk_bridge import check_compliance
+        issues = check_compliance(config)
+        print("  RCAN v1.2 Compliance\n")
+        if issues:
+            for issue in issues:
+                print(f"    ⚠  {issue}")
+        else:
+            print("    ✅ Fully compliant with RCAN v1.2 spec")
+        print()
+    except FileNotFoundError:
+        pass
+    except Exception as exc:
+        print(f"  RCAN compliance check skipped: {exc}\n")
+
     # Peripheral scan section
     try:
         from castor.peripherals import print_scan_table, scan_all

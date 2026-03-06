@@ -62,6 +62,8 @@ dependencies = [
     # CLI & Demo
     "rich>=13.0.0",
     "argcomplete>=3.0.0",
+    # RCAN Python SDK — official protocol implementation
+    "rcan>=0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -90,6 +92,7 @@ channels = [
 ]
 rcan = [
     "zeroconf>=0.131.0",
+    "rcan>=0.1.0",
 ]
 dynamixel = ["dynamixel-sdk>=3.7.31"]
 esp32 = ["websocket-client>=1.7.0"]
