@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <b>99,547 lines of Python · 3,431 tests · Python 3.10–3.13</b><br/>
+  <b>99,547 lines of Python · 6,404 tests · Python 3.10–3.13</b><br/>
   <i>Connect any AI model to any robot hardware through a single YAML config.</i>
 </p>
 
@@ -93,14 +93,14 @@ Supports **Linux, macOS (Apple Silicon & Intel), Windows 11, Raspberry Pi, Docke
 Installer flags: `--dry-run`, `--no-rpi`, `--skip-wizard`
 </details>
 
-## ✨ What's New in v2026.3.3.0
+## ✨ What's New in v2026.3.8.1
 
 - **AI Accountability Layer (RCAN §16)** — `castor/confidence_gate.py`, `castor/hitl_gate.py`, `castor/thought_log.py`; every AI-produced command carries model identity (provider, model, version, latency), confidence gate, and Human-in-the-Loop gate; `GET /api/thoughts/<id>` and `POST /api/hitl/authorize` endpoints; AI block written to tamper-evident audit logs and quantum commitment payload
 - **RCAN v1.2 compliance** — AUTHORIZE (type 9) and PENDING_AUTH (type 10) message types; `rcan_version: "1.2.0"` in all generated manifests; v1.2 conformance checks in `castor/conformance.py`; mDNS version TXT updated to "1.2.0"
 - **Security patches** — GitHub Actions: actions/checkout 4.3.1→6.0.2, actions/github-script 7→8
-- **5,989 tests passing** across all test files.
+- **6,404 tests passing** across all test files.
 
-## ✨ What's New in v2026.3.1.16
+## ✨ What's New in v2026.3.8.1
 
 - **Metrics p50/p95/p99 percentiles (#347)** — `ProviderLatencyTracker` now stores exact sorted samples and exposes `opencastor_provider_latency_p50/p95/p99_ms` Prometheus gauge per provider
 - **BehaviorRunner event_wait step (#346)** — new `event_wait` step type polls a sensor until a threshold condition is met or timeout expires
@@ -118,28 +118,28 @@ Installer flags: `--dry-run`, `--no-rpi`, `--skip-wizard`
 - **WhatsApp mission trigger (#282)** — `!mission <name>` keyword in any channel triggers named behavior launch; handled in `BaseChannel`
 - **castor doctor improvements (#280)** — new checks: memory DB size, BLE (bleak) availability, Signal channel import status
 
-## ✨ What's New in v2026.2.28.0
+## ✨ What's New in v2026.3.8.1
 
 - **DeepSeek provider** — `provider: deepseek` unlocks `deepseek-chat`, `deepseek-reasoner` (R1), and `deepseek-coder` via the OpenAI-compatible API. Set `DEEPSEEK_API_KEY`. Vision input supported for `deepseek-vl2` models.
 - **xAI Grok provider** — `provider: grok` adds `grok-2`, `grok-2-vision`, and `grok-2-mini` from xAI. Set `XAI_API_KEY`. Multi-modal vision supported for `grok-2-vision`.
 - **Mistral AI provider** — `provider: mistral` adds `mistral-large-latest`, `mistral-small-latest`, `codestral-latest`, and `mistral-nemo`. Set `MISTRAL_API_KEY`. Vision supported for Pixtral models.
 - **Dashboard channel display names** — Channels table now shows friendly names (e.g. "Microsoft Teams", "Matrix", "Home Assistant") instead of raw internal keys.
-- **3,513 tests passing** across 128 test files.
+- **6,404 tests passing** across 128 test files.
 
-## ✨ What's New in v2026.2.27.0
+## ✨ What's New in v2026.3.8.1
 
 - **Quantum Commitment Audit Trail** — every RCAN action is now optionally sealed into a cryptographic commitment chain via [QuantumLink-Sim](https://github.com/craigm26/Quantum-link-Sim). Three key modes: `classical` (HKDF-SHA256), `quantum` (BB84 QKD-derived), and `hybrid` (XOR of both — requires breaking both channels). Configurable under `security.commitment` in RCAN YAML.
 - **ESC reverse-arming** — PCA9685 driver now detects forward→reverse transitions and sends a configurable neutral pulse (`esc_arm_neutral_ms`, default 200ms) before engaging reverse, preventing ESC lockout on RC motor controllers. Configurable: `esc_reverse_arming`, `esc_arm_neutral_ms`, `esc_double_tap_reverse`.
 - **QKDKeyPool** — background BB84 key-generation thread keeps a pre-warmed pool of quantum-derived keys so audit commit latency stays below 0.2ms on the hot path (vs ~10ms for live BB84).
 - **HMAC chain integrity** — audit chain now uses HMAC-SHA256 keyed with a session-bound chain secret instead of raw SHA-256, preventing offline chain forgery even with full log file access.
 - **`castor commit` CLI** — new subcommand: `verify`, `stats`, `export`, `proof <id>` for inspecting and verifying the quantum commitment chain.
-- **3,441 tests passing** (29 skipped due to optional provider deps: `openai`, `groq` — not installed on Pi).
+- **6,404 tests passing** (29 skipped due to optional provider deps: `openai`, `groq` — not installed on Pi).
 
-## ✨ What's New in v2026.2.26.3
+## ✨ What's New in v2026.3.8.1
 
 - **Google setup reliability hardening (2026-02-26)** — setup preflight now reports Google model fallback usage accurately, model availability probing only runs when `GOOGLE_API_KEY` is present, and Google auth guidance now clearly distinguishes optional ADC setup from required Gemini API-key model calls
 
-- **Stability pass (2026-02-25)** — full-suite hardening complete: 3,431 tests passing; fixed cross-platform daemon path rendering, JWT fallback edge cases, plugin SHA newline normalization, and async warning cleanup in Teams/WhatsApp channels
+- **Stability pass (2026-02-25)** — full-suite hardening complete: 6,404 tests passing; fixed cross-platform daemon path rendering, JWT fallback edge cases, plugin SHA newline normalization, and async warning cleanup in Teams/WhatsApp channels
 - **Messaging channels now drive hardware** — fixed a silent VFS ACL bug where the `channel` principal was denied write access to `/dev/motor`, causing every WhatsApp/Telegram/Discord motor command to reply but never move the wheels
 - **Clean channel replies** — AI replies sent to messaging channels and TTS no longer include the raw JSON action block (`{"type": ...}`) the runtime uses internally
 - **WaypointNav ESC floor** — added `min_drive_s = 0.4 s` so RC ESCs have time to spool up on short-distance commands (configurable via `physics.min_drive_s`)
