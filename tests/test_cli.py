@@ -461,21 +461,20 @@ class TestParserEdgeCases:
         assert args.max_results == 50
 
     def test_install_service_args(self):
-        """install-service accepts --config, --host, --port."""
+        """install-service accepts --config, --dashboard-port, --dry-run."""
         args = self._dispatch_and_capture(
             "castor.cli.cmd_install_service",
             "castor",
             "install-service",
             "--config",
             "my.rcan.yaml",
-            "--host",
-            "0.0.0.0",
-            "--port",
-            "9000",
+            "--dashboard-port",
+            "8502",
+            "--dry-run",
         )
         assert args.config == "my.rcan.yaml"
-        assert args.host == "0.0.0.0"
-        assert args.port == 9000
+        assert args.dashboard_port == 8502
+        assert args.dry_run is True
 
     def test_learn_lesson(self):
         """Learn accepts --lesson."""
@@ -1480,29 +1479,57 @@ class TestCmdUpgrade:
 # cmd_install_service
 # =====================================================================
 class TestCmdInstallService:
-    def test_generates_service_file(self, capsys, tmp_path):
-        """cmd_install_service should write a systemd unit to /tmp/."""
-        args = _make_args(config="robot.rcan.yaml", host="0.0.0.0", port=8080)
-        with patch("getpass.getuser", return_value="testuser"):
-            with patch("os.getcwd", return_value="/home/test"):
-                with patch("os.path.abspath", return_value="/home/test/robot.rcan.yaml"):
-                    with patch("os.path.exists", return_value=True):
-                        cmd_install_service(args)
+    def _mock_daemon(self):
+        """Return a mock castor.daemon module for patching."""
+        mock_daemon = MagicMock()
+        mock_daemon.SERVICE_NAME = "castor-gateway"
+        mock_daemon.SERVICE_PATH = "/etc/systemd/system/castor-gateway.service"
+        mock_daemon.DASHBOARD_SERVICE_NAME = "castor-dashboard"
+        mock_daemon.DASHBOARD_SERVICE_PATH = "/etc/systemd/system/castor-dashboard.service"
+        mock_daemon.enable_daemon.return_value = {
+            "ok": True,
+            "message": "Service enabled and started",
+            "service_path": "/etc/systemd/system/castor-gateway.service",
+        }
+        mock_daemon.enable_dashboard.return_value = {
+            "ok": True,
+            "message": "Dashboard service enabled and started",
+            "service_path": "/etc/systemd/system/castor-dashboard.service",
+        }
+        return mock_daemon
+
+    def test_installs_both_services(self, capsys, tmp_path):
+        """cmd_install_service installs gateway and dashboard services."""
+        config = tmp_path / "robot.rcan.yaml"
+        config.write_text("rcan_version: 1.0\n")
+        args = _make_args(config=str(config), dashboard_port=8501, dry_run=False)
+        with patch.dict("sys.modules", {"castor.daemon": self._mock_daemon()}):
+            cmd_install_service(args)
         out = capsys.readouterr().out
-        assert "Service file written" in out
-        assert "testuser" in out
+        assert "gateway" in out.lower()
+        assert "dashboard" in out.lower()
         assert "systemctl" in out
 
-    def test_contains_port(self, capsys):
-        """The service file should reference the correct port."""
-        args = _make_args(config="robot.rcan.yaml", host="127.0.0.1", port=9090)
-        with patch("getpass.getuser", return_value="user"):
-            with patch("os.getcwd", return_value="/tmp"):
-                with patch("os.path.abspath", return_value="/tmp/robot.rcan.yaml"):
-                    with patch("os.path.exists", return_value=True):
-                        cmd_install_service(args)
+    def test_missing_config(self, capsys, tmp_path):
+        """cmd_install_service reports error when config not found."""
+        args = _make_args(config=str(tmp_path / "missing.rcan.yaml"), dashboard_port=8501, dry_run=False)
+        cmd_install_service(args)
         out = capsys.readouterr().out
-        assert "9090" in out
+        assert "Config not found" in out
+
+    def test_dry_run_prints_service_files(self, capsys, tmp_path):
+        """--dry-run prints generated service file content without installing."""
+        config = tmp_path / "robot.rcan.yaml"
+        config.write_text("rcan_version: 1.0\n")
+        args = _make_args(config=str(config), dashboard_port=8501, dry_run=True)
+        mock_daemon = self._mock_daemon()
+        mock_daemon.generate_service_file.return_value = "[Unit]\nDescription=gateway\n"
+        mock_daemon.generate_dashboard_service_file.return_value = "[Unit]\nDescription=dashboard\n"
+        with patch.dict("sys.modules", {"castor.daemon": mock_daemon}):
+            cmd_install_service(args)
+        out = capsys.readouterr().out
+        assert "dry-run" in out
+        assert "dashboard" in out.lower()
 
 
 # =====================================================================

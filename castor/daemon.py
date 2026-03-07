@@ -22,6 +22,8 @@ import yaml
 
 SERVICE_NAME = "castor-gateway"
 SERVICE_PATH = Path(f"/etc/systemd/system/{SERVICE_NAME}.service")
+DASHBOARD_SERVICE_NAME = "castor-dashboard"
+DASHBOARD_SERVICE_PATH = Path(f"/etc/systemd/system/{DASHBOARD_SERVICE_NAME}.service")
 SECURITY_INSTALL_PATH = Path("/etc/opencastor/security")
 
 
@@ -381,6 +383,109 @@ def daemon_security_status() -> dict:
                 break
 
     return status
+
+
+# ── Dashboard service ─────────────────────────────────────────────────────────
+
+
+def generate_dashboard_service_file(
+    user: Optional[str] = None,
+    venv_path: Optional[str] = None,
+    working_dir: Optional[str] = None,
+    port: int = 8501,
+) -> str:
+    """Generate a systemd .service file for the CastorDash Streamlit dashboard."""
+    user = user or os.environ.get("USER", "pi")
+    venv_root = _systemd_path(venv_path or sys.prefix).rstrip("/")
+    streamlit_bin = f"{venv_root}/bin/streamlit"
+    castor_pkg = Path(__file__).resolve().parent
+    dashboard_py = str(castor_pkg / "dashboard.py")
+    workdir = _systemd_path(working_dir or str(castor_pkg.parent))
+
+    return f"""\
+[Unit]
+Description=OpenCastor Dashboard (CastorDash)
+Documentation=https://docs.opencastor.com
+After=network-online.target {SERVICE_NAME}.service
+Wants=network-online.target
+PartOf={SERVICE_NAME}.service
+
+[Service]
+Type=simple
+User={user}
+WorkingDirectory={workdir}
+Environment=PYTHONUNBUFFERED=1
+ExecStart={streamlit_bin} run {dashboard_py} \\
+    --server.port {port} \\
+    --server.address 0.0.0.0 \\
+    --server.headless true \\
+    --server.fileWatcherType none
+Restart=always
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier={DASHBOARD_SERVICE_NAME}
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+def enable_dashboard(
+    user: Optional[str] = None,
+    venv_path: Optional[str] = None,
+    working_dir: Optional[str] = None,
+    port: int = 8501,
+) -> dict:
+    """Install and enable the CastorDash systemd service.
+
+    Returns a status dict with ``ok``, ``message``, and ``service_path``.
+    """
+    service_content = generate_dashboard_service_file(user, venv_path, working_dir, port)
+
+    try:
+        DASHBOARD_SERVICE_PATH.write_text(service_content)
+    except PermissionError:
+        proc = subprocess.run(
+            ["sudo", "tee", str(DASHBOARD_SERVICE_PATH)],
+            input=service_content.encode(),
+            capture_output=True,
+        )
+        if proc.returncode != 0:
+            return {
+                "ok": False,
+                "message": f"Could not write dashboard service file: {proc.stderr.decode()}",
+            }
+
+    _run(["sudo", "systemctl", "daemon-reload"])
+    _run(["sudo", "systemctl", "enable", DASHBOARD_SERVICE_NAME])
+    result = _run(["sudo", "systemctl", "start", DASHBOARD_SERVICE_NAME])
+
+    return {
+        "ok": result.returncode == 0,
+        "message": "Dashboard service enabled and started"
+        if result.returncode == 0
+        else result.stderr.decode(),
+        "service_path": str(DASHBOARD_SERVICE_PATH),
+    }
+
+
+def disable_dashboard() -> dict:
+    """Stop and disable the dashboard service, and remove the service file."""
+    _run(["sudo", "systemctl", "stop", DASHBOARD_SERVICE_NAME])
+    _run(["sudo", "systemctl", "disable", DASHBOARD_SERVICE_NAME])
+
+    removed = False
+    if DASHBOARD_SERVICE_PATH.exists():
+        try:
+            DASHBOARD_SERVICE_PATH.unlink()
+            removed = True
+        except PermissionError:
+            result = _run(["sudo", "rm", "-f", str(DASHBOARD_SERVICE_PATH)])
+            removed = result.returncode == 0
+
+    _run(["sudo", "systemctl", "daemon-reload"])
+    return {"ok": True, "removed": removed, "message": "Dashboard service stopped and disabled"}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

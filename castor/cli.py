@@ -2068,42 +2068,56 @@ def cmd_improve(args) -> None:
 
 
 def cmd_install_service(args) -> None:
-    """castor install-service — generate and install a systemd service unit."""
-    import getpass
+    """castor install-service — install systemd services for gateway and dashboard."""
     import os
-    import sys
+
+    from castor.daemon import (
+        DASHBOARD_SERVICE_NAME,
+        DASHBOARD_SERVICE_PATH,
+        SERVICE_NAME,
+        SERVICE_PATH,
+        enable_daemon,
+        enable_dashboard,
+    )
 
     config_path = getattr(args, "config", "robot.rcan.yaml")
-    host = getattr(args, "host", "0.0.0.0")
-    port = getattr(args, "port", 8080)
+    dashboard_port = getattr(args, "dashboard_port", 8501)
+    dry_run = getattr(args, "dry_run", False)
+
     abs_config = os.path.abspath(config_path)
     if not os.path.exists(abs_config):
         print(f"  Config not found: {config_path}")
         return
-    user = getpass.getuser()
-    cwd = os.getcwd()
-    unit = f"""[Unit]
-Description=OpenCastor Robot Runtime
-After=network.target
 
-[Service]
-User={user}
-WorkingDirectory={cwd}
-ExecStart={sys.executable} -m castor gateway --config {abs_config} --host {host} --port {port}
-Restart=on-failure
+    if dry_run:
+        from castor.daemon import generate_dashboard_service_file, generate_service_file
 
-[Install]
-WantedBy=multi-user.target
-"""
-    service_path = f"/tmp/opencastor-{port}.service"
-    with open(service_path, "w") as f:
-        f.write(unit)
-    print(f"  Service file written: {service_path}")
-    print(f"  User: {user}")
-    print(f"  Port: {port}")
-    print(
-        f"  To install: sudo cp {service_path} /etc/systemd/system/ && sudo systemctl enable opencastor-{port}"
-    )
+        print(f"  [dry-run] Gateway service → {SERVICE_PATH}")
+        print(generate_service_file(abs_config))
+        print(f"  [dry-run] Dashboard service → {DASHBOARD_SERVICE_PATH}")
+        print(generate_dashboard_service_file(port=dashboard_port))
+        return
+
+    print("  Installing gateway service...")
+    gw = enable_daemon(abs_config)
+    if gw["ok"]:
+        print(f"  Gateway service installed: {gw['service_path']}")
+    else:
+        print(f"  Gateway service failed: {gw['message']}")
+
+    print("  Installing dashboard service...")
+    dash = enable_dashboard(port=dashboard_port)
+    if dash["ok"]:
+        print(f"  Dashboard service installed: {dash['service_path']}")
+        print(f"  Dashboard available at http://localhost:{dashboard_port}")
+    else:
+        print(f"  Dashboard service failed: {dash['message']}")
+
+    if gw["ok"] and dash["ok"]:
+        print("\n  Both services are enabled and will start automatically on boot.")
+        print("  Manage with:")
+        print(f"    sudo systemctl status {SERVICE_NAME}")
+        print(f"    sudo systemctl status {DASHBOARD_SERVICE_NAME}")
 
 
 def cmd_learn(args) -> None:
@@ -2572,13 +2586,17 @@ def main() -> None:
     # castor install-service
     p_svc = sub.add_parser(
         "install-service",
-        help="Generate a systemd service unit file",
+        help="Install systemd services for gateway and dashboard (auto-start on boot)",
         epilog="Example: castor install-service --config robot.rcan.yaml",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_svc.add_argument("--config", default="robot.rcan.yaml", help="RCAN config file")
-    p_svc.add_argument("--host", default="127.0.0.1", help="Bind address")
-    p_svc.add_argument("--port", type=int, default=8000, help="Port number")
+    p_svc.add_argument(
+        "--dashboard-port", type=int, default=8501, help="Dashboard port (default: 8501)"
+    )
+    p_svc.add_argument(
+        "--dry-run", action="store_true", help="Print generated service files without installing"
+    )
 
     # castor status
     sub.add_parser("status", help="Show provider and channel readiness")
