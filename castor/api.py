@@ -4048,7 +4048,18 @@ async def _start_channels():
     """Initialize and start all configured messaging channels."""
     from castor.channels import create_channel, get_ready_channels
 
+    # OPENCASTOR_CHANNELS_DISABLED=whatsapp,telegram  — comma-separated list of
+    # channels to skip even if credentials/session files are present.
+    _disabled = {
+        c.strip().lower()
+        for c in os.getenv("OPENCASTOR_CHANNELS_DISABLED", "").split(",")
+        if c.strip()
+    }
+
     for name in get_ready_channels():
+        if name.lower() in _disabled:
+            logger.info(f"Channel {name} skipped (OPENCASTOR_CHANNELS_DISABLED)")
+            continue
         try:
             channel_cfg = (state.config or {}).get("channels", {}).get(name, {})
             channel = create_channel(name, config=channel_cfg, on_message=_handle_channel_message)
