@@ -31,8 +31,8 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-  /* ── base dark theme ── */
-  .stApp { background-color: #0d1117; color: #e6edf3; }
+  /* ── base light theme ── */
+  .stApp { background-color: #f5f7fa !important; color: #0d0d0d !important; }
   #MainMenu, footer, header { visibility: hidden; }
 
   /* ── desktop padding; tighter on mobile ── */
@@ -47,22 +47,27 @@ st.markdown(
     font-size: 0.95rem !important;
     touch-action: manipulation;
     border-radius: 8px !important;
+    background: #ffffff !important;
+    color: #0d0d0d !important;
+    border: 1px solid #d0d5dd !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
   }
   [data-testid="stChatInput"] textarea { font-size: 1rem !important; }
   [data-testid="stTextInput"] input   { font-size: 1rem !important; min-height: 44px; }
 
-  /* ── D-pad buttons (extra tall, big emoji) ── */
+  /* ── D-pad buttons ── */
   [data-testid="stButton"].dpad > button {
     min-height: 68px !important;
     font-size: 1.5rem !important;
-    background: #161b22 !important;
-    border: 1px solid #30363d !important;
+    background: #ffffff !important;
+    border: 1px solid #d0d5dd !important;
     border-radius: 12px !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.10) !important;
   }
   [data-testid="stButton"].dpad-stop > button {
     min-height: 68px !important;
     font-size: 1.1rem !important;
-    background: #da3633 !important;
+    background: #c00000 !important;
     color: #fff !important;
     border: none !important;
     border-radius: 12px !important;
@@ -70,85 +75,95 @@ st.markdown(
 
   /* ── metric cards ── */
   [data-testid="stMetric"] {
-    background: #161b22 !important;
+    background: #ffffff !important;
     border-radius: 8px !important;
     padding: 14px 16px !important;
-    border: 1px solid #21262d !important;
-    border-left: 3px solid #58a6ff !important;
+    border: 1px solid #d0d5dd !important;
+    border-left: 3px solid #0057ff !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important;
   }
-  [data-testid="stMetricValue"] { font-size: 1.1rem !important; font-weight: 700 !important; }
+  [data-testid="stMetricValue"] { font-size: 1.1rem !important; font-weight: 700 !important; color: #0d0d0d !important; }
   [data-testid="stMetricLabel"] {
-    font-size: 0.68rem !important; color: #adbac7 !important;
+    font-size: 0.68rem !important; color: #555f6e !important;
     text-transform: uppercase; letter-spacing: 0.06em;
   }
 
   /* ── section headers ── */
   .sh {
-    color: #e6edf3; font-size: 0.78rem; font-weight: 700;
+    color: #0d0d0d; font-size: 0.78rem; font-weight: 700;
     letter-spacing: 0.08em; text-transform: uppercase;
-    border-left: 3px solid #58a6ff; padding-left: 9px;
+    border-left: 3px solid #0057ff; padding-left: 9px;
     margin: 10px 0 5px 0;
   }
-  .sh.g { border-left-color: #3fb950; }
-  .sh.o { border-left-color: #d29922; }
-  .sh.r { border-left-color: #f85149; }
+  .sh.g { border-left-color: #007a2f; }
+  .sh.o { border-left-color: #b35a00; }
+  .sh.r { border-left-color: #c00000; }
 
   /* ── status bar ── */
   .status-bar {
-    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    background: #ffffff; border: 1px solid #d0d5dd; border-radius: 8px;
     padding: 8px 14px; margin-bottom: 8px; font-family: monospace; font-size: 0.82rem;
-    white-space: nowrap; overflow-x: auto;
+    white-space: nowrap; overflow-x: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    color: #0d0d0d;
   }
   @media (max-width: 768px) { .status-bar { font-size: 0.72rem; padding: 6px 8px; } }
 
   /* ── status dots ── */
   .dot-g { display:inline-block;width:9px;height:9px;border-radius:50%;
-            background:#3fb950;box-shadow:0 0 5px #3fb950;margin-right:3px;}
+            background:#007a2f;box-shadow:0 0 5px #007a2f;margin-right:3px;}
   .dot-r { display:inline-block;width:9px;height:9px;border-radius:50%;
-            background:#f85149;box-shadow:0 0 5px #f85149;margin-right:3px;}
+            background:#c00000;box-shadow:0 0 5px #c00000;margin-right:3px;}
   .dot-y { display:inline-block;width:9px;height:9px;border-radius:50%;
-            background:#d29922;box-shadow:0 0 4px #d29922;margin-right:3px;}
+            background:#b35a00;box-shadow:0 0 4px #b35a00;margin-right:3px;}
   .dot-x { display:inline-block;width:9px;height:9px;border-radius:50%;
-            background:#6e7681;margin-right:3px;}
+            background:#9aa3af;margin-right:3px;}
 
   /* ── sensor badges ── */
-  .bw { display:inline-block;background:#1a4a1a;color:#3fb950;border:1px solid #3fb950;
+  .bw { display:inline-block;background:#e6f4ec;color:#007a2f;border:1px solid #007a2f;
         border-radius:4px;font-size:0.62rem;font-weight:700;padding:1px 6px;text-transform:uppercase;}
-  .bm { display:inline-block;background:#3d2b00;color:#d29922;border:1px solid #d29922;
+  .bm { display:inline-block;background:#fff3e0;color:#b35a00;border:1px solid #b35a00;
         border-radius:4px;font-size:0.62rem;font-weight:700;padding:1px 6px;text-transform:uppercase;}
-  .be { display:inline-block;background:#4d1f00;color:#ff7b72;border:1px solid #ff7b72;
+  .be { display:inline-block;background:#fdecea;color:#c00000;border:1px solid #c00000;
         border-radius:4px;font-size:0.62rem;font-weight:700;padding:1px 6px;text-transform:uppercase;}
-  .bx { display:inline-block;background:#1c1c24;color:#6e7681;border:1px solid #30363d;
+  .bx { display:inline-block;background:#f0f1f3;color:#555f6e;border:1px solid #d0d5dd;
         border-radius:4px;font-size:0.62rem;font-weight:700;padding:1px 6px;text-transform:uppercase;}
 
   /* ── telem row ── */
   .tr { display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;
-        background:#161b22;border:1px solid #21262d;margin-bottom:5px;font-size:0.82rem;}
-  .tl { flex:1;font-weight:600;color:#e6edf3;font-size:0.8rem; }
-  .tv { color:#adbac7;font-size:0.76rem; }
+        background:#ffffff;border:1px solid #d0d5dd;margin-bottom:5px;font-size:0.82rem;
+        box-shadow:0 1px 2px rgba(0,0,0,0.05);}
+  .tl { flex:1;font-weight:600;color:#0d0d0d;font-size:0.8rem; }
+  .tv { color:#555f6e;font-size:0.76rem; }
 
-  /* ── log terminal ── */
+  /* ── log terminal (keep dark for readability) ── */
   .log-term {
-    background:#0d1117 !important;border:1px solid #21262d !important;border-radius:8px;
+    background:#111827 !important;border:1px solid #374151 !important;border-radius:8px;
     padding:8px 12px;font-family:"JetBrains Mono","Fira Code","Consolas",monospace !important;
-    font-size:0.7rem !important;color:#3fb950 !important;overflow-y:auto;max-height:320px;
+    font-size:0.7rem !important;color:#4ade80 !important;overflow-y:auto;max-height:320px;
   }
 
   /* ── camera offline pulse ── */
   @keyframes cam-pulse {
-    0%,100% { border-color:#f85149; box-shadow:0 0 0px #f85149; }
-    50%      { border-color:#ff7b72; box-shadow:0 0 8px #f85149; }
+    0%,100% { border-color:#c00000; box-shadow:0 0 0px #c00000; }
+    50%      { border-color:#ef4444; box-shadow:0 0 8px #c00000; }
   }
 
   /* ── tab label sizing ── */
-  [data-testid="stTabs"] button { font-size: 0.82rem; padding: 8px 10px; }
+  [data-testid="stTabs"] button { font-size: 0.82rem; padding: 8px 10px; color: #0d0d0d !important; }
   @media (max-width: 480px) {
     [data-testid="stTabs"] button { font-size: 0.7rem; padding: 6px 6px; }
   }
 
-  /* ── hide stale Streamlit elements ── */
+  /* ── misc ── */
   [data-testid="stDataFrame"] { font-size: 0.78rem; }
   hr { margin: 0.8rem 0 !important; }
+
+  /* ── back-to-face link ── */
+  .face-back {
+    display:inline-block;padding:6px 14px;background:#0057ff;color:#fff !important;
+    border-radius:8px;text-decoration:none;font-size:0.82rem;font-weight:600;
+    box-shadow:0 1px 4px rgba(0,87,255,0.3);
+  }
 </style>
 """,
     unsafe_allow_html=True,
@@ -197,7 +212,7 @@ def _fmt_uptime(s) -> str:
     return f"{h:02d}:{m:02d}:{sc:02d}" if h else f"{m:02d}:{sc:02d}"
 
 
-def _dot(ok, tc="#3fb950", fc="#f85149") -> str:
+def _dot(ok, tc="#007a2f", fc="#c00000") -> str:
     color = tc if ok else fc
     return f'<span style="color:{color};font-size:0.9em;">●</span>'
 
@@ -271,19 +286,26 @@ with st.sidebar:
             "Speak replies", value=st.session_state.voice_speak_replies
         )
 
+# ── back-to-face link ────────────────────────────────────────────────────────
+_host = GW.split("://")[-1].split(":")[0]
+st.markdown(
+    f'<a class="face-back" href="http://{_host}:8000/face">← Robot Face</a>',
+    unsafe_allow_html=True,
+)
+
 # ── HEADER STATUS BAR ─────────────────────────────────────────────────────────
 _ch_html = (
-    " · ".join(f'<span style="color:#58a6ff">{c}</span>' for c in channels_active)
+    " · ".join(f'<span style="color:#0057ff">{c}</span>' for c in channels_active)
     if channels_active
-    else '<span style="color:#6e7681">no channels</span>'
+    else '<span style="color:#9aa3af">no channels</span>'
 )
 st.markdown(
     f"""<div class="status-bar">
   🤖 <strong>{robot_name}</strong> &nbsp;
   {_dot(brain_ok)} brain <strong>{"on" if brain_ok else "off"}</strong> &nbsp;
-  {_dot(driver_ok, "#3fb950", "#d29922")} driver <strong>{"hw" if driver_ok else "mock"}</strong>
+  {_dot(driver_ok, "#007a2f", "#b35a00")} driver <strong>{"hw" if driver_ok else "mock"}</strong>
   &nbsp; 📡 {_ch_html} &nbsp;
-  <span style="color:#6e7681">⏱ {_fmt_uptime(uptime)}</span> &nbsp;
+  <span style="color:#9aa3af">⏱ {_fmt_uptime(uptime)}</span> &nbsp;
   {_dot(cam_ok)} cam <strong>{"live" if cam_ok else "off"}</strong>
 </div>""",
     unsafe_allow_html=True,
@@ -320,8 +342,8 @@ with _tab_ctrl:
         _gp_url = f"{GW.rstrip('/')}/gamepad" + (f"?token={_gp_tok}" if _gp_tok else "")
         st.markdown(
             f'<a href="{_gp_url}" target="_blank" style="display:inline-flex;align-items:center;'
-            f'height:48px;padding:0 16px;background:#1f6feb;color:#fff;border-radius:8px;'
-            f'text-decoration:none;font-size:0.9rem;border:1px solid #388bfd;white-space:nowrap;">'
+            f'height:48px;padding:0 16px;background:#0057ff;color:#fff;border-radius:8px;'
+            f'text-decoration:none;font-size:0.9rem;border:1px solid #3b7de8;white-space:nowrap;">'
             f"🎮 Open Gamepad Controller →</a>",
             unsafe_allow_html=True,
         )
@@ -338,24 +360,24 @@ with _tab_ctrl:
         _gw_host = GW.replace("http://", "").replace("https://", "").split(":")[0]
         _gw_port = GW.split(":")[-1].split("/")[0] if ":" in GW else "8000"
         _gw_proto = "https:" if GW.startswith("https") else "http:"
-        _cam_border = "2px solid #3fb950" if cam_ok else "2px solid #f85149"
+        _cam_border = "2px solid #007a2f" if cam_ok else "2px solid #c00000"
         _cam_anim = "none" if cam_ok else "cam-pulse 2s ease-in-out infinite"
         st.components.v1.html(
             f"""
 <style>
 @keyframes cam-pulse {{
-  0%,100% {{ border-color:#f85149; box-shadow:0 0 0px #f85149; }}
-  50%      {{ border-color:#ff7b72; box-shadow:0 0 8px #f85149; }}
+  0%,100% {{ border-color:#c00000; box-shadow:0 0 0px #c00000; }}
+  50%      {{ border-color:#ef4444; box-shadow:0 0 8px #c00000; }}
 }}
 </style>
-<div style="background:#0d1117;border:{_cam_border};border-radius:8px;overflow:hidden;
+<div style="background:#ffffff;border:{_cam_border};border-radius:8px;overflow:hidden;
             aspect-ratio:4/3;max-height:380px;position:relative;
             animation:{_cam_anim};">
   <img id="cam" src="" style="width:100%;height:100%;object-fit:cover;display:block;"
        onerror="document.getElementById('cam-err').style.display='flex';this.style.display='none';" />
   <div id="cam-err" style="display:none;position:absolute;inset:0;align-items:center;
-       justify-content:center;flex-direction:column;color:#8b949e;font-family:monospace;
-       font-size:0.85rem;background:#0d1117;">
+       justify-content:center;flex-direction:column;color:#6b7280;font-family:monospace;
+       font-size:0.85rem;background:#ffffff;">
     <div style="font-size:2rem;margin-bottom:8px;">📷</div><div>No camera signal</div>
   </div>
 </div>
@@ -465,9 +487,9 @@ with _tab_ctrl:
         st.markdown(
             f'<p class="sh">🎮 Gamepad</p>'
             f'<a href="{_gp_url}" target="_blank" style="display:inline-block;padding:6px 14px;'
-            f'background:#161b22;color:#58a6ff;border-radius:6px;text-decoration:none;'
-            f'font-size:0.8rem;border:1px solid #30363d;">Open controller page →</a>'
-            f'<div style="color:#6e7681;font-size:0.68rem;margin-top:4px;">'
+            f'background:#ffffff;color:#0057ff;border-radius:6px;text-decoration:none;'
+            f'font-size:0.8rem;border:1px solid #d0d5dd;">Open controller page →</a>'
+            f'<div style="color:#9aa3af;font-size:0.68rem;margin-top:4px;">'
             f'D-pad/stick=move · A/B=stop · L=reboot · R=shutdown · Start=ESTOP</div>',
             unsafe_allow_html=True,
         )
