@@ -287,9 +287,14 @@ with st.sidebar:
         )
 
 # ── back-to-face link ────────────────────────────────────────────────────────
-_host = GW.split("://")[-1].split(":")[0].split("/")[0]
+# Use the device's actual hostname (e.g. "alex") with .local suffix for mDNS,
+# so the link resolves correctly from the browser regardless of how GW is set.
+import socket as _socket
+_gw_port = GW.split(":")[-1].split("/")[0] if GW.count(":") >= 2 else "8000"
+_hn = _socket.gethostname()
+_face_host = _hn if "." in _hn else f"{_hn}.local"
 st.markdown(
-    f'<a class="face-back" href="http://{_host}:8000/face">← Robot Face</a>',
+    f'<a class="face-back" href="http://{_face_host}:{_gw_port}/face">← Robot Face</a>',
     unsafe_allow_html=True,
 )
 
