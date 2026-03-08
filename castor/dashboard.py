@@ -251,9 +251,11 @@ uptime         = health.get("uptime_s", 0)
 brain_ok       = health.get("brain")
 driver_ok      = health.get("driver")
 channels_active = status.get("channels_active", health.get("channels", []))
-cam_ok  = str(proc.get("camera", "")).lower() in ("online", "true", "ok")
-loop_count = proc.get("loop_count", 0)
-avg_lat    = proc.get("avg_latency_ms", 0)
+_proc_hw   = proc.get("hw", {})
+_proc_loop = proc.get("loop", {})
+cam_ok     = str(_proc_hw.get("camera", "")).lower() in ("online", "true", "ok")
+loop_count = _proc_loop.get("iteration", 0)
+avg_lat    = _proc_loop.get("latency_ms", 0)
 
 # ── SIDEBAR (settings + quick actions) ────────────────────────────────────────
 with st.sidebar:
@@ -536,7 +538,7 @@ with _tab_status:
     st.divider()
 
     # ── Key metrics ──────────────────────────────────────────────────────────
-    speaker_ok = str(proc.get("speaker", "")).lower() in ("online", "true", "ok")
+    speaker_ok = str(_proc_hw.get("speaker", "")).lower() in ("online", "true", "ok")
     _today = (usage.get("daily") or [{}])[-1] if usage.get("daily") else {}
     _mc1, _mc2, _mc3, _mc4, _mc5, _mc6 = st.columns(6)
     _mc1.metric("Uptime",   _fmt_uptime(uptime))
@@ -546,7 +548,8 @@ with _tab_status:
     _mc5.metric("Speaker",  "online" if speaker_ok else "offline")
     _mc6.metric("Tokens",   f"{_today.get('total_tokens', 0):,}")
 
-    last_thought = str(proc.get("last_thought") or "")
+    _lt_raw = proc.get("brain", {}).get("last_thought") or {}
+    last_thought = str(_lt_raw.get("raw_text", "") if isinstance(_lt_raw, dict) else _lt_raw)
     if last_thought:
         st.caption(f"💭 {last_thought[:120]}{'…' if len(last_thought) > 120 else ''}")
 
@@ -1222,6 +1225,25 @@ with _tab_settings:
         st.session_state.api_token   = _new_tok.strip()
         st.success("Connection settings saved.")
         st.rerun()
+
+    st.divider()
+
+    # ── Terminal / tmux ────────────────────────────────────────────────────────
+    st.markdown("#### 🖥️ Terminal Access")
+    st.caption("Quick commands to open a terminal on the robot. Run these in a shell on any machine on the same network.")
+    import urllib.parse as _urlp
+    _gw_host_t = _urlp.urlparse(GW).hostname or "alex.local"
+    _ssh_user = st.text_input("SSH user", value="craigm26", key="ssh_user_input")
+    _ssh_host = st.text_input("SSH host", value=_gw_host_t, key="ssh_host_input")
+    _term_cmds = {
+        "SSH shell": f"ssh {_ssh_user}@{_ssh_host}",
+        "Attach tmux": f"ssh {_ssh_user}@{_ssh_host} -t 'tmux attach || tmux new'",
+        "Gateway logs": f"ssh {_ssh_user}@{_ssh_host} -t 'journalctl --user -u opencastor -f'",
+        "Python REPL": f"ssh {_ssh_user}@{_ssh_host} -t '/home/{_ssh_user}/opencastor-env/bin/python'",
+        "Watch status": f"ssh {_ssh_user}@{_ssh_host} -t 'watch -n2 systemctl --user status opencastor'",
+    }
+    for _label, _cmd in _term_cmds.items():
+        st.code(_cmd, language="bash")
 
     st.divider()
 

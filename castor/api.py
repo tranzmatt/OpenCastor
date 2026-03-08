@@ -4456,6 +4456,22 @@ async def on_startup():
     port = os.getenv("OPENCASTOR_API_PORT", "8000")
     logger.info(f"OpenCastor Gateway ready on {host}:{port}")
 
+    # Wake-up greeting — non-blocking so startup is not delayed
+    _robot_name_wakeup = (state.config or {}).get("metadata", {}).get("robot_name", "robot")
+    if hasattr(state, "speaker") and state.speaker and getattr(state.speaker, "enabled", False):
+        import threading as _threading
+
+        def _wakeup_speak():
+            try:
+                state.speaker.speak(
+                    f"Hello. I am {_robot_name_wakeup}. I am online and ready."
+                )
+            except Exception as _ws_exc:
+                logger.debug("Wake-up speech failed: %s", _ws_exc)
+
+        _threading.Thread(target=_wakeup_speak, daemon=True).start()
+        logger.info("Wake-up greeting queued for %s", _robot_name_wakeup)
+
     provider = get_jwt_secret_provider()
     try:
         provider.enforce_weak_source_policy()
