@@ -31,6 +31,20 @@ castor wizard          # guided setup: API keys, hardware, channels
 castor gateway         # start the API gateway + messaging
 ```
 
+The wizard selects a device-aware stack profile:
+
+<!-- SETUP_CATALOG:BEGIN -->
+- `apple_native` — Apple Native (Recommended on eligible Mac)
+- `mlx_local_vision` — MLX Local Vision
+- `ollama_universal_local` — Ollama Universal Local
+
+| Apple Profile | Meaning |
+|---|---|
+| `apple-balanced` | Apple Balanced |
+| `apple-creative` | Apple Creative |
+| `apple-tagging` | Apple Tagging |
+<!-- SETUP_CATALOG:END -->
+
 Or with Docker:
 ```bash
 cp .env.example .env && nano .env
