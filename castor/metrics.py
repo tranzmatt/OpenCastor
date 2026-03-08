@@ -17,10 +17,10 @@ Usage::
 
 from __future__ import annotations
 
+import datetime as _dt
 import threading
 import time
 from collections import defaultdict
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 __all__ = ["MetricsRegistry", "get_registry", "ChannelInterArrivalTracker", "RequestRateTracker"]
@@ -948,7 +948,11 @@ class MetricsRegistry:
             uptime_s = now - self._started_at
             uptime_m = uptime_s / 60.0
             uptime_h = uptime_s / 3600.0
-            started_at_iso = datetime.utcfromtimestamp(self._started_at).isoformat() + "Z"
+            started_at_iso = (
+                _dt.datetime.fromtimestamp(self._started_at, _dt.timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z")
+            )
             return {
                 "uptime_s": uptime_s,
                 "uptime_m": uptime_m,
