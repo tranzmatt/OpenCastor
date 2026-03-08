@@ -578,9 +578,10 @@ async def direct_action(action: ActionRequest, request: Request):
     if state.fs:
         ok = state.fs.write("/dev/motor", action_dict, principal="api")
         if not ok:
+            reason = state.fs.last_write_denial or "Unknown safety layer rejection."
             raise HTTPException(
                 status_code=422,
-                detail="Action rejected by safety layer (bounds violation or e-stop active)",
+                detail=f"Action rejected by safety layer: {reason}",
             )
         # Use the safety-clamped action
         clamped = state.fs.read("/dev/motor", principal="api")
@@ -609,6 +610,24 @@ async def clear_estop():
             return {"status": "cleared"}
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     return {"status": "no_fs"}
+
+
+@app.get("/api/fs/estop", dependencies=[Depends(verify_token)])
+async def get_estop_status():
+    """GET /api/fs/estop — Return current emergency stop state.
+
+    Returns:
+        estopped: True if e-stop is active (motor writes blocked).
+        proc_status: Current /proc/status value (active, estop, idle, ...).
+        last_denial: Reason for the most recent safety layer write rejection.
+    """
+    if state.fs:
+        return {
+            "estopped": state.fs.is_estopped,
+            "proc_status": state.fs.read("/proc/status", principal="api") or "unknown",
+            "last_denial": state.fs.last_write_denial,
+        }
+    return {"estopped": False, "proc_status": "no_fs", "last_denial": ""}
 
 
 # ---------------------------------------------------------------------------
@@ -4703,7 +4722,7 @@ async def gamepad_page(token: str = ""):
   const authH = TOKEN ? {{"Authorization":"Bearer "+TOKEN}} : {{}};
   const jsonH = Object.assign({{"Content-Type":"application/json"}}, authH);
 
-  let gpIdx=null, raf=null, prev={{}}, lastT=0, pendingFn=null;
+  let gpIdx=null, raf=null, prev={{}}, lastT=0, pendingFn=null, lastMoving=false;
 
   function fb(msg,c){{
     const el=document.getElementById("fb");
@@ -4809,18 +4828,193 @@ async def gamepad_page(token: str = ""):
 
 
 @app.get("/face")
-async def robot_face_page(token: str = ""):
-    """Animated friendly geometric robot face — kiosk home screen.
+async def robot_face_page(token: str = "", style: str = "friendly"):
+    """Animated robot face kiosk home screen.
 
     Polls /api/status every 500ms to drive reactive SVG animations.
-    Speaking mouth is driven by requestAnimationFrame with a composite-sine
-    oscillator for natural lip movement.
+    Speaking mouth uses requestAnimationFrame composite-sine oscillator.
     Long-press (2 s) anywhere navigates to the Streamlit dashboard (port 8501).
     No auth required (kiosk use).
+
+    Query params:
+        style: "friendly" (default), "kawaii", "retro"
     """
     from fastapi.responses import HTMLResponse
     import re as _re
     _tok = _re.sub(r"[^A-Za-z0-9._\-]", "", token)
+    _style = style if style in ("friendly", "kawaii", "retro") else "friendly"
+
+    # ── Per-style definitions ──────────────────────────────────────────────────
+    _styles = {
+        "friendly": {
+            "bg": "#f5f7fa",
+            "css_extra": "",
+            "face_svg": """
+    <!-- left eyebrow: thick high arch — friendly/happy -->
+    <path id="brow-l" d="M 122 124 Q 156 100 186 116"
+          fill="none" stroke="#0d0d0d" stroke-width="6.5" stroke-linecap="round"/>
+    <!-- right eyebrow -->
+    <path id="brow-r" d="M 214 116 Q 244 100 278 124"
+          fill="none" stroke="#0d0d0d" stroke-width="6.5" stroke-linecap="round"/>
+    <!-- cheek blush -->
+    <ellipse id="cheek-l" cx="120" cy="212" rx="28" ry="19" fill="#fca5a5" opacity="0.45"/>
+    <ellipse id="cheek-r" cx="280" cy="212" rx="28" ry="19" fill="#fca5a5" opacity="0.45"/>
+    <!-- left eye -->
+    <g id="eye-l">
+      <circle cx="158" cy="175" r="30" fill="#ffffff" stroke="#0d0d0d" stroke-width="3"/>
+      <circle id="iris-l" cx="158" cy="175" r="19" fill="#0057ff"/>
+      <circle cx="157" cy="173" r="10" fill="#0d0d0d"/>
+      <circle cx="147" cy="163" r="6"  fill="#ffffff"/>
+      <circle cx="162" cy="168" r="3"  fill="#ffffff" opacity="0.75"/>
+    </g>
+    <!-- right eye -->
+    <g id="eye-r">
+      <circle cx="242" cy="175" r="30" fill="#ffffff" stroke="#0d0d0d" stroke-width="3"/>
+      <circle id="iris-r" cx="242" cy="175" r="19" fill="#0057ff"/>
+      <circle cx="241" cy="173" r="10" fill="#0d0d0d"/>
+      <circle cx="231" cy="163" r="6"  fill="#ffffff"/>
+      <circle cx="246" cy="168" r="3"  fill="#ffffff" opacity="0.75"/>
+    </g>
+    <!-- mouth -->
+    <path id="mouth" d="M 138 260 Q 200 304 262 260"
+          fill="none" stroke="#0d0d0d" stroke-width="5.5" stroke-linecap="round"/>""",
+            "js_presets": """
+const IRIS_COLOR   = "#0057ff";
+const OFFLINE_IRIS = "#9aa3af";
+const CHEEK_BASE   = 0.45;
+const HAS_CHEEKS   = true;
+const SPEAK_UY=258, SPEAK_AMP=30, SPEAK_X1=140, SPEAK_X2=260;
+const M_SMILE = "M 138 260 Q 200 304 262 260";
+const M_FLAT  = "M 152 266 Q 200 272 248 266";
+const M_SMISH = "M 144 264 Q 200 288 256 264";
+const M_FROWN = "M 140 280 Q 200 258 260 280";
+const B_IDLE   = ["M 122 124 Q 156 100 186 116","M 214 116 Q 244 100 278 124"];
+const B_MOVE   = ["M 122 132 Q 156 116 186 126","M 214 126 Q 244 116 278 132"];
+const B_SPEAK  = ["M 120 114 Q 156  90 186 106","M 214 106 Q 244  90 280 114"];
+const B_LISTEN = ["M 120 110 Q 156  86 186 102","M 214 102 Q 244  86 280 110"];
+const B_ESTOP  = ["M 122 138 Q 156 130 186 140","M 214 140 Q 244 130 278 138"];
+const B_OFFLN  = ["M 122 134 Q 156 128 186 136","M 214 136 Q 244 128 278 134"];""",
+        },
+        "kawaii": {
+            "bg": "#fff0f6",
+            "css_extra": """
+  #eye-l{transform-origin:155px 178px;}
+  #eye-r{transform-origin:245px 178px;}""",
+            "face_svg": """
+    <!-- kawaii brows: thin gentle curves -->
+    <path id="brow-l" d="M 126 118 Q 155  98 182 112"
+          fill="none" stroke="#c47ab4" stroke-width="5" stroke-linecap="round"/>
+    <path id="brow-r" d="M 218 112 Q 245  98 274 118"
+          fill="none" stroke="#c47ab4" stroke-width="5" stroke-linecap="round"/>
+    <!-- big cheek blush ovals -->
+    <ellipse id="cheek-l" cx="112" cy="218" rx="34" ry="22" fill="#ffb3cc" opacity="0.55"/>
+    <ellipse id="cheek-r" cx="288" cy="218" rx="34" ry="22" fill="#ffb3cc" opacity="0.55"/>
+    <!-- left eye: large purple iris -->
+    <g id="eye-l">
+      <circle cx="155" cy="178" r="34" fill="#ffffff" stroke="#c47ab4" stroke-width="2.5"/>
+      <circle id="iris-l" cx="155" cy="178" r="22" fill="#9b5de5"/>
+      <circle cx="154" cy="176" r="11" fill="#1a0030"/>
+      <circle cx="142" cy="164" r="8"  fill="#ffffff"/>
+      <circle cx="158" cy="170" r="4"  fill="#ffffff" opacity="0.8"/>
+      <circle cx="146" cy="188" r="3"  fill="#ffffff" opacity="0.4"/>
+    </g>
+    <!-- right eye -->
+    <g id="eye-r">
+      <circle cx="245" cy="178" r="34" fill="#ffffff" stroke="#c47ab4" stroke-width="2.5"/>
+      <circle id="iris-r" cx="245" cy="178" r="22" fill="#9b5de5"/>
+      <circle cx="244" cy="176" r="11" fill="#1a0030"/>
+      <circle cx="232" cy="164" r="8"  fill="#ffffff"/>
+      <circle cx="248" cy="170" r="4"  fill="#ffffff" opacity="0.8"/>
+      <circle cx="236" cy="188" r="3"  fill="#ffffff" opacity="0.4"/>
+    </g>
+    <!-- kawaii small cat mouth -->
+    <path id="mouth" d="M 172 268 Q 200 288 228 268"
+          fill="none" stroke="#c47ab4" stroke-width="4.5" stroke-linecap="round"/>""",
+            "js_presets": """
+const IRIS_COLOR   = "#9b5de5";
+const OFFLINE_IRIS = "#c8aee0";
+const CHEEK_BASE   = 0.55;
+const HAS_CHEEKS   = true;
+const SPEAK_UY=264, SPEAK_AMP=22, SPEAK_X1=162, SPEAK_X2=238;
+const M_SMILE = "M 172 268 Q 200 288 228 268";
+const M_FLAT  = "M 172 272 Q 200 276 228 272";
+const M_SMISH = "M 168 270 Q 200 282 232 270";
+const M_FROWN = "M 172 282 Q 200 268 228 282";
+const B_IDLE   = ["M 126 118 Q 155  98 182 112","M 218 112 Q 245  98 274 118"];
+const B_MOVE   = ["M 126 124 Q 155 108 182 118","M 218 118 Q 245 108 274 124"];
+const B_SPEAK  = ["M 124 110 Q 155  90 182 104","M 218 104 Q 245  90 276 110"];
+const B_LISTEN = ["M 124 106 Q 155  86 182 100","M 218 100 Q 245  86 276 106"];
+const B_ESTOP  = ["M 126 130 Q 155 124 182 132","M 218 132 Q 245 124 274 130"];
+const B_OFFLN  = ["M 126 128 Q 155 122 182 130","M 218 130 Q 245 122 274 128"];""",
+        },
+        "retro": {
+            "bg": "#0a0a0a",
+            "css_extra": """
+  html,body{background:#0a0a0a;}
+  svg{filter:drop-shadow(0 0 8px #00ff41);}
+  @keyframes scanline{0%{transform:translateY(-100%);}100%{transform:translateY(100vh);}}
+  #scanline{animation:scanline 3s linear infinite;}
+  #listen-ring{stroke:#00ff41;}""",
+            "face_svg": """
+    <!-- scanline overlay -->
+    <line id="scanline" x1="0" y1="0" x2="400" y2="0" stroke="#00ff41"
+          stroke-width="2" opacity="0.12"/>
+    <!-- retro pixel brows (rectangles) -->
+    <rect id="brow-l" x="124" y="114" width="60" height="8" rx="2"
+          fill="#00ff41"/>
+    <rect id="brow-r" x="216" y="114" width="60" height="8" rx="2"
+          fill="#00ff41"/>
+    <!-- no cheeks on retro — dummy invisible elements -->
+    <ellipse id="cheek-l" cx="0" cy="0" rx="1" ry="1" fill="none" opacity="0"/>
+    <ellipse id="cheek-r" cx="0" cy="0" rx="1" ry="1" fill="none" opacity="0"/>
+    <!-- left eye: square pixel style -->
+    <g id="eye-l">
+      <rect cx="158" cy="175" x="130" y="150" width="56" height="48" rx="6"
+            fill="#0a0a0a" stroke="#00ff41" stroke-width="3"/>
+      <rect id="iris-l" x="143" y="163" width="30" height="24" rx="3" fill="#00ff41"/>
+      <rect x="149" y="169" width="14" height="12" rx="2" fill="#0a0a0a"/>
+      <rect x="139" y="158" width="8" height="8" fill="#00ff41" opacity="0.6"/>
+    </g>
+    <!-- right eye -->
+    <g id="eye-r">
+      <rect cx="242" cy="175" x="214" y="150" width="56" height="48" rx="6"
+            fill="#0a0a0a" stroke="#00ff41" stroke-width="3"/>
+      <rect id="iris-r" x="227" y="163" width="30" height="24" rx="3" fill="#00ff41"/>
+      <rect x="233" y="169" width="14" height="12" rx="2" fill="#0a0a0a"/>
+      <rect x="223" y="158" width="8" height="8" fill="#00ff41" opacity="0.6"/>
+    </g>
+    <!-- retro mouth: segmented line -->
+    <path id="mouth" d="M 142 264 L 168 280 L 200 284 L 232 280 L 258 264"
+          fill="none" stroke="#00ff41" stroke-width="4" stroke-linecap="square"
+          stroke-linejoin="miter"/>""",
+            "js_presets": """
+const IRIS_COLOR   = "#00ff41";
+const OFFLINE_IRIS = "#1a4d1a";
+const CHEEK_BASE   = 0;
+const HAS_CHEEKS   = false;
+const SPEAK_UY=272, SPEAK_AMP=18, SPEAK_X1=148, SPEAK_X2=252;
+const M_SMILE = "M 142 264 L 168 280 L 200 284 L 232 280 L 258 264";
+const M_FLAT  = "M 142 272 L 200 272 L 258 272";
+const M_SMISH = "M 142 268 L 168 276 L 200 278 L 232 276 L 258 268";
+const M_FROWN = "M 142 284 L 168 270 L 200 268 L 232 270 L 258 284";
+const B_IDLE   = [null, null];  // retro uses rects, brows handled specially
+const B_MOVE   = [null, null];
+const B_SPEAK  = [null, null];
+const B_LISTEN = [null, null];
+const B_ESTOP  = [null, null];
+const B_OFFLN  = [null, null];
+// retro brow Y positions (rect y attribute)
+const RB_IDLE=114, RB_MOVE=120, RB_SPEAK=106, RB_LISTEN=102, RB_ESTOP=128, RB_OFFLN=126;""",
+        },
+    }
+
+    _s = _styles[_style]
+    _face_svg = _s["face_svg"]
+    _js_presets = _s["js_presets"]
+    _bg = _s["bg"]
+    _css_extra = _s["css_extra"]
+    _is_retro = "true" if _style == "retro" else "false"
+
     _html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4829,78 +5023,31 @@ async def robot_face_page(token: str = ""):
 <title>Castor</title>
 <style>
   *{{margin:0;padding:0;box-sizing:border-box;}}
-  html,body{{width:100%;height:100%;overflow:hidden;background:#f5f7fa;
+  html,body{{width:100%;height:100%;overflow:hidden;background:{_bg};
              display:flex;align-items:center;justify-content:center;
              font-family:system-ui,sans-serif;user-select:none;-webkit-user-select:none;}}
   svg{{max-width:min(90vw,90vh);max-height:min(90vw,90vh);}}
-
-  /* blink: whole eye group scaleY — sclera+iris+pupil+highlight blink together */
   @keyframes blink{{0%,88%,100%{{transform:scaleY(1);}}93%{{transform:scaleY(0.06);}}}}
   #eye-l{{transform-origin:158px 175px;animation:blink 4.2s ease-in-out infinite;}}
   #eye-r{{transform-origin:242px 175px;animation:blink 4.2s ease-in-out infinite 0.09s;}}
-
-  /* listening ring pulse */
   @keyframes listen-ring{{0%,100%{{r:148;opacity:0.18;}}50%{{r:165;opacity:0.6;}}}}
   #listen-ring{{display:none;animation:listen-ring 1.1s ease-in-out infinite;}}
-
-  /* long-press progress ring */
   #lp-ring{{display:none;}}
-
-  /* e-stop glow on face group */
   @keyframes estop-glow{{0%,100%{{filter:drop-shadow(0 0 10px #c00000);}}
                           50%{{filter:drop-shadow(0 0 32px #c00000);}}}}
   .estop-face{{animation:estop-glow 0.55s ease-in-out infinite;}}
+  {_css_extra}
 </style>
 </head>
 <body>
 <svg id="svg-face" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
-
-  <!-- listening pulse ring (behind everything) -->
   <circle id="listen-ring" cx="200" cy="195" r="148" fill="none"
           stroke="#0057ff" stroke-width="4"/>
-
-  <!-- long-press progress ring (r=155, circumference≈974) -->
   <circle id="lp-ring" cx="200" cy="195" r="155" fill="none"
           stroke="#0057ff" stroke-width="5" stroke-dasharray="974" stroke-dashoffset="974"
           stroke-linecap="round" transform="rotate(-90 200 195)"/>
-
-  <!-- face group (e-stop glow target) -->
   <g id="face-group">
-
-    <!-- left eyebrow: thick high arch = friendly/happy -->
-    <path id="brow-l" d="M 122 136 Q 156 112 186 128"
-          fill="none" stroke="#0d0d0d" stroke-width="6.5" stroke-linecap="round"/>
-
-    <!-- right eyebrow -->
-    <path id="brow-r" d="M 214 128 Q 244 112 278 136"
-          fill="none" stroke="#0d0d0d" stroke-width="6.5" stroke-linecap="round"/>
-
-    <!-- cheek blush (behind eyes so eyes render on top) -->
-    <ellipse id="cheek-l" cx="120" cy="212" rx="28" ry="19" fill="#fca5a5" opacity="0.45"/>
-    <ellipse id="cheek-r" cx="280" cy="212" rx="28" ry="19" fill="#fca5a5" opacity="0.45"/>
-
-    <!-- left eye: sclera + blue iris + black pupil + two highlights -->
-    <g id="eye-l">
-      <circle cx="158" cy="175" r="30" fill="#ffffff" stroke="#0d0d0d" stroke-width="3"/>
-      <circle cx="158" cy="175" r="19" fill="#0057ff"/>
-      <circle cx="157" cy="173" r="10" fill="#0d0d0d"/>
-      <circle cx="147" cy="163" r="6"  fill="#ffffff"/>
-      <circle cx="162" cy="168" r="3"  fill="#ffffff" opacity="0.75"/>
-    </g>
-
-    <!-- right eye: sclera + blue iris + black pupil + two highlights -->
-    <g id="eye-r">
-      <circle cx="242" cy="175" r="30" fill="#ffffff" stroke="#0d0d0d" stroke-width="3"/>
-      <circle cx="242" cy="175" r="19" fill="#0057ff"/>
-      <circle cx="241" cy="173" r="10" fill="#0d0d0d"/>
-      <circle cx="231" cy="163" r="6"  fill="#ffffff"/>
-      <circle cx="246" cy="168" r="3"  fill="#ffffff" opacity="0.75"/>
-    </g>
-
-    <!-- mouth — d attribute and fill driven entirely by JS -->
-    <path id="mouth" d="M 138 260 Q 200 304 262 260"
-          fill="none" stroke="#0d0d0d" stroke-width="5.5" stroke-linecap="round"/>
-
+    {_face_svg}
     <!-- estop X eyes (hidden by default) -->
     <g id="x-eyes" style="display:none">
       <line x1="134" y1="151" x2="182" y2="199" stroke="#c00000" stroke-width="7" stroke-linecap="round"/>
@@ -4908,16 +5055,19 @@ async def robot_face_page(token: str = ""):
       <line x1="218" y1="151" x2="266" y2="199" stroke="#c00000" stroke-width="7" stroke-linecap="round"/>
       <line x1="266" y1="151" x2="218" y2="199" stroke="#c00000" stroke-width="7" stroke-linecap="round"/>
     </g>
-
   </g>
 </svg>
 
 <script>
-const TOKEN   = "{_tok}";
-const API     = window.location.origin;
-const DASH    = "http://" + window.location.hostname + ":8501";
-const LP_MS   = 2000;
-const LP_CIRC = 2 * Math.PI * 155;
+const TOKEN    = "{_tok}";
+const API      = window.location.origin;
+const DASH     = "http://" + window.location.hostname + ":8501";
+const LP_MS    = 2000;
+const LP_CIRC  = 2 * Math.PI * 155;
+const IS_RETRO = {_is_retro};
+
+// Per-style presets (injected by server)
+{_js_presets}
 
 // Elements
 const faceGroup = document.getElementById("face-group");
@@ -4931,31 +5081,22 @@ const xEyes     = document.getElementById("x-eyes");
 const mouth     = document.getElementById("mouth");
 const lpRing    = document.getElementById("lp-ring");
 const lsRing    = document.getElementById("listen-ring");
-const irisL     = eyeL.children[1];  // blue iris (child index 1)
-const irisR     = eyeR.children[1];
+const irisL     = document.getElementById("iris-l");
+const irisR     = document.getElementById("iris-r");
 
-// ── Speaking mouth oscillator ─────────────────────────────────────────────────
-// Composite sine wave mimics speech phoneme rhythm:
-//   primary ~3 Hz (syllable rate) + overtone ~6.5 Hz (articulation detail)
-// Drives SVG path `d` directly via requestAnimationFrame at ~60 fps.
-// The mouth draws a D-shaped open oval whose lower-lip Y position oscillates.
-let _speakRaf = null;
-let _speakT   = 0;
-
+// ── Speaking mouth oscillator (rAF composite-sine) ────────────────────────────
+let _speakRaf = null, _speakT = 0;
 function _speakTick() {{
   _speakT += 1 / 60;
-  // absolute-value envelope → only upward openings (no negative jaw movement)
-  const amp = 30 * Math.abs(
+  const amp = SPEAK_AMP * Math.abs(
     0.65 * Math.sin(_speakT * 3.0 * Math.PI) +
     0.35 * Math.sin(_speakT * 6.5 * Math.PI + 0.8)
   );
-  const uy = 258;                     // upper-lip Y (matches M_SMILE baseline)
-  const ly = uy + Math.max(2, amp);  // lower-lip Y
-  // D-shaped open-mouth path: upper arc + lower arc joined into a filled oval
+  const uy = SPEAK_UY, ly = uy + Math.max(2, amp);
   mouth.setAttribute("d",
-    `M 140 ${{uy}} Q 200 ${{uy - 12}} 260 ${{uy}} Q 200 ${{ly + 10}} 140 ${{uy}} Z`
+    `M ${{SPEAK_X1}} ${{uy}} Q 200 ${{uy - 12}} ${{SPEAK_X2}} ${{uy}} Q 200 ${{ly + 10}} ${{SPEAK_X1}} ${{uy}} Z`
   );
-  mouth.setAttribute("fill", "#0d0d0d");
+  mouth.setAttribute("fill", IS_RETRO ? "#00ff41" : "#0d0d0d");
   _speakRaf = requestAnimationFrame(_speakTick);
 }}
 function _startSpeak() {{ if (!_speakRaf) _speakTick(); }}
@@ -4964,11 +5105,16 @@ function _stopSpeak()  {{
   mouth.setAttribute("fill", "none");
 }}
 
-// ── Mouth path presets ────────────────────────────────────────────────────────
-const M_SMILE = "M 138 260 Q 200 304 262 260";   // wide warm smile
-const M_FLAT  = "M 152 266 Q 200 272 248 266";   // neutral / focused
-const M_SMISH = "M 144 264 Q 200 288 256 264";   // slight smile (listening)
-const M_FROWN = "M 140 280 Q 200 258 260 280";   // frown (estop)
+// ── Retro brow helper (moves rect y attr instead of path d) ──────────────────
+function _setBrows(pathOrY) {{
+  if (IS_RETRO) {{
+    browL.setAttribute("y", pathOrY);
+    browR.setAttribute("y", pathOrY);
+  }} else {{
+    if (pathOrY[0]) browL.setAttribute("d", pathOrY[0]);
+    if (pathOrY[1]) browR.setAttribute("d", pathOrY[1]);
+  }}
+}}
 
 // ── State machine ─────────────────────────────────────────────────────────────
 let state = "idle";
@@ -4977,14 +5123,16 @@ function _resetFace() {{
   faceGroup.classList.remove("estop-face");
   lsRing.style.display = "none";
   _stopSpeak();
-  eyeL.style.display = "block"; eyeR.style.display = "block";
+  eyeL.style.display = ""; eyeR.style.display = "";
   xEyes.style.display = "none";
-  irisL.setAttribute("fill", "#0057ff");
-  irisR.setAttribute("fill", "#0057ff");
+  if (irisL) irisL.setAttribute("fill", IRIS_COLOR);
+  if (irisR) irisR.setAttribute("fill", IRIS_COLOR);
   eyeL.style.transform = ""; eyeR.style.transform = "";
-  mouth.setAttribute("stroke", "#0d0d0d");
-  cheekL.setAttribute("opacity", "0.45");
-  cheekR.setAttribute("opacity", "0.45");
+  mouth.setAttribute("stroke", IS_RETRO ? "#00ff41" : "#0d0d0d");
+  if (HAS_CHEEKS) {{
+    cheekL.setAttribute("opacity", String(CHEEK_BASE));
+    cheekR.setAttribute("opacity", String(CHEEK_BASE));
+  }}
 }}
 
 function applyState(s) {{
@@ -4993,48 +5141,43 @@ function applyState(s) {{
   _resetFace();
 
   if (s === "idle") {{
-    browL.setAttribute("d", "M 122 136 Q 156 112 186 128"); // high friendly arch
-    browR.setAttribute("d", "M 214 128 Q 244 112 278 136");
+    _setBrows(IS_RETRO ? RB_IDLE : B_IDLE);
     mouth.setAttribute("d", M_SMILE);
-
   }} else if (s === "moving") {{
-    browL.setAttribute("d", "M 122 144 Q 156 128 186 138"); // slightly lowered: focused
-    browR.setAttribute("d", "M 214 138 Q 244 128 278 144");
+    _setBrows(IS_RETRO ? RB_MOVE : B_MOVE);
     mouth.setAttribute("d", M_FLAT);
-
   }} else if (s === "speaking") {{
-    browL.setAttribute("d", "M 120 126 Q 156 102 186 118"); // raised high: engaged
-    browR.setAttribute("d", "M 214 118 Q 244 102 280 126");
-    _startSpeak();  // rAF oscillator takes over mouth path
-
+    _setBrows(IS_RETRO ? RB_SPEAK : B_SPEAK);
+    _startSpeak();
   }} else if (s === "listening") {{
     lsRing.style.display = "block";
     eyeL.style.transform = "scale(1.10)"; eyeL.style.transformOrigin = "158px 175px";
     eyeR.style.transform = "scale(1.10)"; eyeR.style.transformOrigin = "242px 175px";
-    browL.setAttribute("d", "M 120 122 Q 156 98 186 114");  // highest: attentive
-    browR.setAttribute("d", "M 214 114 Q 244 98 280 122");
-    cheekL.setAttribute("opacity", "0.65");  // blushing with attention
-    cheekR.setAttribute("opacity", "0.65");
+    _setBrows(IS_RETRO ? RB_LISTEN : B_LISTEN);
+    if (HAS_CHEEKS) {{
+      cheekL.setAttribute("opacity", String(Math.min(1, CHEEK_BASE + 0.2)));
+      cheekR.setAttribute("opacity", String(Math.min(1, CHEEK_BASE + 0.2)));
+    }}
     mouth.setAttribute("d", M_SMISH);
-
   }} else if (s === "estop") {{
     faceGroup.classList.add("estop-face");
     eyeL.style.display = "none"; eyeR.style.display = "none";
     xEyes.style.display = "block";
-    browL.setAttribute("d", "M 122 150 Q 156 142 186 152"); // V-angry
-    browR.setAttribute("d", "M 214 152 Q 244 142 278 150");
-    cheekL.setAttribute("opacity", "0");     // no happy cheeks during estop
-    cheekR.setAttribute("opacity", "0");
+    _setBrows(IS_RETRO ? RB_ESTOP : B_ESTOP);
+    if (HAS_CHEEKS) {{
+      cheekL.setAttribute("opacity", "0");
+      cheekR.setAttribute("opacity", "0");
+    }}
     mouth.setAttribute("stroke", "#c00000");
     mouth.setAttribute("d", M_FROWN);
-
   }} else if (s === "offline") {{
-    irisL.setAttribute("fill", "#9aa3af");   // grey iris
-    irisR.setAttribute("fill", "#9aa3af");
-    browL.setAttribute("d", "M 122 146 Q 156 140 186 148"); // drooped / sad
-    browR.setAttribute("d", "M 214 148 Q 244 140 278 146");
-    cheekL.setAttribute("opacity", "0.2");   // faded cheeks
-    cheekR.setAttribute("opacity", "0.2");
+    if (irisL) irisL.setAttribute("fill", OFFLINE_IRIS);
+    if (irisR) irisR.setAttribute("fill", OFFLINE_IRIS);
+    _setBrows(IS_RETRO ? RB_OFFLN : B_OFFLN);
+    if (HAS_CHEEKS) {{
+      cheekL.setAttribute("opacity", String(CHEEK_BASE * 0.4));
+      cheekR.setAttribute("opacity", String(CHEEK_BASE * 0.4));
+    }}
     mouth.setAttribute("d", M_FLAT);
   }}
 }}
@@ -5043,10 +5186,7 @@ function applyState(s) {{
 async function poll() {{
   const headers = TOKEN ? {{"Authorization": "Bearer " + TOKEN}} : {{}};
   try {{
-    const r = await fetch(API + "/api/status", {{
-      headers,
-      signal: AbortSignal.timeout(1000),
-    }});
+    const r = await fetch(API + "/api/status", {{headers, signal: AbortSignal.timeout(1000)}});
     if (!r.ok) {{ applyState("offline"); return; }}
     const d = await r.json();
     if      (d.estop)                                                  applyState("estop");
@@ -5060,9 +5200,7 @@ setInterval(poll, 500);
 poll();
 
 // ── Long-press 2s → backstage dashboard ──────────────────────────────────────
-let lpStart = 0;
-let lpAnim  = null;
-
+let lpStart = 0, lpAnim = null;
 function lpBegin(e) {{
   e.preventDefault();
   lpStart = Date.now();
@@ -5075,7 +5213,6 @@ function lpBegin(e) {{
   }}, 16);
 }}
 function lpEnd() {{ clearInterval(lpAnim); lpRing.style.display = "none"; }}
-
 document.addEventListener("pointerdown",   lpBegin);
 document.addEventListener("pointerup",     lpEnd);
 document.addEventListener("pointercancel", lpEnd);

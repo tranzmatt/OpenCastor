@@ -1,7 +1,7 @@
 """
 CastorDash — mobile-first, tab-based telemetry dashboard for OpenCastor.
 
-Tabs:  🕹️ Control · 📊 Status · 💬 Chat · 🤖 Fleet · 🔧 Builder
+Tabs:  🕹️ Control · 📊 Status · 💬 Chat · 🤖 Fleet · 🔧 Builder · ⚙️ Settings
 
 Run with: streamlit run castor/dashboard.py
 """
@@ -180,6 +180,7 @@ _DEFAULTS = {
     "_latency_history": {},
     "dp_speed": 0.7,
     "dp_turn": 0.6,
+    "face_style": "friendly",
 }
 for k, v in _DEFAULTS.items():
     if k not in st.session_state:
@@ -293,8 +294,9 @@ import socket as _socket
 _gw_port = GW.split(":")[-1].split("/")[0] if GW.count(":") >= 2 else "8000"
 _hn = _socket.gethostname()
 _face_host = _hn if "." in _hn else f"{_hn}.local"
+_face_style_qs = st.session_state.get("face_style", "friendly")
 st.markdown(
-    f'<a class="face-back" href="http://{_face_host}:{_gw_port}/face">← Robot Face</a>',
+    f'<a class="face-back" href="http://{_face_host}:{_gw_port}/face?style={_face_style_qs}">← Robot Face</a>',
     unsafe_allow_html=True,
 )
 
@@ -317,8 +319,8 @@ st.markdown(
 )
 
 # ── TABS ──────────────────────────────────────────────────────────────────────
-_tab_ctrl, _tab_status, _tab_chat, _tab_fleet, _tab_builder = st.tabs(
-    ["🕹️ Control", "📊 Status", "💬 Chat", "🤖 Fleet", "🔧 Builder"]
+_tab_ctrl, _tab_status, _tab_chat, _tab_fleet, _tab_builder, _tab_settings = st.tabs(
+    ["🕹️ Control", "📊 Status", "💬 Chat", "🤖 Fleet", "🔧 Builder", "⚙️ Settings"]
 )
 
 
@@ -1142,6 +1144,72 @@ with _tab_builder:
                     st.warning("Shutting down…")
                 except Exception as _sde:
                     st.error(str(_sde))
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ⚙️ SETTINGS TAB
+# ═══════════════════════════════════════════════════════════════════════════════
+with _tab_settings:
+    st.subheader("⚙️ Settings")
+
+    # ── Robot Face Style ───────────────────────────────────────────────────────
+    st.markdown("#### 🤖 Robot Face Design")
+    st.caption("Choose the face shown on the kiosk screen. Changes take effect when you navigate back to the robot face.")
+
+    _face_options = {
+        "friendly": "😊 Friendly — warm blue eyes, rosy cheeks, wide smile",
+        "kawaii":   "🌸 Kawaii — big sparkly purple eyes, pink blush, cat mouth",
+        "retro":    "💾 Retro — green-on-dark pixel eyes, scanlines, terminal vibe",
+    }
+    _current_style = st.session_state.get("face_style", "friendly")
+    _selected_style = st.radio(
+        "Face style",
+        options=list(_face_options.keys()),
+        format_func=lambda k: _face_options[k],
+        index=list(_face_options.keys()).index(_current_style),
+        label_visibility="collapsed",
+    )
+    if _selected_style != _current_style:
+        st.session_state.face_style = _selected_style
+        st.rerun()
+
+    st.divider()
+
+    # ── Gateway & Connection ───────────────────────────────────────────────────
+    st.markdown("#### 🔌 Gateway Connection")
+    _new_gw = st.text_input(
+        "Gateway URL",
+        value=st.session_state.gateway_url,
+        placeholder="http://alex.local:8000",
+        key="settings_gw_input",
+    )
+    _new_tok = st.text_input(
+        "API Token",
+        value=st.session_state.api_token,
+        type="password",
+        placeholder="leave blank if no auth",
+        key="settings_tok_input",
+    )
+    if st.button("💾 Save Connection", key="settings_save_conn"):
+        st.session_state.gateway_url = _new_gw.strip()
+        st.session_state.api_token   = _new_tok.strip()
+        st.success("Connection settings saved.")
+        st.rerun()
+
+    st.divider()
+
+    # ── Quick-open face preview ────────────────────────────────────────────────
+    st.markdown("#### 👀 Preview Face")
+    import socket as _sock_s
+    _gw_port_s = GW.split(":")[-1].split("/")[0] if GW.count(":") >= 2 else "8000"
+    _hn_s = _sock_s.gethostname()
+    _fh_s = _hn_s if "." in _hn_s else f"{_hn_s}.local"
+    _face_url = f"http://{_fh_s}:{_gw_port_s}/face?style={st.session_state.face_style}"
+    st.markdown(
+        f'<a href="{_face_url}" target="_blank" style="font-size:1rem;">'
+        f'🔗 Open face in new tab ({st.session_state.face_style})</a>',
+        unsafe_allow_html=True,
+    )
+
 
 # ── AUTO-REFRESH ───────────────────────────────────────────────────────────────
 time.sleep(refresh_s)
