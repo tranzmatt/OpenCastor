@@ -1,11 +1,7 @@
 """
-CastorDash — single-page telemetry dashboard for OpenCastor.
+CastorDash — mobile-first, tab-based telemetry dashboard for OpenCastor.
 
-Mirrors the terminal watch layout:
-  • Header bar : robot · brain · driver · channels · uptime
-  • Left column: live MJPEG camera feed + command input
-  • Right column: status/telemetry · driver · channels · learner stats
-  • Bottom row : recent command history
+Tabs:  🕹️ Control · 📊 Status · 💬 Chat · 🤖 Fleet · 🔧 Builder
 
 Run with: streamlit run castor/dashboard.py
 """
@@ -35,127 +31,124 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-  /* dark background */
+  /* ── base dark theme ── */
   .stApp { background-color: #0d1117; color: #e6edf3; }
+  #MainMenu, footer, header { visibility: hidden; }
 
-  /* main container breathing room */
-  .block-container { padding: 1.5rem 2rem !important; }
+  /* ── desktop padding; tighter on mobile ── */
+  .block-container { padding: 0.75rem 1.25rem 1rem !important; max-width: 100% !important; }
+  @media (max-width: 768px) {
+    .block-container { padding: 0.4rem 0.4rem 0.5rem !important; }
+  }
 
-  /* metric cards */
+  /* ── touch-friendly buttons (min 48 px tall) ── */
+  [data-testid="stButton"] > button {
+    min-height: 48px !important;
+    font-size: 0.95rem !important;
+    touch-action: manipulation;
+    border-radius: 8px !important;
+  }
+  [data-testid="stChatInput"] textarea { font-size: 1rem !important; }
+  [data-testid="stTextInput"] input   { font-size: 1rem !important; min-height: 44px; }
+
+  /* ── D-pad buttons (extra tall, big emoji) ── */
+  [data-testid="stButton"].dpad > button {
+    min-height: 68px !important;
+    font-size: 1.5rem !important;
+    background: #161b22 !important;
+    border: 1px solid #30363d !important;
+    border-radius: 12px !important;
+  }
+  [data-testid="stButton"].dpad-stop > button {
+    min-height: 68px !important;
+    font-size: 1.1rem !important;
+    background: #da3633 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 12px !important;
+  }
+
+  /* ── metric cards ── */
   [data-testid="stMetric"] {
     background: #161b22 !important;
     border-radius: 8px !important;
-    padding: 18px 20px !important;
+    padding: 14px 16px !important;
     border: 1px solid #21262d !important;
     border-left: 3px solid #58a6ff !important;
-    transition: border-left-color 0.3s;
   }
-  [data-testid="stMetricValue"] { font-size: 1.2rem !important; font-weight: 700 !important; }
-  [data-testid="stMetricLabel"] { font-size: 0.7rem !important; color: #adbac7 !important; text-transform: uppercase; letter-spacing: 0.06em; }
+  [data-testid="stMetricValue"] { font-size: 1.1rem !important; font-weight: 700 !important; }
+  [data-testid="stMetricLabel"] {
+    font-size: 0.68rem !important; color: #adbac7 !important;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
 
-  /* header status bar */
+  /* ── section headers ── */
+  .sh {
+    color: #e6edf3; font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    border-left: 3px solid #58a6ff; padding-left: 9px;
+    margin: 10px 0 5px 0;
+  }
+  .sh.g { border-left-color: #3fb950; }
+  .sh.o { border-left-color: #d29922; }
+  .sh.r { border-left-color: #f85149; }
+
+  /* ── status bar ── */
   .status-bar {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    padding: 10px 18px !important;
-    margin-bottom: 12px;
-    font-family: monospace;
-    font-size: 0.9rem;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 8px 14px; margin-bottom: 8px; font-family: monospace; font-size: 0.82rem;
+    white-space: nowrap; overflow-x: auto;
+  }
+  @media (max-width: 768px) { .status-bar { font-size: 0.72rem; padding: 6px 8px; } }
+
+  /* ── status dots ── */
+  .dot-g { display:inline-block;width:9px;height:9px;border-radius:50%;
+            background:#3fb950;box-shadow:0 0 5px #3fb950;margin-right:3px;}
+  .dot-r { display:inline-block;width:9px;height:9px;border-radius:50%;
+            background:#f85149;box-shadow:0 0 5px #f85149;margin-right:3px;}
+  .dot-y { display:inline-block;width:9px;height:9px;border-radius:50%;
+            background:#d29922;box-shadow:0 0 4px #d29922;margin-right:3px;}
+  .dot-x { display:inline-block;width:9px;height:9px;border-radius:50%;
+            background:#6e7681;margin-right:3px;}
+
+  /* ── sensor badges ── */
+  .bw { display:inline-block;background:#1a4a1a;color:#3fb950;border:1px solid #3fb950;
+        border-radius:4px;font-size:0.62rem;font-weight:700;padding:1px 6px;text-transform:uppercase;}
+  .bm { display:inline-block;background:#3d2b00;color:#d29922;border:1px solid #d29922;
+        border-radius:4px;font-size:0.62rem;font-weight:700;padding:1px 6px;text-transform:uppercase;}
+  .be { display:inline-block;background:#4d1f00;color:#ff7b72;border:1px solid #ff7b72;
+        border-radius:4px;font-size:0.62rem;font-weight:700;padding:1px 6px;text-transform:uppercase;}
+  .bx { display:inline-block;background:#1c1c24;color:#6e7681;border:1px solid #30363d;
+        border-radius:4px;font-size:0.62rem;font-weight:700;padding:1px 6px;text-transform:uppercase;}
+
+  /* ── telem row ── */
+  .tr { display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;
+        background:#161b22;border:1px solid #21262d;margin-bottom:5px;font-size:0.82rem;}
+  .tl { flex:1;font-weight:600;color:#e6edf3;font-size:0.8rem; }
+  .tv { color:#adbac7;font-size:0.76rem; }
+
+  /* ── log terminal ── */
+  .log-term {
+    background:#0d1117 !important;border:1px solid #21262d !important;border-radius:8px;
+    padding:8px 12px;font-family:"JetBrains Mono","Fira Code","Consolas",monospace !important;
+    font-size:0.7rem !important;color:#3fb950 !important;overflow-y:auto;max-height:320px;
   }
 
-  /* panel titles */
-  .panel-title {
-    color: #adbac7;
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 4px;
-  }
-
-  /* emergency stop */
-  div[data-testid="stButton"] button[kind="primary"] {
-    background-color: #da3633 !important;
-    border-color: #da3633 !important;
-    font-weight: 700;
-    width: 100%;
-  }
-
-  /* hide streamlit branding */
-  #MainMenu, footer, header { visibility: hidden; }
-
-  /* compact dataframe */
-  [data-testid="stDataFrame"] { font-size: 0.8rem; }
-
-  /* ── glowing status dots ── */
-  .dot-green  { display:inline-block; width:10px; height:10px; border-radius:50%;
-                background:#3fb950; box-shadow: 0 0 6px #3fb950; margin-right:4px; }
-  .dot-red    { display:inline-block; width:10px; height:10px; border-radius:50%;
-                background:#f85149; box-shadow: 0 0 6px #f85149; margin-right:4px; }
-  .dot-yellow { display:inline-block; width:10px; height:10px; border-radius:50%;
-                background:#d29922; box-shadow: 0 0 5px #d29922; margin-right:4px; }
-  .dot-grey   { display:inline-block; width:10px; height:10px; border-radius:50%;
-                background:#6e7681; margin-right:4px; }
-
-  /* ── camera offline pulsing border ── */
+  /* ── camera offline pulse ── */
   @keyframes cam-pulse {
-    0%   { border-color: #f85149; box-shadow: 0 0 0px #f85149; }
-    50%  { border-color: #ff7b72; box-shadow: 0 0 8px #f85149; }
-    100% { border-color: #f85149; box-shadow: 0 0 0px #f85149; }
-  }
-  .cam-offline { animation: cam-pulse 2s ease-in-out infinite; }
-
-  /* ── command panel background ── */
-  .command-panel {
-    background: #161b22;
-    border: 1px solid #21262d;
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-top: 8px;
+    0%,100% { border-color:#f85149; box-shadow:0 0 0px #f85149; }
+    50%      { border-color:#ff7b72; box-shadow:0 0 8px #f85149; }
   }
 
-  /* ── log viewer terminal feel ── */
-  .log-terminal {
-    background: #0d1117 !important;
-    border: 1px solid #21262d !important;
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace !important;
-    font-size: 0.72rem !important;
-    color: #3fb950 !important;
-    overflow-y: auto;
-    max-height: 260px;
+  /* ── tab label sizing ── */
+  [data-testid="stTabs"] button { font-size: 0.82rem; padding: 8px 10px; }
+  @media (max-width: 480px) {
+    [data-testid="stTabs"] button { font-size: 0.7rem; padding: 6px 6px; }
   }
 
-  /* ── section divider accent ── */
-  .section-header {
-    color: #e6edf3;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    border-left: 3px solid #58a6ff;
-    padding-left: 10px;
-    margin: 12px 0 6px 0;
-  }
-  .section-header.green { border-left-color: #3fb950; }
-  .section-header.orange { border-left-color: #d29922; }
-  .section-header.red { border-left-color: #f85149; }
-
-  /* ── sensor/mode badges ── */
-  .badge-hw { display:inline-block; background:#1a4a1a; color:#3fb950; border:1px solid #3fb950; border-radius:4px; font-size:0.65rem; font-weight:700; letter-spacing:0.06em; padding:1px 7px; vertical-align:middle; text-transform:uppercase; }
-  .badge-mock { display:inline-block; background:#3d2b00; color:#d29922; border:1px solid #d29922; border-radius:4px; font-size:0.65rem; font-weight:700; letter-spacing:0.06em; padding:1px 7px; vertical-align:middle; text-transform:uppercase; }
-  .badge-offline { display:inline-block; background:#3d0000; color:#f85149; border:1px solid #f85149; border-radius:4px; font-size:0.65rem; font-weight:700; letter-spacing:0.06em; padding:1px 7px; vertical-align:middle; text-transform:uppercase; }
-  .badge-error { display:inline-block; background:#4d1f00; color:#ff7b72; border:1px solid #ff7b72; border-radius:4px; font-size:0.65rem; font-weight:700; letter-spacing:0.06em; padding:1px 7px; vertical-align:middle; text-transform:uppercase; }
-
-  /* ── telemetry status row cards ── */
-  .telem-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:6px; background:#161b22; border:1px solid #21262d; margin-bottom:6px; font-size:0.85rem; }
-  .telem-label { flex:1; font-weight:600; color:#e6edf3; }
-  .telem-val { color:#adbac7; font-size:0.8rem; }
-
-  /* ── divider spacing ── */
-  .block-container > hr { margin: 1.5rem 0 !important; }
+  /* ── hide stale Streamlit elements ── */
+  [data-testid="stDataFrame"] { font-size: 0.78rem; }
+  hr { margin: 0.8rem 0 !important; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -169,7 +162,9 @@ _DEFAULTS = {
     "voice_mode": False,
     "voice_speak_replies": True,
     "last_refresh": 0.0,
-    "_latency_history": {},  # {str(provider_index): [ema_ms, ...]} rolling 20 readings (#363)
+    "_latency_history": {},
+    "dp_speed": 0.7,
+    "dp_turn": 0.6,
 }
 for k, v in _DEFAULTS.items():
     if k not in st.session_state:
@@ -179,14 +174,11 @@ GW = st.session_state.gateway_url
 
 
 def _hdr() -> dict:
-    """Build auth header from current session state (evaluated on every rerun)."""
     tok = st.session_state.api_token
     return {"Authorization": f"Bearer {tok}"} if tok else {}
 
 
 # ── API helpers ────────────────────────────────────────────────────────────────
-
-
 def _get(path: str, timeout: float = 2.0) -> dict:
     try:
         r = _req.get(f"{GW}{path}", headers=_hdr(), timeout=timeout)
@@ -205,1287 +197,924 @@ def _fmt_uptime(s) -> str:
     return f"{h:02d}:{m:02d}:{sc:02d}" if h else f"{m:02d}:{sc:02d}"
 
 
-def _dot_html(ok, true_col="#3fb950", false_col="#f85149", none_col="#6e7681") -> str:
-    color = true_col if ok is True else (false_col if ok is False else none_col)
+def _dot(ok, tc="#3fb950", fc="#f85149") -> str:
+    color = tc if ok else fc
     return f'<span style="color:{color};font-size:0.9em;">●</span>'
 
 
-# ── fetch all data once per render ────────────────────────────────────────────
-health = _get("/health")
-status = _get("/api/status")
-proc = _get("/api/fs/proc")
-driver = _get("/api/driver/health")
-learner = _get("/api/learner/stats")
-hist = _get("/api/command/history?limit=8")
-episodes = _get("/api/memory/episodes?limit=20")
-usage = _get("/api/usage")
-
-# Sensor telemetry for status panel
-_imu_raw = _get("/api/imu/latest")
-_imu_orient = _get("/api/imu/orientation")  # may 500 on alex
-_lidar_raw = _get("/api/lidar/scan")
-_bat_raw = _get("/api/battery/latest")
-
-# Determine real vs mock for each sensor
-_imu_mode = _imu_raw.get("mode", "offline") if _imu_raw else "offline"
-_lidar_mode = _lidar_raw.get("mode", "offline") if _lidar_raw else "offline"
-_bat_mode = _bat_raw.get("mode", "offline") if _bat_raw else "offline"
-
-
-def _sensor_badge(mode: str) -> str:
+def _badge(mode: str) -> str:
     if mode == "hardware":
-        return '<span class="badge-hw">HARDWARE</span>'
+        return '<span class="bw">HW</span>'
     if mode == "mock":
-        return '<span class="badge-mock">MOCK</span>'
+        return '<span class="bm">MOCK</span>'
     if mode == "error":
-        return '<span class="badge-error">ERROR</span>'
-    return '<span class="badge-offline">OFFLINE</span>'
+        return '<span class="be">ERR</span>'
+    return '<span class="bx">OFFLINE</span>'
 
 
-robot_name = status.get("robot_name", health.get("robot_name", "Bob"))
-uptime = health.get("uptime_s", 0)
-brain_ok = health.get("brain")
-driver_ok = health.get("driver")
+# ── fetch all data once per render ────────────────────────────────────────────
+health   = _get("/health")
+status   = _get("/api/status")
+proc     = _get("/api/fs/proc")
+driver   = _get("/api/driver/health")
+learner  = _get("/api/learner/stats")
+hist     = _get("/api/command/history?limit=8")
+episodes = _get("/api/memory/episodes?limit=20")
+usage    = _get("/api/usage")
+_imu_raw   = _get("/api/imu/latest")
+_imu_orient = _get("/api/imu/orientation")
+_lidar_raw  = _get("/api/lidar/scan")
+_bat_raw    = _get("/api/battery/latest")
+
+_imu_mode   = _imu_raw.get("mode", "offline")  if _imu_raw   else "offline"
+_lidar_mode = _lidar_raw.get("mode", "offline") if _lidar_raw else "offline"
+_bat_mode   = _bat_raw.get("mode", "offline")   if _bat_raw   else "offline"
+
+robot_name     = status.get("robot_name", health.get("robot_name", "robot"))
+uptime         = health.get("uptime_s", 0)
+brain_ok       = health.get("brain")
+driver_ok      = health.get("driver")
 channels_active = status.get("channels_active", health.get("channels", []))
-cam_ok = str(proc.get("camera", "")).lower() in ("online", "true", "ok")
+cam_ok  = str(proc.get("camera", "")).lower() in ("online", "true", "ok")
 loop_count = proc.get("loop_count", 0)
-avg_lat = proc.get("avg_latency_ms", 0)
-lat_color = "#3fb950" if avg_lat < 300 else "#d29922" if avg_lat < 1000 else "#f85149"
+avg_lat    = proc.get("avg_latency_ms", 0)
 
-# ── HEADER STATUS BAR ─────────────────────────────────────────────────────────
-ch_html = (
-    " &nbsp;·&nbsp; ".join(f'<span style="color:#58a6ff">{c}</span>' for c in channels_active)
-    if channels_active
-    else '<span style="color:#6e7681">no channels</span>'
-)
-
-st.markdown(
-    f"""
-<div class="status-bar">
-  🤖 &nbsp;<strong>{robot_name}</strong>
-  &nbsp;&nbsp;&nbsp;
-  {_dot_html(brain_ok)} brain&nbsp;<strong>{"online" if brain_ok else "offline"}</strong>
-  &nbsp;&nbsp;
-  {_dot_html(driver_ok, "#3fb950", "#d29922")} driver&nbsp;<strong>{"online" if driver_ok else "mock"}</strong>
-  &nbsp;&nbsp;&nbsp;
-  📡 &nbsp;{ch_html}
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <span style="color:#6e7681">↑ {_fmt_uptime(uptime)}</span>
-  &nbsp;&nbsp;
-  {_dot_html(cam_ok)} camera&nbsp;<strong>{"live" if cam_ok else "offline"}</strong>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-# ── TELEMETRY STATUS PANEL ─────────────────────────────────────────────────────
-_telem_cols = st.columns(5)
-_sensors = [
-    ("🧭 IMU", _imu_mode, _imu_raw.get("model", "") if _imu_raw else ""),
-    ("📡 LiDAR", _lidar_mode, "RPLidar" if _lidar_mode == "hardware" else "not connected"),
-    (
-        "🔋 Battery",
-        _bat_mode,
-        f"{_bat_raw.get('voltage_v', 0):.1f}V"
-        if _bat_raw and _bat_raw.get("voltage_v")
-        else "no sensor",
-    ),
-    ("🦾 Driver", driver.get("mode", "offline"), driver.get("driver_type", "?")),
-    ("📷 Camera", "hardware" if cam_ok else "offline", "live" if cam_ok else "no signal"),
-]
-for col, (name, mode, detail) in zip(_telem_cols, _sensors, strict=False):
-    badge = _sensor_badge(mode)
-    col.markdown(
-        f'<div class="telem-row"><div><div class="telem-label">{name}</div>'
-        f'<div class="telem-val">{detail}</div></div>{badge}</div>',
-        unsafe_allow_html=True,
-    )
-
-# ── SIDEBAR ───────────────────────────────────────────────────────────────────
+# ── SIDEBAR (settings + quick actions) ────────────────────────────────────────
 with st.sidebar:
     st.markdown("### ⚙️ Settings")
-    st.session_state.gateway_url = st.text_input("Gateway URL", value=st.session_state.gateway_url)
+    st.session_state.gateway_url = st.text_input(
+        "Gateway URL", value=st.session_state.gateway_url
+    )
     st.session_state.api_token = st.text_input(
         "API Token", value=st.session_state.api_token, type="password"
     )
-    refresh_s = st.slider("Auto-refresh (s)", 1, 10, 3)
+    refresh_s = st.slider("Refresh (s)", 1, 10, 3)
     st.divider()
-
-    # Emergency Stop — always prominent
-    st.markdown("### 🛑 Emergency Stop")
-    if st.button("EMERGENCY STOP", type="primary", width="stretch"):
+    st.markdown("### 🛑 E-STOP")
+    if st.button("⏹ EMERGENCY STOP", type="primary", use_container_width=True):
         try:
             _req.post(f"{GW}/api/stop", headers=_hdr(), timeout=3)
-            st.warning("⚠️ Motors disengaged!")
-        except Exception as e:
-            st.error(f"E-stop failed: {e}")
-
+            st.warning("Motors disengaged!")
+        except Exception as _e:
+            st.error(f"E-stop failed: {_e}")
+    if st.button("▶ Clear Stop", use_container_width=True):
+        try:
+            _req.post(f"{GW}/api/estop/clear", headers=_hdr(), timeout=3)
+            st.success("Stop cleared")
+        except Exception as _e:
+            st.error(f"Clear failed: {_e}")
     st.divider()
-    st.markdown("### 🎤 Voice Mode")
-    st.session_state.voice_mode = st.toggle(
-        "Continuous Voice",
-        value=st.session_state.voice_mode,
-    )
+    st.markdown("### 🎤 Voice")
+    st.session_state.voice_mode = st.toggle("Continuous voice", value=st.session_state.voice_mode)
     if st.session_state.voice_mode:
         st.session_state.voice_speak_replies = st.checkbox(
             "Speak replies", value=st.session_state.voice_speak_replies
         )
-        st.components.v1.html(
-            """
-<script>
-function castorStartVoice() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { alert('Voice not supported — use Chrome/Edge'); return; }
-  const r = new SR();
-  r.lang = 'en-US';
-  r.onresult = e => window.parent.postMessage(
-    {type:'streamlit:setComponentValue', value: e.results[0][0].transcript}, '*');
-  r.start();
-}
-</script>
-<button onclick="castorStartVoice()"
-  style="padding:8px 16px;border-radius:20px;background:#238636;color:white;
-         border:none;cursor:pointer;width:100%;font-size:13px;">
-  🎤 Browser Mic
-</button>""",
-            height=48,
+
+# ── HEADER STATUS BAR ─────────────────────────────────────────────────────────
+_ch_html = (
+    " · ".join(f'<span style="color:#58a6ff">{c}</span>' for c in channels_active)
+    if channels_active
+    else '<span style="color:#6e7681">no channels</span>'
+)
+st.markdown(
+    f"""<div class="status-bar">
+  🤖 <strong>{robot_name}</strong> &nbsp;
+  {_dot(brain_ok)} brain <strong>{"on" if brain_ok else "off"}</strong> &nbsp;
+  {_dot(driver_ok, "#3fb950", "#d29922")} driver <strong>{"hw" if driver_ok else "mock"}</strong>
+  &nbsp; 📡 {_ch_html} &nbsp;
+  <span style="color:#6e7681">⏱ {_fmt_uptime(uptime)}</span> &nbsp;
+  {_dot(cam_ok)} cam <strong>{"live" if cam_ok else "off"}</strong>
+</div>""",
+    unsafe_allow_html=True,
+)
+
+# ── TABS ──────────────────────────────────────────────────────────────────────
+_tab_ctrl, _tab_status, _tab_chat, _tab_fleet, _tab_builder = st.tabs(
+    ["🕹️ Control", "📊 Status", "💬 Chat", "🤖 Fleet", "🔧 Builder"]
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 🕹️ CONTROL TAB
+# ═══════════════════════════════════════════════════════════════════════════════
+with _tab_ctrl:
+    # E-STOP row always at top
+    _estop_c, _clr_c, _gp_c = st.columns([2, 2, 3])
+    with _estop_c:
+        if st.button("⏹ E-STOP", type="primary", use_container_width=True, key="ctrl_estop"):
+            try:
+                _req.post(f"{GW}/api/stop", headers=_hdr(), timeout=3)
+                st.toast("Motors stopped!", icon="⏹")
+            except Exception as _e:
+                st.error(str(_e))
+    with _clr_c:
+        if st.button("▶ Clear", use_container_width=True, key="ctrl_clear"):
+            try:
+                _req.post(f"{GW}/api/estop/clear", headers=_hdr(), timeout=3)
+                st.toast("Stop cleared", icon="▶")
+            except Exception as _e:
+                st.error(str(_e))
+    with _gp_c:
+        _gp_tok = st.session_state.api_token
+        _gp_url = f"{GW.rstrip('/')}/gamepad" + (f"?token={_gp_tok}" if _gp_tok else "")
+        st.markdown(
+            f'<a href="{_gp_url}" target="_blank" style="display:inline-flex;align-items:center;'
+            f'height:48px;padding:0 16px;background:#1f6feb;color:#fff;border-radius:8px;'
+            f'text-decoration:none;font-size:0.9rem;border:1px solid #388bfd;white-space:nowrap;">'
+            f"🎮 Open Gamepad Controller →</a>",
+            unsafe_allow_html=True,
         )
 
-# ── MAIN BODY ─────────────────────────────────────────────────────────────────
-left_col, right_col = st.columns([3, 2], gap="medium")
+    st.divider()
 
-# ═══════════════════════════════════════════════════════════════════
-# LEFT COLUMN — camera feed + command input
-# ═══════════════════════════════════════════════════════════════════
-with left_col:
-    # ── Live camera ──────────────────────────────────────────────
-    st.markdown(
-        '<p class="section-header green">📷 Live Camera — OAK-D USB3 · 640×480 @ 30fps</p>',
-        unsafe_allow_html=True,
-    )
+    # ── Camera + D-pad side by side on desktop, stacked on mobile ─────────────
+    _cam_col, _dpad_col = st.columns([3, 2], gap="medium")
 
-    _tok = st.session_state.api_token
-    cam_border_style = "border:2px solid #3fb950;" if cam_ok else "border:2px solid #f85149;"
-    # Parse host/port from GW so we can pass them to JS without relying on
-    # window.location inside the about:blank Streamlit component iframe.
-    _gw_host = GW.replace("http://", "").replace("https://", "").split(":")[0]
-    _gw_port = GW.split(":")[-1].split("/")[0] if ":" in GW else "8000"
-    _gw_proto = "https:" if GW.startswith("https") else "http:"
-    _tok_js = _tok.replace('"', '\\"') if _tok else ""
-    st.components.v1.html(
-        f"""
+    with _cam_col:
+        st.markdown('<p class="sh g">📷 Live Camera</p>', unsafe_allow_html=True)
+        _tok = st.session_state.api_token
+        _tok_js = _tok.replace('"', '\\"') if _tok else ""
+        _gw_host = GW.replace("http://", "").replace("https://", "").split(":")[0]
+        _gw_port = GW.split(":")[-1].split("/")[0] if ":" in GW else "8000"
+        _gw_proto = "https:" if GW.startswith("https") else "http:"
+        _cam_border = "2px solid #3fb950" if cam_ok else "2px solid #f85149"
+        _cam_anim = "none" if cam_ok else "cam-pulse 2s ease-in-out infinite"
+        st.components.v1.html(
+            f"""
 <style>
 @keyframes cam-pulse {{
-  0%   {{ border-color:#f85149; box-shadow:0 0 0px #f85149; }}
-  50%  {{ border-color:#ff7b72; box-shadow:0 0 8px #f85149; }}
-  100% {{ border-color:#f85149; box-shadow:0 0 0px #f85149; }}
+  0%,100% {{ border-color:#f85149; box-shadow:0 0 0px #f85149; }}
+  50%      {{ border-color:#ff7b72; box-shadow:0 0 8px #f85149; }}
 }}
-.cam-wrap {{ animation: {"cam-pulse 2s ease-in-out infinite" if not cam_ok else "none"}; }}
 </style>
-<div class="cam-wrap" style="background:#0d1117;{cam_border_style}border-radius:8px;
-            overflow:hidden;aspect-ratio:4/3;max-height:420px;position:relative;">
-  <img id="cam" src=""
-       style="width:100%;height:100%;object-fit:cover;display:block;"
-       onerror="document.getElementById('cam-err').style.display='flex';
-                this.style.display='none';" />
-  <div id="cam-err"
-       style="display:none;position:absolute;inset:0;align-items:center;
-              justify-content:center;flex-direction:column;color:#8b949e;
-              font-family:monospace;font-size:0.85rem;background:#0d1117;">
-    <div style="font-size:2rem;margin-bottom:8px;">📷</div>
-    <div>No camera signal</div>
-    <div id="cam-url-err" style="margin-top:4px;font-size:0.7rem;color:#6e7681;"></div>
+<div style="background:#0d1117;border:{_cam_border};border-radius:8px;overflow:hidden;
+            aspect-ratio:4/3;max-height:380px;position:relative;
+            animation:{_cam_anim};">
+  <img id="cam" src="" style="width:100%;height:100%;object-fit:cover;display:block;"
+       onerror="document.getElementById('cam-err').style.display='flex';this.style.display='none';" />
+  <div id="cam-err" style="display:none;position:absolute;inset:0;align-items:center;
+       justify-content:center;flex-direction:column;color:#8b949e;font-family:monospace;
+       font-size:0.85rem;background:#0d1117;">
+    <div style="font-size:2rem;margin-bottom:8px;">📷</div><div>No camera signal</div>
   </div>
 </div>
-<div style="margin-top:4px;font-family:monospace;font-size:0.7rem;color:#6e7681;">
-  Stream: <a id="cam-link" href="#" target="_blank" style="color:#58a6ff;">resolving…</a>
-</div>
 <script>
-(function() {{
-  var tok = "{_tok_js}";
-  var port = "{_gw_port}";
-  var cfgHost = "{_gw_host}";
-  var proto = "{_gw_proto}";
-  // If config host is localhost/127.0.0.1, use the browser's parent-frame host
-  // (the Streamlit iframe runs in about:blank so window.location is empty)
-  var host = cfgHost;
-  if (host === "127.0.0.1" || host === "localhost" || host === "") {{
-    try {{ var ph = window.parent.location.hostname; if (ph) host = ph; }} catch(e) {{}}
-    try {{ var th = window.top.location.hostname;    if (th) host = th; }} catch(e) {{}}
+(function(){{
+  var tok="{_tok_js}", port="{_gw_port}", cfgHost="{_gw_host}", proto="{_gw_proto}";
+  var host=cfgHost;
+  if(host==="127.0.0.1"||host==="localhost"||host===""){{
+    try{{var ph=window.parent.location.hostname;if(ph)host=ph;}}catch(e){{}}
+    try{{var th=window.top.location.hostname;if(th)host=th;}}catch(e){{}}
   }}
-  var base = proto + "//" + host + ":" + port + "/api/stream/mjpeg";
-  var url = tok ? base + "?token=" + encodeURIComponent(tok) : base;
-  var img = document.getElementById("cam");
-  var link = document.getElementById("cam-link");
-  var errUrl = document.getElementById("cam-url-err");
-  if (img)  {{ img.src = url; }}
-  if (link) {{ link.href = url; link.textContent = base; }}
-  if (errUrl) {{ errUrl.textContent = base; }}
+  var base=proto+"//"+host+":"+port+"/api/stream/mjpeg";
+  var url=tok?base+"?token="+encodeURIComponent(tok):base;
+  var img=document.getElementById("cam");
+  if(img)img.src=url;
 }})();
-</script>
-""",
-        height=460,
-    )
-
-    # ── Depth obstacle badges (Issue #117) ──────────────────────
-    _depth_obs = _get("/api/depth/obstacles")
-    if _depth_obs.get("available"):
-        st.markdown('<p class="panel-title">📏 Obstacle Distances</p>', unsafe_allow_html=True)
-        _do_l, _do_c, _do_r = st.columns(3)
-        _do_l.metric(
-            "Left", f"{_depth_obs['left_cm']:.0f} cm" if _depth_obs.get("left_cm") else "—"
-        )
-        _do_c.metric(
-            "Center", f"{_depth_obs['center_cm']:.0f} cm" if _depth_obs.get("center_cm") else "—"
-        )
-        _do_r.metric(
-            "Right", f"{_depth_obs['right_cm']:.0f} cm" if _depth_obs.get("right_cm") else "—"
+</script>""",
+            height=400,
         )
 
-    st.divider()
+        # Depth obstacle badges
+        _depth = _get("/api/depth/obstacles")
+        if _depth.get("available"):
+            st.markdown('<p class="sh">📏 Obstacles</p>', unsafe_allow_html=True)
+            _dl, _dc, _dr = st.columns(3)
+            _dl.metric("Left",   f"{_depth.get('left_cm', 0):.0f} cm"   if _depth.get("left_cm")   else "—")
+            _dc.metric("Center", f"{_depth.get('center_cm', 0):.0f} cm" if _depth.get("center_cm") else "—")
+            _dr.metric("Right",  f"{_depth.get('right_cm', 0):.0f} cm"  if _depth.get("right_cm")  else "—")
 
-    # ── Command input ─────────────────────────────────────────────
-    st.markdown('<p class="section-header">💬 Command</p>', unsafe_allow_html=True)
+    with _dpad_col:
+        st.markdown('<p class="sh">🕹️ Manual Drive</p>', unsafe_allow_html=True)
 
-    # Voice button (server-side mic via local STT)
-    if st.button("🎤 Speak"):
-        try:
-            import speech_recognition as sr
+        _spd = st.slider("Speed", 0.1, 1.0, st.session_state.dp_speed, 0.05, key="dp_speed_sl")
+        _trn = st.slider("Turn",  0.1, 1.0, st.session_state.dp_turn,  0.05, key="dp_turn_sl")
+        st.session_state.dp_speed = _spd
+        st.session_state.dp_turn  = _trn
 
-            recognizer = sr.Recognizer()
-            with sr.Microphone() as source:
-                st.toast("Listening…", icon="🎤")
-                audio = recognizer.listen(source, timeout=8, phrase_time_limit=30)
-                text = recognizer.recognize_google(audio)
-                st.session_state["voice_input"] = text
-                if st.session_state.voice_mode:
-                    st.toast(f"Heard: {text[:60]}", icon="✅")
-        except Exception as e:
-            st.toast(f"Voice: {e}", icon="❌")
+        # D-pad grid  [  ] [▲] [  ]
+        #             [◀] [■] [▶]
+        #             [  ] [▼] [  ]
+        _r1a, _r1b, _r1c = st.columns(3)
+        _r2a, _r2b, _r2c = st.columns(3)
+        _r3a, _r3b, _r3c = st.columns(3)
 
-    # Push-to-Talk button — delegates mic capture to the gateway STT endpoint
-    if st.button("🎙️ Push to Talk", help="Uses gateway /api/voice/listen (STT via server mic)"):
-        try:
-            with st.spinner("Listening…"):
-                resp = _req.post(
-                    f"{GW}/api/voice/listen",
-                    headers=_hdr(),
-                    timeout=20,
-                )
-            if resp.ok:
-                data = resp.json()
-                transcript = data.get("transcript", "")
-                thought = data.get("thought") or {}
-                st.toast(f"Heard: {transcript[:80]}", icon="🎙️")
-                if thought.get("raw_text"):
-                    st.toast(f"Reply: {thought['raw_text'][:80]}", icon="🤖")
-                if transcript:
-                    st.session_state["voice_input"] = transcript
-            else:
-                err = resp.json().get("detail", resp.text)
-                st.toast(f"PTT error: {err}", icon="❌")
-        except Exception as _ptt_exc:
-            st.toast(f"PTT: {_ptt_exc}", icon="❌")
-
-    prompt = st.chat_input("Type a command…")
-    user_text = prompt or st.session_state.pop("voice_input", None)
-
-    # Chat history (compact)
-    msg_container = st.container(height=180)
-    with msg_container:
-        for m in st.session_state.messages[-6:]:
-            with st.chat_message(m["role"]):
-                st.markdown(m["content"])
-
-    if user_text:
-        st.session_state.messages.append({"role": "user", "content": user_text})
-        with st.spinner("Thinking…"):
+        def _move(lin, ang):
             try:
-                r = _req.post(
-                    f"{GW}/api/command",
-                    json={"instruction": user_text},
-                    headers=_hdr(),
-                    timeout=30,
+                _req.post(
+                    f"{GW}/api/action",
+                    json={"type": "move", "linear": round(lin, 2), "angular": round(ang, 2),
+                          "duration_ms": 600},
+                    headers=_hdr(), timeout=2,
                 )
-                reply = r.json().get("raw_text", str(r.json())) if r.ok else f"[{r.status_code}]"
-            except Exception as e:
-                reply = f"[error] {e}"
+            except Exception:
+                pass
 
-        st.session_state.messages.append({"role": "assistant", "content": reply})
-
-        # Browser speech synthesis in voice mode
-        if st.session_state.voice_mode and st.session_state.voice_speak_replies:
-            safe = reply.replace("\\", "\\\\").replace("`", "\\`").replace('"', '\\"')
-            st.components.v1.html(
-                f"<script>(()=>{{const u=new SpeechSynthesisUtterance(`{safe}`);"
-                "u.lang='en-US';window.speechSynthesis.cancel();window.speechSynthesis.speak(u);}})();</script>",
-                height=0,
-            )
-        st.rerun()
-
-    # ── Live Logs ─────────────────────────────────────────────────
-    st.divider()
-    st.markdown(
-        '<p class="section-header green">📋 Live Logs</p>',
-        unsafe_allow_html=True,
-    )
-    with st.expander(f"Gateway log — last 50 lines (refreshes every {refresh_s}s)", expanded=True):
-        import subprocess as _subprocess
-        from pathlib import Path as _Path
-
-        _log_lines: list = []
-        _log_source = ""
-        # 1. Try journalctl (systemd --user service)
-        try:
-            _jctl = _subprocess.run(
-                [
-                    "journalctl",
-                    "--user",
-                    "-u",
-                    "opencastor.service",
-                    "-n",
-                    "50",
-                    "--no-pager",
-                    "--output=short",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if _jctl.returncode == 0 and _jctl.stdout.strip():
-                _log_lines = _jctl.stdout.splitlines()
-                _log_source = "journalctl --user -u opencastor.service"
-        except Exception:
-            pass
-        # 2. Fallback: /tmp log files
-        if not _log_lines:
-            for _log_candidate in [
-                "/tmp/alex_gateway.log",
-                "/tmp/bob_gateway.log",
-                "/tmp/castor_gateway.log",
-            ]:
+        with _r1b:
+            if st.button("▲", use_container_width=True, key="dp_fwd", help="Forward"):
+                _move(_spd, 0.0)
+        with _r2a:
+            if st.button("◀", use_container_width=True, key="dp_left", help="Turn left"):
+                _move(0.0, _trn)
+        with _r2b:
+            if st.button("■", use_container_width=True, key="dp_stop", help="Stop", type="primary"):
                 try:
-                    _raw = _Path(_log_candidate).read_text(errors="replace")
-                    _log_lines = _raw.splitlines()[-50:]
-                    _log_source = _log_candidate
-                    break
+                    _req.post(f"{GW}/api/stop", headers=_hdr(), timeout=2)
                 except Exception:
-                    continue
-        if _log_lines:
-            st.caption(f"Source: {_log_source}")
-            st.code("\n".join(_log_lines), language=None)
-        else:
-            st.caption("No gateway log found — start the gateway or check systemd service")
+                    pass
+        with _r2c:
+            if st.button("▶", use_container_width=True, key="dp_right", help="Turn right"):
+                _move(0.0, -_trn)
+        with _r3b:
+            if st.button("▼", use_container_width=True, key="dp_back", help="Backward"):
+                _move(-_spd, 0.0)
 
-# ═══════════════════════════════════════════════════════════════════
-# RIGHT COLUMN — status panels (mirrors terminal watch)
-# ═══════════════════════════════════════════════════════════════════
-with right_col:
-    # ── Status & Telemetry ────────────────────────────────────────
-    st.markdown('<p class="section-header">⚡ Status & Telemetry</p>', unsafe_allow_html=True)
+        st.divider()
+        st.markdown('<p class="sh">🎤 Voice</p>', unsafe_allow_html=True)
+        if st.button("🎙️ Push to Talk", use_container_width=True, key="ptt_ctrl"):
+            try:
+                with st.spinner("Listening…"):
+                    resp = _req.post(f"{GW}/api/voice/listen", headers=_hdr(), timeout=20)
+                if resp.ok:
+                    data = resp.json()
+                    transcript = data.get("transcript", "")
+                    thought = data.get("thought") or {}
+                    if transcript:
+                        st.toast(f"Heard: {transcript[:60]}", icon="🎙️")
+                    if thought.get("raw_text"):
+                        st.toast(f"Reply: {thought['raw_text'][:60]}", icon="🤖")
+                else:
+                    st.toast(f"PTT error: {resp.status_code}", icon="❌")
+            except Exception as _ptt_e:
+                st.toast(f"PTT: {_ptt_e}", icon="❌")
 
+        if st.button("🎤 Server Mic (STT)", use_container_width=True, key="stt_ctrl"):
+            try:
+                import speech_recognition as _sr
+                rec = _sr.Recognizer()
+                with _sr.Microphone() as src:
+                    st.toast("Listening…", icon="🎤")
+                    audio = rec.listen(src, timeout=8, phrase_time_limit=30)
+                    text = rec.recognize_google(audio)
+                    st.session_state["voice_input"] = text
+            except Exception as _stt_e:
+                st.toast(f"STT: {_stt_e}", icon="❌")
+
+        st.divider()
+        st.markdown(
+            f'<p class="sh">🎮 Gamepad</p>'
+            f'<a href="{_gp_url}" target="_blank" style="display:inline-block;padding:6px 14px;'
+            f'background:#161b22;color:#58a6ff;border-radius:6px;text-decoration:none;'
+            f'font-size:0.8rem;border:1px solid #30363d;">Open controller page →</a>'
+            f'<div style="color:#6e7681;font-size:0.68rem;margin-top:4px;">'
+            f'D-pad/stick=move · A/B=stop · L=reboot · R=shutdown · Start=ESTOP</div>',
+            unsafe_allow_html=True,
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 📊 STATUS TAB
+# ═══════════════════════════════════════════════════════════════════════════════
+with _tab_status:
+    # ── Sensor badges row ──────────────────────────────────────────────────────
+    _s1, _s2, _s3, _s4, _s5 = st.columns(5)
+    _sensors = [
+        ("🧭 IMU",    _imu_mode,   _imu_raw.get("model", "") if _imu_raw else ""),
+        ("📡 LiDAR",  _lidar_mode, "RPLidar" if _lidar_mode == "hardware" else "none"),
+        ("🔋 Battery", _bat_mode,  f"{_bat_raw.get('voltage_v', 0):.1f}V" if _bat_raw and _bat_raw.get("voltage_v") else "no sensor"),
+        ("🦾 Driver",  driver.get("mode", "offline"), (driver.get("driver_type") or "—").replace("Driver", "")),
+        ("📷 Camera",  "hardware" if cam_ok else "offline", "live" if cam_ok else "no signal"),
+    ]
+    for col, (name, mode, detail) in zip([_s1, _s2, _s3, _s4, _s5], _sensors, strict=False):
+        col.markdown(
+            f'<div class="tr"><div><div class="tl">{name}</div>'
+            f'<div class="tv">{detail}</div></div>{_badge(mode)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+
+    # ── Key metrics ──────────────────────────────────────────────────────────
     speaker_ok = str(proc.get("speaker", "")).lower() in ("online", "true", "ok")
     _today = (usage.get("daily") or [{}])[-1] if usage.get("daily") else {}
-    _today_tokens = _today.get("total_tokens", 0)
-    _today_cost = _today.get("cost_usd", 0.0)
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Uptime", _fmt_uptime(uptime))
-    c2.metric("Loops", str(loop_count))
-    c3.metric("Latency", f"{avg_lat:.0f} ms" if avg_lat else "—")
-    c1.metric("Camera", "live ●" if cam_ok else "offline ○")
-    c2.metric("Speaker", "online" if speaker_ok else "offline")
-    c3.metric("Tokens", f"{_today_tokens:,}" if _today_tokens else "0")
-
-    if _imu_mode == "mock" or _lidar_mode == "mock" or _bat_mode == "mock":
-        _mock_sensors = [
-            s
-            for s, m in [("IMU", _imu_mode), ("LiDAR", _lidar_mode), ("Battery", _bat_mode)]
-            if m == "mock"
-        ]
-        st.warning(
-            f"Simulated sensors: {', '.join(_mock_sensors)} — not physically connected",
-            icon=None,
-        )
+    _mc1, _mc2, _mc3, _mc4, _mc5, _mc6 = st.columns(6)
+    _mc1.metric("Uptime",   _fmt_uptime(uptime))
+    _mc2.metric("Loops",    str(loop_count))
+    _mc3.metric("Latency",  f"{avg_lat:.0f} ms" if avg_lat else "—")
+    _mc4.metric("Camera",   "live ●" if cam_ok else "offline ○")
+    _mc5.metric("Speaker",  "online" if speaker_ok else "offline")
+    _mc6.metric("Tokens",   f"{_today.get('total_tokens', 0):,}")
 
     last_thought = str(proc.get("last_thought") or "")
     if last_thought:
-        st.caption(f"💭 {last_thought[:80]}{'…' if len(last_thought) > 80 else ''}")
+        st.caption(f"💭 {last_thought[:120]}{'…' if len(last_thought) > 120 else ''}")
 
     st.divider()
 
-    # ── Driver + Battery (side by side) ─────────────────────────
-    _drv_bat_col, _bat_col = st.columns(2)
+    # ── Driver + Battery ──────────────────────────────────────────────────────
+    _drv_col, _bat_col = st.columns(2)
 
-    with _drv_bat_col:
-        st.markdown('<p class="section-header orange">🦾 Driver</p>', unsafe_allow_html=True)
-        drv_ok = driver.get("ok")
-        drv_mode = driver.get("mode", "?")
-        drv_type = driver.get("driver_type", "PCA9685")
-        drv_err = driver.get("error", "")
-        dc1, dc2 = st.columns(2)
-        dc1.metric("Mode", drv_mode.capitalize() if drv_mode else "—")
-        dc2.metric("Type", (drv_type or "—").replace("PCA9685RC", "RC").replace("Driver", ""))
-        if drv_err:
-            st.caption(f"ℹ️ {drv_err[:52]}")
+    with _drv_col:
+        st.markdown('<p class="sh o">🦾 Driver</p>', unsafe_allow_html=True)
+        _dc1, _dc2 = st.columns(2)
+        _drv_mode = driver.get("mode", "?")
+        _drv_type = (driver.get("driver_type") or "—").replace("PCA9685RC", "RC").replace("Driver", "")
+        _dc1.metric("Mode", (_drv_mode or "—").capitalize())
+        _dc2.metric("Type", _drv_type)
+        if driver.get("error"):
+            st.caption(f"ℹ️ {str(driver['error'])[:60]}")
 
     with _bat_col:
-        st.markdown('<p class="section-header green">🔋 Battery</p>', unsafe_allow_html=True)
-        _bat_mode_cur = _bat_raw.get("mode", "offline") if _bat_raw else "offline"
-        if _bat_mode_cur == "mock":
-            st.warning(
-                "Mock mode — No battery sensor connected. Readings are simulated.", icon=None
-            )
-        elif _bat_raw and (
-            _bat_raw.get("available", False) or _bat_raw.get("voltage_v") is not None
-        ):
+        st.markdown('<p class="sh g">🔋 Battery</p>', unsafe_allow_html=True)
+        if _bat_mode == "mock":
+            st.warning("Mock — no battery sensor", icon=None)
+        elif _bat_raw and (_bat_raw.get("available") or _bat_raw.get("voltage_v") is not None):
             _bv = _bat_raw.get("voltage_v")
             _bc = _bat_raw.get("current_ma")
-            _bp = _bat_raw.get("power_mw")
-            _bat1, _bat2 = st.columns(2)
-            _bat1.metric("Voltage", f"{_bv:.1f}V" if _bv is not None else "—")
-            _bat2.metric("Current", f"{_bc:.0f}mA" if _bc is not None else "—")
-            st.metric("Power", f"{_bp:.0f}mW" if _bp is not None else "—")
-            # ── Battery gauge (#294) ──────────────────────────────
+            _bb1, _bb2 = st.columns(2)
+            _bb1.metric("Voltage", f"{_bv:.1f}V" if _bv is not None else "—")
+            _bb2.metric("Current", f"{_bc:.0f}mA" if _bc is not None else "—")
             if _bv is not None:
-                _bat_min_v = float(os.getenv("CASTOR_BAT_MIN_V", "3.0"))
-                _bat_max_v = float(os.getenv("CASTOR_BAT_MAX_V", "4.2"))
-                _bat_range = _bat_max_v - _bat_min_v
-                _bat_pct = (
-                    max(0.0, min(1.0, (_bv - _bat_min_v) / _bat_range)) if _bat_range > 0 else 0.5
-                )
-                _bat_icon = "🟢" if _bat_pct > 0.5 else ("🟡" if _bat_pct > 0.2 else "🔴")
-                st.progress(_bat_pct, text=f"{_bat_icon} {_bat_pct:.0%} charge")
+                _bat_min = float(os.getenv("CASTOR_BAT_MIN_V", "3.0"))
+                _bat_max = float(os.getenv("CASTOR_BAT_MAX_V", "4.2"))
+                _bat_rng = _bat_max - _bat_min
+                _bat_pct = max(0.0, min(1.0, (_bv - _bat_min) / _bat_rng)) if _bat_rng else 0.5
+                _bat_ico = "🟢" if _bat_pct > 0.5 else ("🟡" if _bat_pct > 0.2 else "🔴")
+                st.progress(_bat_pct, text=f"{_bat_ico} {_bat_pct:.0%}")
         else:
             st.caption("No sensor")
 
     st.divider()
 
-    # ── Channels ─────────────────────────────────────────────────
-    st.markdown('<p class="section-header">📡 Channels</p>', unsafe_allow_html=True)
-    ch_avail = status.get("channels_available", {})
-    ch_active = set(channels_active)
-
-    _CH_DISPLAY = {
-        "whatsapp": "WhatsApp",
-        "whatsapp_twilio": "WhatsApp (Twilio)",
-        "telegram": "Telegram",
-        "discord": "Discord",
-        "slack": "Slack",
-        "mqtt": "MQTT",
-        "homeassistant": "Home Assistant",
-        "teams": "Microsoft Teams",
-        "matrix": "Matrix",
+    # ── Channels ──────────────────────────────────────────────────────────────
+    st.markdown('<p class="sh">📡 Channels</p>', unsafe_allow_html=True)
+    _ch_avail = status.get("channels_available", {})
+    _ch_active = set(channels_active)
+    _CH_NAMES = {
+        "whatsapp": "WhatsApp", "whatsapp_twilio": "WhatsApp (Twilio)",
+        "telegram": "Telegram", "discord": "Discord", "slack": "Slack",
+        "mqtt": "MQTT", "homeassistant": "Home Assistant",
     }
-    if ch_avail:
-        ch_rows = []
-        # Sort: active first (🟢), then ready (🟡), then unavail (⚫); alpha within group
-        _order = {"active": 0, "ready": 1, "unavail": 2}
-        for ch_name, avail in sorted(ch_avail.items()):
-            is_active = ch_name in ch_active
-            dot = "🟢" if is_active else ("🟡" if avail else "⚫")
-            ch_status = "active" if is_active else ("ready" if avail else "unavail")
-            display_name = _CH_DISPLAY.get(ch_name, ch_name.replace("_", " ").title())
-            ch_rows.append(
-                {"Channel": display_name, "Status": ch_status, "": dot, "_ord": _order[ch_status]}
-            )
-        ch_rows.sort(key=lambda r: (r["_ord"], r["Channel"]))
-        for r in ch_rows:
-            del r["_ord"]
-        import pandas as pd
-
-        st.dataframe(
-            pd.DataFrame(ch_rows),
-            hide_index=True,
-            width="stretch",
-            height=min(250, 36 + 36 * len(ch_rows)),
-        )
+    if _ch_avail:
+        import pandas as _pd
+        _ch_rows = []
+        for _cn, _av in sorted(_ch_avail.items()):
+            _is_act = _cn in _ch_active
+            _ch_rows.append({
+                "Channel": _CH_NAMES.get(_cn, _cn.replace("_", " ").title()),
+                "": "🟢" if _is_act else ("🟡" if _av else "⚫"),
+                "Status": "active" if _is_act else ("ready" if _av else "unavail"),
+            })
+        _ch_rows.sort(key=lambda r: (0 if r["Status"] == "active" else 1 if r["Status"] == "ready" else 2, r["Channel"]))
+        st.dataframe(_pd.DataFrame(_ch_rows), hide_index=True, use_container_width=True,
+                     height=min(220, 36 + 36 * len(_ch_rows)))
     else:
         st.caption("No channel data")
 
     st.divider()
 
-    # ── Learner + Cache (side by side) ───────────────────────────
-    _lrn_col, _cch_col = st.columns(2)
-
-    with _lrn_col:
-        st.markdown('<p class="section-header">🧠 Learner</p>', unsafe_allow_html=True)
+    # ── Learner + Cache + Fallback ─────────────────────────────────────────────
+    _lc1, _lc2, _lc3 = st.columns(3)
+    with _lc1:
+        st.markdown('<p class="sh">🧠 Learner</p>', unsafe_allow_html=True)
         if learner.get("available"):
-            lc1, lc2 = st.columns(2)
-            lc1.metric("Episodes", learner.get("episodes_analyzed", 0))
-            lc2.metric("Applied", learner.get("improvements_applied", 0))
-            lc1.metric("Rejected", learner.get("improvements_rejected", 0))
-            avg_dur = learner.get("avg_duration_ms")
-            lc2.metric("Avg cycle", f"{avg_dur:.0f}ms" if avg_dur else "—")
+            _l1, _l2 = st.columns(2)
+            _l1.metric("Episodes", learner.get("episodes_analyzed", 0))
+            _l2.metric("Applied",  learner.get("improvements_applied", 0))
         else:
             st.caption("No data yet")
 
     _cs = _get("/api/cache/stats")
-    with _cch_col:
-        st.markdown('<p class="section-header">⚡ Cache</p>', unsafe_allow_html=True)
+    with _lc2:
+        st.markdown('<p class="sh">⚡ Cache</p>', unsafe_allow_html=True)
         if _cs.get("entries") is not None:
             _cc1, _cc2 = st.columns(2)
             _cc1.metric("Hit rate", f"{_cs.get('hit_rate_pct', 0):.1f}%")
-            _cc2.metric("Entries", _cs.get("entries", 0))
+            _cc2.metric("Entries",  _cs.get("entries", 0))
         else:
             st.caption("No data")
 
+    with _lc3:
+        st.markdown('<p class="sh">🔌 Fallback</p>', unsafe_allow_html=True)
+        _fb = status.get("offline_fallback", {})
+        if _fb.get("enabled"):
+            st.metric("Active", "Yes" if _fb.get("using_fallback") else "No")
+            st.caption(_fb.get("fallback_provider", "—"))
+        else:
+            st.caption("Disabled")
+
     st.divider()
 
-    # ── Offline fallback ─────────────────────────────────────────
-    fb = status.get("offline_fallback", {})
-    if fb.get("enabled"):
-        st.markdown('<p class="section-header">🔌 Offline Fallback</p>', unsafe_allow_html=True)
-        fc1, fc2 = st.columns(2)
-        fc1.metric("Using fallback", "Yes" if fb.get("using_fallback") else "No")
-        fc2.metric("Provider", fb.get("fallback_provider", "—"))
-
-    # ── Object Detection ─────────────────────────────────────────
+    # ── Object detection ──────────────────────────────────────────────────────
     _det = _get("/api/detection/latest")
     if _det.get("detections") is not None:
-        st.markdown('<p class="section-header">👁 Detection</p>', unsafe_allow_html=True)
+        st.markdown('<p class="sh">👁 Detection</p>', unsafe_allow_html=True)
         _dets = _det.get("detections", [])
-        _dlat = _det.get("latency_ms", 0)
-        _dmode = _det.get("mode", "mock")
-        st.caption(f"Mode: {_dmode} · {_dlat:.0f}ms · {len(_dets)} objects")
+        st.caption(f"Mode: {_det.get('mode','mock')} · {_det.get('latency_ms',0):.0f}ms · {len(_dets)} objects")
         if _dets:
             for _d in _dets[:5]:
                 _conf = _d.get("confidence", 0)
-                _cls = _d.get("class", "?")
-                _color = "🟢" if _conf > 0.7 else "🟡"
-                st.write(f"{_color} **{_cls}** ({_conf:.0%})")
-        else:
-            st.caption("None detected")
+                st.write(f"{'🟢' if _conf > 0.7 else '🟡'} **{_d.get('class','?')}** ({_conf:.0%})")
 
-# ── BOTTOM — command history ──────────────────────────────────────────────────
-st.divider()
-st.markdown('<p class="section-header">🕒 Recent Commands</p>', unsafe_allow_html=True)
+    st.divider()
 
-history_entries = hist.get("history", [])
-if history_entries:
-    import pandas as pd
+    # ── Recent commands ────────────────────────────────────────────────────────
+    st.markdown('<p class="sh">🕒 Recent Commands</p>', unsafe_allow_html=True)
+    _hist_entries = hist.get("history", [])
+    if _hist_entries:
+        import pandas as _pd2
+        _hist_rows = []
+        for _e in reversed(_hist_entries):
+            _ts = _e.get("ts", "")
+            _hist_rows.append({
+                "Time":     _ts[11:16] if len(_ts) > 15 else _ts[:5],
+                "Command":  str(_e.get("instruction", ""))[:40],
+                "Response": str(_e.get("action") or _e.get("raw_text") or "")[:60],
+            })
+        st.dataframe(_pd2.DataFrame(_hist_rows), hide_index=True, use_container_width=True,
+                     height=min(220, 36 + 36 * len(_hist_rows)))
+    else:
+        st.caption("No commands yet")
 
-    rows = []
-    for e in reversed(history_entries):
-        ts = e.get("ts", "")
-        hhmm = ts[11:16] if len(ts) > 15 else ts[:5]
-        instr = str(e.get("instruction", ""))[:48]
-        action = str(e.get("action") or e.get("raw_text") or "")[:64]
-        rows.append({"Time": hhmm, "Command": instr, "Response / Action": action})
-    st.dataframe(
-        pd.DataFrame(rows),
-        hide_index=True,
-        width="stretch",
-        height=min(240, 36 + 36 * len(rows)),
-    )
-else:
-    st.caption("No commands yet — type one above")
+    # ── IMU orientation ────────────────────────────────────────────────────────
+    if _imu_orient and not _imu_orient.get("error"):
+        st.divider()
+        st.markdown('<p class="sh">🧭 IMU Orientation</p>', unsafe_allow_html=True)
+        _io1, _io2, _io3 = st.columns(3)
+        _io1.metric("Yaw",   f"{_imu_orient.get('yaw_deg',   0):.1f}°")
+        _io2.metric("Pitch", f"{_imu_orient.get('pitch_deg', 0):.1f}°")
+        _io3.metric("Roll",  f"{_imu_orient.get('roll_deg',  0):.1f}°")
 
-# ── EPISODE HISTORY ──────────────────────────────────────────────────────────
-st.divider()
-with st.expander(
-    f"🧠 Episode Memory  — {episodes.get('total', 0)} total",
-    expanded=False,
-):
-    ep_list = episodes.get("episodes", [])
-    if ep_list:
-        import pandas as pd
 
-        ep_rows = []
-        for ep in ep_list:
-            ts = ep.get("ts", "")
-            hhmm = ts[11:19] if len(ts) > 18 else ts
-            action_type = (ep.get("action") or {}).get("type", ep.get("action_type", "—"))
-            ep_rows.append(
-                {
-                    "Time": hhmm,
-                    "Instruction": str(ep.get("instruction", ""))[:48],
-                    "Action": action_type,
-                    "Latency (ms)": f"{ep.get('latency_ms', 0):.0f}",
-                    "Outcome": ep.get("outcome", "—")[:24],
-                }
-            )
-        # Summary table
-        st.dataframe(
-            pd.DataFrame(ep_rows),
-            hide_index=True,
-            width="stretch",
-            height=min(300, 36 + 36 * len(ep_rows)),
-        )
+# ═══════════════════════════════════════════════════════════════════════════════
+# 💬 CHAT TAB
+# ═══════════════════════════════════════════════════════════════════════════════
+with _tab_chat:
+    # Quick voice buttons
+    _vb1, _vb2, _ = st.columns([1, 1, 3])
+    with _vb1:
+        if st.button("🎙️ PTT", use_container_width=True, key="ptt_chat"):
+            try:
+                with st.spinner("Listening…"):
+                    _r = _req.post(f"{GW}/api/voice/listen", headers=_hdr(), timeout=20)
+                if _r.ok:
+                    _d = _r.json()
+                    if _d.get("transcript"):
+                        st.session_state["voice_input"] = _d["transcript"]
+            except Exception as _e:
+                st.toast(str(_e), icon="❌")
+    with _vb2:
+        if st.button("🗑 Clear chat", use_container_width=True, key="clr_chat"):
+            st.session_state.messages = []
+            st.rerun()
 
-        # ── Memory timeline chart (#311) ──────────────────────────
-        st.markdown('<p class="panel-title">📈 Episode Timeline</p>', unsafe_allow_html=True)
-        try:
-            import pandas as _pd_tl
+    # Chat history
+    _msg_box = st.container(height=340)
+    with _msg_box:
+        for _m in st.session_state.messages[-20:]:
+            with st.chat_message(_m["role"]):
+                st.markdown(_m["content"])
 
-            _tl_records = []
-            for _ep in ep_list:
-                _ep_ts = _ep.get("ts")
-                if _ep_ts:
-                    try:
-                        _epoch = float(_ep_ts)
-                    except (TypeError, ValueError):
-                        # ISO string fallback: "2026-01-15T12:34:56.789"
-                        import datetime as _dt_tl
-
-                        _epoch = _dt_tl.datetime.fromisoformat(str(_ep_ts)).timestamp()
-                    _action = (_ep.get("action") or {}).get("type", "unknown")
-                    _tl_records.append({"ts": _epoch, "action": _action, "count": 1})
-            if _tl_records:
-                _tl_df = _pd_tl.DataFrame(_tl_records)
-                _tl_df["minute"] = _pd_tl.to_datetime(_tl_df["ts"], unit="s").dt.floor("1min")
-                _tl_pivot = (
-                    _tl_df.groupby(["minute", "action"])["count"].sum().unstack(fill_value=0)
+    # Chat input
+    _prompt = st.chat_input("Type a command or question…")
+    _user_text = _prompt or st.session_state.pop("voice_input", None)
+    if _user_text:
+        st.session_state.messages.append({"role": "user", "content": _user_text})
+        with st.spinner("Thinking…"):
+            try:
+                _cr = _req.post(
+                    f"{GW}/api/command", json={"instruction": _user_text},
+                    headers=_hdr(), timeout=30,
                 )
-                st.bar_chart(_tl_pivot, height=160, use_container_width=True)
+                _reply = _cr.json().get("raw_text", str(_cr.json())) if _cr.ok else f"[{_cr.status_code}]"
+            except Exception as _ce:
+                _reply = f"[error] {_ce}"
+        st.session_state.messages.append({"role": "assistant", "content": _reply})
+        if st.session_state.voice_mode and st.session_state.voice_speak_replies:
+            _safe = _reply.replace("\\", "\\\\").replace("`", "\\`").replace('"', '\\"')
+            st.components.v1.html(
+                f"<script>(()=>{{const u=new SpeechSynthesisUtterance(`{_safe}`);"
+                "u.lang='en-US';window.speechSynthesis.cancel();window.speechSynthesis.speak(u);}})();</script>",
+                height=0,
+            )
+        st.rerun()
+
+    st.divider()
+
+    # Episode history
+    with st.expander(f"🧠 Episode Memory — {episodes.get('total', 0)} total", expanded=False):
+        _ep_list = episodes.get("episodes", [])
+        if _ep_list:
+            import pandas as _pd3
+            _ep_rows = []
+            for _ep in _ep_list:
+                _ets = _ep.get("ts", "")
+                _ep_rows.append({
+                    "Time":        _ets[11:19] if len(_ets) > 18 else _ets,
+                    "Instruction": str(_ep.get("instruction", ""))[:40],
+                    "Action":      (_ep.get("action") or {}).get("type", _ep.get("action_type", "—")),
+                    "Latency ms":  f"{_ep.get('latency_ms', 0):.0f}",
+                    "Outcome":     _ep.get("outcome", "—")[:20],
+                })
+            st.dataframe(_pd3.DataFrame(_ep_rows), hide_index=True, use_container_width=True,
+                         height=min(260, 36 + 36 * len(_ep_rows)))
+
+            # Timeline bar chart
+            try:
+                import pandas as _pd4
+                _tl = []
+                for _ep in _ep_list:
+                    _ets = _ep.get("ts")
+                    if _ets:
+                        try:
+                            _epoch = float(_ets)
+                        except (TypeError, ValueError):
+                            import datetime as _dt
+                            _epoch = _dt.datetime.fromisoformat(str(_ets)).timestamp()
+                        _tl.append({"ts": _epoch, "action": (_ep.get("action") or {}).get("type", "?"), "n": 1})
+                if _tl:
+                    _tl_df = _pd4.DataFrame(_tl)
+                    _tl_df["min"] = _pd4.to_datetime(_tl_df["ts"], unit="s").dt.floor("1min")
+                    _tl_piv = _tl_df.groupby(["min", "action"])["n"].sum().unstack(fill_value=0)
+                    st.bar_chart(_tl_piv, height=140, use_container_width=True)
+            except Exception:
+                pass
+
+            # Replay buttons
+            st.markdown("**Replay an episode:**")
+            for _ep in _ep_list[:10]:
+                _ep_id = _ep.get("id", "")
+                _at = (_ep.get("action") or {}).get("type", "—")
+                _ets = _ep.get("ts", "")
+                _lbl = f"{_ets[11:19] if len(_ets)>18 else _ets}  {str(_ep.get('instruction',''))[:28]}  [{_at}]"
+                if st.button("▶", key=f"replay_{_ep_id}", help=f"Replay: {_lbl}"):
+                    try:
+                        _rr = _req.post(f"{GW}/api/memory/replay/{_ep_id}", headers=_hdr(), timeout=5)
+                        st.toast("Replayed ✓" if _rr.ok else f"Failed: {_rr.status_code}", icon="▶")
+                    except Exception as _re:
+                        st.toast(str(_re), icon="❌")
+        else:
+            st.caption("No episodes yet — start the runtime loop to capture them")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 🤖 FLEET TAB
+# ═══════════════════════════════════════════════════════════════════════════════
+with _tab_fleet:
+    def _load_fleet_nodes():
+        from pathlib import Path
+        try:
+            import yaml as _yaml
+        except ImportError:
+            return []
+        _here = Path(__file__).resolve().parent.parent
+        for c in [
+            Path(os.getenv("OPENCASTOR_CONFIG", "")).parent / "swarm.yaml" if os.getenv("OPENCASTOR_CONFIG") else None,
+            _here / "config" / "swarm.yaml",
+            Path("config/swarm.yaml"),
+        ]:
+            if c and c.exists():
+                try:
+                    return (_yaml.safe_load(c.read_text()) or {}).get("nodes", [])
+                except Exception:
+                    pass
+        return []
+
+    def _query_node(node):
+        import time as _t
+        host = node.get("ip") or node.get("host", "localhost")
+        port = node.get("port", 8000)
+        base = f"http://{host}:{port}"
+        tok  = node.get("token", "")
+        hdrs = {"Authorization": f"Bearer {tok}"} if tok else {}
+        res  = {"Robot": node.get("name","?"), "IP": str(host), "Brain": False, "Driver": False,
+                "Uptime": "—", "Ping ms": None, "Status": "offline",
+                "_base": base, "_hdrs": hdrs, "_online": False}
+        t0 = _t.monotonic()
+        try:
+            r = _req.get(f"{base}/health", headers=hdrs, timeout=2.5)
+            ms = (_t.monotonic() - t0) * 1000
+            res["Ping ms"] = round(ms, 1)
+            if r.status_code == 200:
+                d = r.json()
+                res["_online"] = True
+                res["Brain"]   = bool(d.get("brain"))
+                res["Driver"]  = bool(d.get("driver"))
+                try:
+                    s = int(float(d.get("uptime_s", 0)))
+                    h, rem = divmod(s, 3600); m, sc = divmod(rem, 60)
+                    res["Uptime"] = f"{h:02d}:{m:02d}:{sc:02d}" if h else f"{m:02d}:{sc:02d}"
+                except Exception:
+                    pass
+                res["Status"] = "🟢 healthy" if (res["Brain"] and res["Driver"]) else "🟡 degraded"
+        except Exception:
+            res["Ping ms"] = round((_t.monotonic() - t0) * 1000, 1)
+            res["Status"] = "⚫ offline"
+        return res
+
+    _fn = _load_fleet_nodes()
+    if not _fn:
+        st.info("No fleet nodes configured — add nodes to config/swarm.yaml")
+    else:
+        import concurrent.futures as _cf
+        with _cf.ThreadPoolExecutor(max_workers=len(_fn)) as _ex:
+            _fr = list(_ex.map(_query_node, _fn))
+
+        import pandas as _pd5
+        _dcols = ["Robot", "IP", "Brain", "Driver", "Uptime", "Ping ms", "Status"]
+        _fdf = _pd5.DataFrame([{k: r[k] for k in _dcols} for r in _fr])
+        _fdf["Brain"]  = _fdf["Brain"].map(lambda v: "✅" if v else "❌")
+        _fdf["Driver"] = _fdf["Driver"].map(lambda v: "✅" if v else "❌")
+        st.dataframe(_fdf, hide_index=True, use_container_width=True,
+                     height=min(280, 36 + 36 * len(_fr)))
+
+        # Fleet command
+        _fi1, _fi2 = st.columns([4, 1])
+        with _fi1:
+            _finstr = st.text_input("Fleet command", placeholder="e.g. move forward 1 meter",
+                                    key="fleet_instr", label_visibility="collapsed")
+        with _fi2:
+            _fsend = st.button("Send", use_container_width=True, key="fleet_send")
+        if _fsend and _finstr:
+            _active = [r for r in _fr if r["_online"]]
+            _errs   = []
+            for _r in _active:
+                try:
+                    _rr = _req.post(f"{_r['_base']}/api/command",
+                                    json={"instruction": _finstr}, headers=_r["_hdrs"], timeout=10)
+                    if not _rr.ok:
+                        _errs.append(f"{_r['Robot']}: {_rr.status_code}")
+                except Exception as _fe:
+                    _errs.append(f"{_r['Robot']}: {_fe}")
+            st.error("Errors: " + "; ".join(_errs)) if _errs else st.success(f"Sent to {len(_active)} node(s)")
+
+        # Per-node stop
+        if _fr:
+            st.markdown('<p class="sh r">⏹ Per-node stop</p>', unsafe_allow_html=True)
+            _scols = st.columns(min(len(_fr), 6))
+            for _i, _r in enumerate(_fr):
+                with _scols[_i % len(_scols)]:
+                    if st.button(f"⏹ {_r['Robot']}", key=f"stop_{_r['Robot']}", use_container_width=True):
+                        try:
+                            _req.post(f"{_r['_base']}/api/stop", headers=_r["_hdrs"], timeout=3)
+                            st.toast(f"{_r['Robot']} stopped", icon="⏹")
+                        except Exception as _se:
+                            st.toast(str(_se), icon="❌")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 🔧 BUILDER TAB
+# ═══════════════════════════════════════════════════════════════════════════════
+with _tab_builder:
+    # ── Live Logs (expanded by default for builders) ───────────────────────────
+    with st.expander("📋 Gateway Logs", expanded=True):
+        import subprocess as _sp
+        from pathlib import Path as _Path
+        _log_lines, _log_src = [], ""
+        try:
+            _jctl = _sp.run(
+                ["journalctl", "--user", "-u", "opencastor.service",
+                 "-n", "60", "--no-pager", "--output=short"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if _jctl.returncode == 0 and _jctl.stdout.strip():
+                _log_lines = _jctl.stdout.splitlines()
+                _log_src   = "journalctl --user -u opencastor.service"
+        except Exception:
+            pass
+        if not _log_lines:
+            for _lp in ["/tmp/alex_gateway.log", "/tmp/bob_gateway.log", "/tmp/castor_gateway.log"]:
+                try:
+                    _log_lines = _Path(_lp).read_text(errors="replace").splitlines()[-60:]
+                    _log_src   = _lp; break
+                except Exception:
+                    continue
+        if _log_lines:
+            st.caption(f"Source: {_log_src}")
+            st.code("\n".join(_log_lines[-60:]), language=None)
+        else:
+            st.caption("No logs found — check systemd service or log file paths")
+
+    st.divider()
+
+    # ── Driver health (key for builders) ──────────────────────────────────────
+    with st.expander("🦾 Driver & Hardware", expanded=True):
+        _dhc1, _dhc2, _dhc3 = st.columns(3)
+        _dhc1.metric("Mode",   (driver.get("mode") or "—").capitalize())
+        _dhc2.metric("OK",     "✅" if driver.get("ok") else "❌")
+        _dhc3.metric("Type",   (driver.get("driver_type") or "—").replace("Driver", ""))
+        if driver.get("error"):
+            st.error(driver["error"])
+        # Raw action test
+        st.markdown("**Test a raw move command:**")
+        _tc1, _tc2, _tc3 = st.columns(3)
+        _test_lin = _tc1.number_input("linear",  -1.0, 1.0, 0.0, 0.1, key="test_lin")
+        _test_ang = _tc2.number_input("angular", -1.0, 1.0, 0.0, 0.1, key="test_ang")
+        _test_dur = _tc3.number_input("duration ms", 0, 5000, 500, 100, key="test_dur")
+        if st.button("⚙️ Send Test Action", key="test_action"):
+            try:
+                _tr = _req.post(f"{GW}/api/action",
+                                json={"type": "move", "linear": _test_lin,
+                                      "angular": _test_ang, "duration_ms": int(_test_dur)},
+                                headers=_hdr(), timeout=3)
+                st.success(str(_tr.json())) if _tr.ok else st.error(str(_tr.json()))
+            except Exception as _te:
+                st.error(str(_te))
+
+    st.divider()
+
+    # ── Behaviors & Missions ────────────────────────────────────────────────────
+    with st.expander("🎬 Behaviors & Missions", expanded=False):
+        _beh = _get("/api/behavior/status")
+        if _beh.get("running"):
+            st.success(f"Running: **{_beh.get('name','?')}**  (job {str(_beh.get('job_id',''))[:8]})")
+        else:
+            st.info("No behavior running")
+        _bp = st.text_input("Behavior / mission file", placeholder="patrol.behavior.yaml",
+                            key="beh_path")
+        _bb1, _bb2 = st.columns(2)
+        with _bb1:
+            if st.button("▶ Run", key="beh_run", use_container_width=True):
+                if _bp.strip():
+                    try:
+                        _br = _req.post(f"{GW}/api/behavior/run",
+                                        json={"path": _bp.strip()}, headers=_hdr(), timeout=5)
+                        st.toast(
+                            f"Started: {_br.json().get('name','?')}" if _br.ok
+                            else f"Error {_br.status_code}", icon="▶" if _br.ok else "❌"
+                        )
+                    except Exception as _be:
+                        st.toast(str(_be), icon="❌")
+                else:
+                    st.toast("Enter a file path first", icon="⚠")
+        with _bb2:
+            if st.button("⏹ Stop", key="beh_stop", use_container_width=True):
+                try:
+                    _bs = _req.post(f"{GW}/api/behavior/stop", headers=_hdr(), timeout=5)
+                    st.toast("Stopped" if _bs.ok else f"Error {_bs.status_code}",
+                             icon="⏹" if _bs.ok else "❌")
+                except Exception as _bse:
+                    st.toast(str(_bse), icon="❌")
+
+        # Mission history
+        try:
+            from castor.dashboard_memory_timeline import MemoryTimeline as _MLT
+            _mlt = _MLT()
+            _mo  = _mlt.get_outcome_summary(window_h=24)
+            _mpc = _mlt.get_latency_percentiles(window_h=24)
+            _m1, _m2, _m3 = st.columns(3)
+            _m1.metric("Episodes (24h)", _mo.get("total", 0))
+            _m2.metric("Success rate",   f"{_mo.get('ok_rate', 0) * 100:.0f}%")
+            _m3.metric("p50 latency",    f"{_mpc.get('p50_ms') or 0:.0f} ms")
         except Exception:
             pass
 
-        # Per-episode replay buttons
-        st.markdown('<p class="panel-title">Replay an episode</p>', unsafe_allow_html=True)
-        for ep in ep_list:
-            ep_id = ep.get("id", "")
-            action_type = (ep.get("action") or {}).get("type", "—")
-            ts = ep.get("ts", "")
-            hhmm = ts[11:19] if len(ts) > 18 else ts
-            label = f"{hhmm}  {str(ep.get('instruction', ''))[:32]}  [{action_type}]"
-            if st.button("▶", key=f"replay_{ep_id}", help=f"Replay: {label}"):
-                try:
-                    r = _req.post(
-                        f"{GW}/api/memory/replay/{ep_id}",
-                        headers=_hdr(),
-                        timeout=5,
-                    )
-                    if r.ok:
-                        st.toast("Replayed ✓", icon="▶")
-                    else:
-                        st.toast(f"Replay failed: {r.status_code} {r.text[:80]}", icon="❌")
-                except Exception as _replay_err:
-                    st.toast(f"Replay error: {_replay_err}", icon="❌")
-    else:
-        st.caption("No episodes recorded yet — start the runtime loop to capture them")
+    st.divider()
 
-
-# ── PROVIDER HEALTH PANEL (#327) ─────────────────────────────────────────────
-st.divider()
-with st.expander("🧠 Provider Health", expanded=False):
-    _ph = _get("/api/pool/health")
-    if _ph.get("error") or not _ph:
-        st.caption("Provider health not available — configure pool provider to enable.")
-    else:
-        _ph_strategy = _ph.get("strategy", "—")
-        _ph_size = _ph.get("pool_size", 0)
-        _ph_degraded = _ph.get("degraded_count", 0)
-        _ph_col1, _ph_col2, _ph_col3 = st.columns(3)
-        _ph_col1.metric("Strategy", _ph_strategy)
-        _ph_col2.metric("Pool Size", _ph_size)
-        _ph_col3.metric("Degraded", _ph_degraded)
-
-        _ph_members = _ph.get("members", [])
-        if _ph_members:
-            st.markdown('<p class="panel-title">Pool Members</p>', unsafe_allow_html=True)
-            try:
-                import pandas as _pd_ph
-
-                _ph_rows = []
-                for _m in _ph_members:
-                    _ph_rows.append(
-                        {
-                            "Index": _m.get("pool_index", "?"),
-                            "Mode": _m.get("mode", "—"),
-                            "OK": "✅" if _m.get("ok") else "❌",
-                            "Degraded": "⚠" if _m.get("degraded") else "—",
-                            "Error": str(_m.get("error", ""))[:60],
-                        }
-                    )
-                st.dataframe(
-                    _pd_ph.DataFrame(_ph_rows),
-                    hide_index=True,
-                    width="stretch",
-                    height=min(200, 36 + 36 * len(_ph_rows)),
-                )
-            except Exception:
-                pass
-
-        # Circuit breaker state
-        _ph_cb = _ph.get("circuit_breaker")
-        if _ph_cb:
-            st.markdown('<p class="panel-title">Circuit Breaker</p>', unsafe_allow_html=True)
-            _cb_open = _ph_cb.get("open_count", 0)
-            _cb_threshold = _ph_cb.get("threshold", 0)
-            _cb_status = f"{_cb_open} open / threshold {_cb_threshold}"
-            if _cb_open > 0:
-                st.warning(f"Circuits open: {_cb_status}")
-            else:
-                st.success(f"All circuits closed  ({_cb_status})")
-
-        # Adaptive strategy state
-        _ph_adaptive = _ph.get("adaptive")
-        if _ph_adaptive:
-            st.markdown('<p class="panel-title">Adaptive Weights</p>', unsafe_allow_html=True)
-            try:
-                import pandas as _pd_adp
-
-                _ema = _ph_adaptive.get("ema_latency_ms", {})
-                _obs = _ph_adaptive.get("obs_count", {})
-                _adp_rows = [
-                    {
-                        "Provider Index": int(k),
-                        "EMA Latency (ms)": round(float(v), 1),
-                        "Observations": _obs.get(k, _obs.get(int(k), 0)),
-                    }
-                    for k, v in sorted(_ema.items(), key=lambda x: int(x[0]))
-                ]
-                if _adp_rows:
-                    st.dataframe(
-                        _pd_adp.DataFrame(_adp_rows),
-                        hide_index=True,
-                        width="stretch",
-                        height=min(200, 36 + 36 * len(_adp_rows)),
-                    )
-            except Exception:
-                pass
-
-        # Replay state
-        _ph_replay = _ph.get("replay", {})
-        _replay_entries = _ph_replay.get("replay_entries", 0)
-        if _replay_entries:
-            st.info(f"Replay map loaded: {_replay_entries} cached entries")
-
-        # Provider latency sparkline (#363) — rolling EMA latency per pool member
-        _ema_now = (_ph.get("adaptive") or {}).get("ema_latency_ms", {})
-        if not _ema_now and _ph_members:
-            # Fallback: use avg_latency_ms per member when adaptive not active
-            _ema_now = {
-                str(m.get("pool_index", i)): m.get("avg_latency_ms", 0)
-                for i, m in enumerate(_ph_members)
-                if m.get("avg_latency_ms") is not None
-            }
-        if _ema_now:
-            _lat_hist = st.session_state.get("_latency_history", {})
-            for _k, _v in _ema_now.items():
-                _lat_hist.setdefault(str(_k), []).append(round(float(_v), 1))
-                _lat_hist[str(_k)] = _lat_hist[str(_k)][-20:]  # keep 20 readings
-            st.session_state["_latency_history"] = _lat_hist
-            if any(len(v) > 1 for v in _lat_hist.values()):
-                st.markdown(
-                    '<p class="panel-title">Provider Latency Sparkline</p>',
-                    unsafe_allow_html=True,
-                )
-                try:
-                    import pandas as _pd_spark
-
-                    _spark_df = _pd_spark.DataFrame(
-                        {f"Pool[{k}]": vals for k, vals in _lat_hist.items() if vals}
-                    )
-                    st.line_chart(_spark_df, height=120, use_container_width=True)
-                    st.caption("EMA latency (ms) per provider over last 20 refreshes")
-                except Exception:
-                    pass
-
-
-# ── LIDAR POLAR PLOT (#337) ───────────────────────────────────────────────────
-st.divider()
-with st.expander("📡 LiDAR Scan", expanded=False):
-    _lidar_scan = _lidar_raw  # reuse already-fetched data
-    _lidar_zone = _get("/api/lidar/zone_map")
-    if _lidar_scan.get("mode") == "mock":
-        st.warning("LiDAR in mock mode — synthetic data shown, no RPLidar connected", icon=None)
-    if _lidar_scan.get("error") or not _lidar_scan.get("points"):
-        st.caption("LiDAR not available — connect an RPLidar sensor to enable.")
-    else:
-        _pts = _lidar_scan.get("points", [])
-        _scan_ts = _lidar_scan.get("timestamp", "—")
-        st.caption(f"Scan timestamp: {_scan_ts} — {len(_pts)} points")
-
-        # Polar scatter plot of scan points
-        try:
-            import math
-
-            import pandas as _pd_lidar
-
-            _radians = [math.radians(p.get("angle_deg", 0)) for p in _pts]
-            _distances = [p.get("distance_m", 0) for p in _pts]
-            _xs = [r * math.cos(a) for r, a in zip(_distances, _radians, strict=False)]
-            _ys = [r * math.sin(a) for r, a in zip(_distances, _radians, strict=False)]
-
-            _lidar_df = _pd_lidar.DataFrame({"x_m": _xs, "y_m": _ys, "dist_m": _distances})
-            st.scatter_chart(
-                _lidar_df,
-                x="x_m",
-                y="y_m",
-                size="dist_m",
-                height=320,
-            )
-        except Exception as _exc:
-            st.caption(f"Plot unavailable: {_exc}")
-
-        # SLAM hint: wall distances per sector
-        _slam = _get("/api/lidar/slam")
-        if _slam.get("available"):
-            st.markdown(
-                '<p class="panel-title">Wall Detection (SLAM Hint)</p>', unsafe_allow_html=True
-            )
-            _walls = _slam.get("walls", [])
-            if _walls:
-                try:
-                    import pandas as _pd_slam
-
-                    _slam_rows = [
-                        {
-                            "Sector": w.get("sector", "?"),
-                            "Distance (m)": round(w.get("distance_m", 0), 2),
-                            "Angle (°)": round(w.get("angle_deg", 0), 1),
-                            "Confidence": round(w.get("confidence", 0), 2),
-                        }
-                        for w in _walls
-                    ]
-                    st.dataframe(
-                        _pd_slam.DataFrame(_slam_rows),
-                        hide_index=True,
-                        height=min(200, 36 + 36 * len(_slam_rows)),
-                    )
-                except Exception:
-                    pass
-
-        # Zone map grid
-        if _lidar_zone.get("grid"):
-            st.markdown('<p class="panel-title">Zone Occupancy Grid</p>', unsafe_allow_html=True)
-            _grid = _lidar_zone.get("grid", [])
-            _cell_m = _lidar_zone.get("resolution_m", 0.05)
-            st.caption(
-                f"Resolution: {_cell_m} m/cell — "
-                f"{_lidar_zone.get('cols', 0)}×{_lidar_zone.get('rows', 0)} cells"
-            )
-            try:
-                import pandas as _pd_zone
-
-                st.dataframe(
-                    _pd_zone.DataFrame(_grid),
-                    hide_index=True,
-                    height=200,
-                )
-            except Exception:
-                pass
-
-        # IMU orientation alongside LiDAR (guarded — /api/imu/orientation may 500)
-        st.markdown('<p class="panel-title">IMU Orientation</p>', unsafe_allow_html=True)
-        if _imu_orient.get("error") or not _imu_orient:
-            st.caption("IMU orientation unavailable — sensor not connected or returned an error.")
+    # ── Provider Health ────────────────────────────────────────────────────────
+    with st.expander("🧠 Provider Health", expanded=False):
+        _ph = _get("/api/pool/health")
+        if not _ph or _ph.get("error"):
+            st.caption("Not available — configure pool provider to enable.")
         else:
-            _or_col1, _or_col2, _or_col3 = st.columns(3)
-            _or_col1.metric("Yaw", f"{_imu_orient.get('yaw_deg', 0):.1f}°")
-            _or_col2.metric("Pitch", f"{_imu_orient.get('pitch_deg', 0):.1f}°")
-            _or_col3.metric("Roll", f"{_imu_orient.get('roll_deg', 0):.1f}°")
-
-
-# ── FLEET (Swarm) PANEL ───────────────────────────────────────────────────────
-st.divider()
-st.markdown("### 🤖 Fleet")
-
-
-def _load_fleet_nodes():
-    """Load nodes from config/swarm.yaml, gracefully returning [] on any error."""
-    from pathlib import Path
-
-    try:
-        import yaml
-    except ImportError:
-        return []
-    # Locate swarm.yaml relative to OPENCASTOR_CONFIG or project root
-    env_cfg = os.getenv("OPENCASTOR_CONFIG")
-    candidates = []
-    if env_cfg:
-        candidates.append(Path(env_cfg).parent / "swarm.yaml")
-    # Walk up from this file to find the project root config/swarm.yaml
-    _here = Path(__file__).resolve().parent.parent
-    candidates.append(_here / "config" / "swarm.yaml")
-    candidates.append(Path("config/swarm.yaml"))
-
-    for c in candidates:
-        if c.exists():
-            try:
-                with open(c) as fh:
-                    data = yaml.safe_load(fh) or {}
-                return data.get("nodes", [])
-            except Exception:
-                pass
-    return []
-
-
-def _query_fleet_node(node):
-    """GET /health for one fleet node; return status dict (never raises)."""
-    import time as _time
-
-    host = node.get("ip") or node.get("host", "localhost")
-    port = node.get("port", 8000)
-    base = f"http://{host}:{port}"
-    token = node.get("token", "")
-    hdrs = {"Authorization": f"Bearer {token}"} if token else {}
-    start = _time.monotonic()
-    result = {
-        "Robot": node.get("name", "?"),
-        "IP": str(host),
-        "Brain": False,
-        "Driver": False,
-        "Uptime": "—",
-        "Ping (ms)": None,
-        "Status": "offline",
-        "_base": base,
-        "_headers": hdrs,
-        "_online": False,
-    }
-    try:
-        r = _req.get(f"{base}/health", headers=hdrs, timeout=2.5)
-        elapsed = (_time.monotonic() - start) * 1000.0
-        result["Ping (ms)"] = round(elapsed, 1)
-        if r.status_code == 200:
-            d = r.json()
-            result["_online"] = True
-            result["Brain"] = bool(d.get("brain"))
-            result["Driver"] = bool(d.get("driver"))
-            # Uptime
-            try:
-                s = int(float(d.get("uptime_s", 0)))
-                h, rem = divmod(s, 3600)
-                m, sc = divmod(rem, 60)
-                result["Uptime"] = f"{h:02d}:{m:02d}:{sc:02d}" if h else f"{m:02d}:{sc:02d}"
-            except Exception:
-                pass
-            if result["Brain"] and result["Driver"]:
-                result["Status"] = "🟢 healthy"
-            else:
-                result["Status"] = "🟡 degraded"
-    except Exception:
-        elapsed = (_time.monotonic() - start) * 1000.0
-        result["Ping (ms)"] = round(elapsed, 1)
-        result["Status"] = "⚫ offline"
-    return result
-
-
-_fleet_nodes = _load_fleet_nodes()
-
-if not _fleet_nodes:
-    st.caption("No fleet nodes configured — add nodes to config/swarm.yaml")
-else:
-    import concurrent.futures as _cf
-
-    with _cf.ThreadPoolExecutor(max_workers=len(_fleet_nodes)) as _ex:
-        _fleet_results = list(_ex.map(_query_fleet_node, _fleet_nodes))
-
-    # Build display DataFrame (exclude internal keys)
-    import pandas as pd
-
-    _display_cols = ["Robot", "IP", "Brain", "Driver", "Uptime", "Ping (ms)", "Status"]
-    _fleet_df = pd.DataFrame([{k: r[k] for k in _display_cols} for r in _fleet_results])
-    # Render booleans as checkmarks for readability
-    _fleet_df["Brain"] = _fleet_df["Brain"].map(lambda v: "✅" if v else "❌")
-    _fleet_df["Driver"] = _fleet_df["Driver"].map(lambda v: "✅" if v else "❌")
-
-    st.dataframe(
-        _fleet_df,
-        hide_index=True,
-        width="stretch",
-        height=min(300, 36 + 36 * len(_fleet_results)),
-    )
-
-    # Send to fleet
-    _fleet_col1, _fleet_col2 = st.columns([4, 1])
-    with _fleet_col1:
-        _fleet_instruction = st.text_input(
-            "Send to fleet",
-            placeholder="e.g. move forward 1 meter",
-            key="fleet_instruction",
-            label_visibility="collapsed",
-        )
-    with _fleet_col2:
-        _fleet_send = st.button("Send to fleet", width="stretch")
-
-    if _fleet_send and _fleet_instruction:
-        _active_nodes = [r for r in _fleet_results if r["_online"]]
-        if not _active_nodes:
-            st.warning("No nodes online — cannot send command")
-        else:
-            _fleet_errors = []
-            for _fr in _active_nodes:
-                try:
-                    _resp = _req.post(
-                        f"{_fr['_base']}/api/command",
-                        json={"instruction": _fleet_instruction},
-                        headers=_fr["_headers"],
-                        timeout=10,
-                    )
-                    if not _resp.ok:
-                        _fleet_errors.append(f"{_fr['Robot']}: HTTP {_resp.status_code}")
-                except Exception as _fe:
-                    _fleet_errors.append(f"{_fr['Robot']}: {_fe}")
-            if _fleet_errors:
-                st.error("Some nodes failed: " + "; ".join(_fleet_errors))
-            else:
-                st.success(f"Command sent to {len(_active_nodes)} node(s)")
-
-    # Per-node stop buttons
-    if _fleet_results:
-        st.markdown('<p class="panel-title">Per-node emergency stop</p>', unsafe_allow_html=True)
-        _stop_cols = st.columns(min(len(_fleet_results), 6))
-        for _i, _fr in enumerate(_fleet_results):
-            _name = _fr["Robot"]
-            with _stop_cols[_i % len(_stop_cols)]:
-                if st.button("⏹", key=f"stop_{_name}", help=f"Stop {_name}"):
+            _pc1, _pc2, _pc3 = st.columns(3)
+            _pc1.metric("Strategy",  _ph.get("strategy", "—"))
+            _pc2.metric("Pool size", _ph.get("pool_size", 0))
+            _pc3.metric("Degraded",  _ph.get("degraded_count", 0))
+            _ph_members = _ph.get("members", [])
+            if _ph_members:
+                import pandas as _pd6
+                st.dataframe(
+                    _pd6.DataFrame([{
+                        "Index": m.get("pool_index","?"), "Mode": m.get("mode","—"),
+                        "OK": "✅" if m.get("ok") else "❌",
+                        "Error": str(m.get("error",""))[:50],
+                    } for m in _ph_members]),
+                    hide_index=True, use_container_width=True,
+                    height=min(180, 36 + 36 * len(_ph_members))
+                )
+            # Latency sparkline
+            _ema_now = (_ph.get("adaptive") or {}).get("ema_latency_ms", {})
+            if _ema_now:
+                _lh = st.session_state.get("_latency_history", {})
+                for _k, _v in _ema_now.items():
+                    _lh.setdefault(str(_k), []).append(round(float(_v), 1))
+                    _lh[str(_k)] = _lh[str(_k)][-20:]
+                st.session_state["_latency_history"] = _lh
+                if any(len(v) > 1 for v in _lh.values()):
                     try:
-                        _req.post(
-                            f"{_fr['_base']}/api/stop",
-                            headers=_fr["_headers"],
-                            timeout=3,
+                        import pandas as _pd7
+                        st.line_chart(
+                            _pd7.DataFrame({f"Pool[{k}]": v for k, v in _lh.items() if v}),
+                            height=110, use_container_width=True,
                         )
-                        st.toast(f"{_name} stopped", icon="⏹")
-                    except Exception as _se:
-                        st.toast(f"Stop failed: {_se}", icon="❌")
+                        st.caption("EMA latency (ms) per provider — last 20 refreshes")
+                    except Exception:
+                        pass
 
+    st.divider()
 
-# ── BEHAVIORS PANEL ───────────────────────────────────────────────────────────
-st.divider()
-with st.expander("🎬 Behaviors", expanded=False):
-    _beh_status = _get("/api/behavior/status")
-    _beh_running = _beh_status.get("running", False)
-    _beh_name = _beh_status.get("name") or "—"
-    _beh_job_id = _beh_status.get("job_id") or "—"
-
-    if _beh_running:
-        st.success(f"Running: **{_beh_name}**  (job {_beh_job_id[:8]})")
-    else:
-        st.info("No behavior running")
-
-    _beh_path = st.text_input(
-        "Behavior file path",
-        value="",
-        placeholder="patrol.behavior.yaml",
-        key="behavior_path_input",
-    )
-    _bcol1, _bcol2 = st.columns(2)
-    with _bcol1:
-        if st.button("Run", key="behavior_run_btn", width="stretch"):
-            if _beh_path.strip():
-                try:
-                    _br = _req.post(
-                        f"{GW}/api/behavior/run",
-                        json={"path": _beh_path.strip()},
-                        headers=_hdr(),
-                        timeout=5,
-                    )
-                    if _br.ok:
-                        _bd = _br.json()
-                        st.toast(
-                            f"Started: {_bd.get('name', '?')} (job {_bd.get('job_id', '?')[:8]})",
-                            icon="▶",
-                        )
-                    else:
-                        st.toast(f"Error {_br.status_code}: {_br.text[:80]}", icon="❌")
-                except Exception as _be:
-                    st.toast(f"Request failed: {_be}", icon="❌")
-            else:
-                st.toast("Enter a behavior file path first", icon="⚠")
-    with _bcol2:
-        if st.button("Stop", key="behavior_stop_btn", width="stretch"):
+    # ── LiDAR Scan ────────────────────────────────────────────────────────────
+    with st.expander("📡 LiDAR Scan", expanded=False):
+        _ls = _lidar_raw
+        if _ls.get("mode") == "mock":
+            st.warning("LiDAR in mock mode — no RPLidar connected", icon=None)
+        if not _ls.get("points"):
+            st.caption("LiDAR not available — connect an RPLidar sensor.")
+        else:
+            _pts = _ls.get("points", [])
+            st.caption(f"Scan: {_ls.get('timestamp','—')} — {len(_pts)} points")
             try:
-                _bs = _req.post(
-                    f"{GW}/api/behavior/stop",
-                    headers=_hdr(),
-                    timeout=5,
-                )
-                if _bs.ok:
-                    st.toast("Behavior stopped", icon="⏹")
-                else:
-                    st.toast(f"Stop error {_bs.status_code}", icon="❌")
-            except Exception as _bse:
-                st.toast(f"Stop failed: {_bse}", icon="❌")
+                import math
+                import pandas as _pd8
+                _ang = [math.radians(p.get("angle_deg", 0)) for p in _pts]
+                _dst = [p.get("distance_m", 0) for p in _pts]
+                _ldf = _pd8.DataFrame({
+                    "x_m": [r * math.cos(a) for r, a in zip(_dst, _ang, strict=False)],
+                    "y_m": [r * math.sin(a) for r, a in zip(_dst, _ang, strict=False)],
+                    "dist_m": _dst,
+                })
+                st.scatter_chart(_ldf, x="x_m", y="y_m", size="dist_m", height=280)
+            except Exception as _lde:
+                st.caption(f"Plot unavailable: {_lde}")
 
-# ── MISSION CONTROL PANEL (Issue #283) ────────────────────────────────────────
-st.divider()
-with st.expander("🎯 Mission Control", expanded=False):
-    _mc_col1, _mc_col2 = st.columns([2, 1])
-    with _mc_col1:
-        st.markdown("**Mission Control** — Browse, launch, and monitor named missions.")
-    with _mc_col2:
-        _mc_refresh = st.button("↻ Refresh", key="mc_refresh_btn")
+    st.divider()
 
-    # Current mission status
-    _mc_status = _get("/api/behavior/status")
-    _mc_running = _mc_status.get("running", False)
-    _mc_name = _mc_status.get("name") or "—"
-
-    if _mc_running:
-        st.success(f"🚀 Active mission: **{_mc_name}**")
-    else:
-        st.info("No mission running")
-
-    st.markdown("#### Launch a Mission")
-    _mc_mission_name = st.text_input(
-        "Mission name or behavior file path",
-        placeholder="patrol  or  behaviors/patrol.behavior.yaml",
-        key="mc_mission_name_input",
-    )
-    _mc_lcol, _mc_rcol = st.columns(2)
-    with _mc_lcol:
-        if st.button("▶ Launch Mission", key="mc_launch_btn", type="primary"):
-            _mc_target = (_mc_mission_name or "").strip()
-            if _mc_target:
-                # Resolve to file path if it's a bare mission name
-                import os as _os
-
-                _mc_candidates = [
-                    _mc_target,
-                    f"{_mc_target}.behavior.yaml",
-                    f"behaviors/{_mc_target}.behavior.yaml",
-                    f"missions/{_mc_target}.behavior.yaml",
-                ]
-                _mc_path = (
-                    next((c for c in _mc_candidates if _os.path.exists(c)), None)
-                    or f"{_mc_target}.behavior.yaml"
-                )
-                try:
-                    import requests as _req2  # noqa: F401
-
-                    _mc_r = _req2.post(
-                        f"{GW}/api/behavior/run",
-                        json={"path": _mc_path, "name": _mc_target},
-                        headers=_hdr(),
-                        timeout=5,
-                    )
-                    if _mc_r.ok:
-                        st.toast(f"Mission launched: {_mc_target}", icon="🚀")
-                    else:
-                        st.toast(f"Launch error {_mc_r.status_code}: {_mc_r.text[:80]}", icon="❌")
-                except Exception as _mc_exc:
-                    st.toast(f"Launch failed: {_mc_exc}", icon="❌")
-            else:
-                st.toast("Enter a mission name first", icon="⚠")
-    with _mc_rcol:
-        if st.button("⏹ Stop Mission", key="mc_stop_btn"):
-            try:
-                import requests as _req3  # noqa: F401
-
-                _mc_s = _req3.post(f"{GW}/api/behavior/stop", headers=_hdr(), timeout=5)
-                if _mc_s.ok:
-                    st.toast("Mission stopped", icon="⏹")
-                else:
-                    st.toast(f"Stop error {_mc_s.status_code}", icon="❌")
-            except Exception as _mc_se:
-                st.toast(f"Stop failed: {_mc_se}", icon="❌")
-
-    # Mission history from episode memory
-    st.markdown("#### Mission History")
-    try:
-        from castor.dashboard_memory_timeline import MemoryTimeline as _MLT
-
-        _mc_timeline = _MLT()
-        _mc_outcome = _mc_timeline.get_outcome_summary(window_h=24)
-        _mc_hcol1, _mc_hcol2, _mc_hcol3 = st.columns(3)
-        with _mc_hcol1:
-            st.metric("Episodes (24h)", _mc_outcome.get("total", 0))
-        with _mc_hcol2:
-            _mc_ok_rate = _mc_outcome.get("ok_rate", 0.0)
-            st.metric("Success rate", f"{_mc_ok_rate * 100:.0f}%")
-        with _mc_hcol3:
-            _mc_pct = _mc_timeline.get_latency_percentiles(window_h=24)
-            st.metric("p50 latency", f"{_mc_pct.get('p50_ms') or 0:.0f} ms")
-    except Exception as _mc_e:
-        st.caption(f"Memory timeline unavailable: {_mc_e}")
-
-# ── GAMEPAD PANEL ─────────────────────────────────────────────────────────────
-st.divider()
-with st.expander("🎮 Gamepad / Manual Drive", expanded=False):
-    _gp_token = st.session_state.get("token", "")
-    _gp_url = f"{GW.rstrip('/')}/gamepad" + (f"?token={_gp_token}" if _gp_token else "")
-    st.info(
-        "The Gamepad API requires a top-level browser context — it is blocked inside "
-        "Streamlit iframes by Chrome's Permissions-Policy. Open the dedicated controller "
-        "page (served by the OpenCastor gateway) for full gamepad support.",
-        icon="🎮",
-    )
-    st.markdown(
-        f'''<a href="{_gp_url}" target="_blank"
-          style="display:inline-block;padding:8px 20px;background:#1f6feb;color:#fff;
-          border-radius:6px;text-decoration:none;font-family:monospace;font-size:0.9rem;
-          border:1px solid #388bfd;">
-          🎮 Open Gamepad Controller →</a>
-        <span style="font-size:0.75rem;color:#6e7681;margin-left:10px;">
-          opens in new tab · 8bitdo Zero 2 · D-pad + buttons</span>''',
-        unsafe_allow_html=True,
-    )
-    st.caption(
-        "Button map: D-pad/stick=move · A/B=stop · X=status · Y=snapshot "
-        "· L=reboot · R=shutdown · Start=ESTOP · Sel=clear"
-    )
-
-
-# ── SLAM MAP PANEL ─────────────────────────────────────────────────────────────
-st.divider()
-with st.expander("🗺 SLAM / Nav Map", expanded=False):
-    _map_data = _get("/api/nav/map/current")
-    _map_available = _map_data.get("available", False)
-
-    _mcol1, _mcol2 = st.columns([3, 1])
-    with _mcol1:
-        if _map_available:
-            _map_width = _map_data.get("width", 0)
-            _map_height = _map_data.get("height", 0)
-            _map_res = _map_data.get("resolution_m", 0)
-            st.caption(
-                f"Map: {_map_width}×{_map_height} cells | Resolution: {_map_res * 100:.1f} cm/cell"
-            )
-            _cells = _map_data.get("cells")
+    # ── SLAM / Nav Map ─────────────────────────────────────────────────────────
+    with st.expander("🗺 SLAM / Nav Map", expanded=False):
+        _md = _get("/api/nav/map/current")
+        _ma = _md.get("available", False)
+        if not _ma:
+            st.info("SLAM map not available — enable SLAM in your RCAN config.")
+        else:
+            st.caption(f"Map: {_md.get('width',0)}×{_md.get('height',0)} cells  "
+                       f"res={_md.get('resolution_m',0)*100:.1f} cm/cell")
+            _cells = _md.get("cells")
             if _cells:
                 try:
-                    import numpy as _np
-
-                    _arr = _np.array(_cells, dtype=float)
-                    # Normalize: -1=unknown→grey, 0=free→white, 100=occupied→black
-                    _img = _np.zeros((_arr.shape[0], _arr.shape[1], 3), dtype=_np.uint8)
-                    _img[_arr < 0] = [80, 80, 80]  # unknown: grey
-                    _img[_arr == 0] = [230, 230, 230]  # free: light grey
-                    _img[_arr > 50] = [20, 20, 20]  # occupied: dark
-                    # Mark robot pose
-                    _pose = _map_data.get("robot_pose", {})
-                    if _pose:
-                        _rx = int(_pose.get("x", 0))
-                        _ry = int(_pose.get("y", 0))
-                        if 0 <= _rx < _img.shape[1] and 0 <= _ry < _img.shape[0]:
-                            _img[max(0, _ry - 2) : _ry + 3, max(0, _rx - 2) : _rx + 3] = [
-                                63,
-                                185,
-                                80,
-                            ]
                     import io as _io
-
-                    from PIL import Image as _PILImg
-
-                    _pil = _PILImg.fromarray(_img)
+                    import numpy as _np
+                    from PIL import Image as _PI
+                    _arr = _np.array(_cells, dtype=float)
+                    _img = _np.zeros((_arr.shape[0], _arr.shape[1], 3), dtype=_np.uint8)
+                    _img[_arr < 0]  = [80, 80, 80]
+                    _img[_arr == 0] = [230, 230, 230]
+                    _img[_arr > 50] = [20, 20, 20]
+                    _pose = _md.get("robot_pose", {})
+                    if _pose:
+                        _rx, _ry = int(_pose.get("x", 0)), int(_pose.get("y", 0))
+                        if 0 <= _rx < _img.shape[1] and 0 <= _ry < _img.shape[0]:
+                            _img[max(0,_ry-2):_ry+3, max(0,_rx-2):_rx+3] = [63, 185, 80]
                     _buf = _io.BytesIO()
-                    _pil.save(_buf, format="PNG")
-                    st.image(_buf.getvalue(), caption="Occupancy Map", width="stretch")
+                    _PI.fromarray(_img).save(_buf, format="PNG")
+                    st.image(_buf.getvalue(), caption="Occupancy Map", use_container_width=True)
                 except Exception as _me:
-                    st.warning(f"Map render error: {_me}")
-            else:
-                _map_img_url = _map_data.get("image_url")
-                if _map_img_url:
-                    st.image(f"{GW}{_map_img_url}", caption="SLAM Map", width="stretch")
-                else:
-                    st.info("Map data received but no cells/image available.")
-        else:
-            st.info("SLAM map not available — start navigation or enable SLAM in your RCAN config.")
+                    st.warning(f"Render error: {_me}")
+        _nav = _get("/api/nav/status")
+        if _nav.get("running"):
+            st.metric("Nav job", _nav.get("job_id", "?")[:8])
+        if st.button("🗑 Clear Map", key="slam_clear"):
+            try:
+                _req.post(f"{GW}/api/nav/map/clear", headers=_hdr(), timeout=5)
+                st.toast("Map cleared", icon="🗑")
+            except Exception as _mce:
+                st.toast(str(_mce), icon="❌")
 
-    with _mcol2:
-        st.metric("Map Status", "Active" if _map_available else "Unavailable")
-        _nav_status = _get("/api/nav/status")
-        if _nav_status.get("running"):
-            st.metric("Nav Job", _nav_status.get("job_id", "?")[:8])
-            st.metric("Distance", f"{_nav_status.get('distance_m', 0):.1f} m")
-        if st.button("Clear Map", key="slam_clear_btn"):
-            _r = _req.post(f"{GW}/api/nav/map/clear", headers=_hdr(), timeout=5)
-            st.toast("Map cleared" if _r.ok else f"Error {_r.status_code}", icon="🗑")
+    st.divider()
 
+    # ── Runtime controls ────────────────────────────────────────────────────────
+    with st.expander("⚙️ Runtime Controls", expanded=False):
+        _rc1, _rc2 = st.columns(2)
+        with _rc1:
+            st.markdown("**Gateway**")
+            if st.button("⏸ Pause loop", key="rt_pause", use_container_width=True):
+                try:
+                    _req.post(f"{GW}/api/runtime/pause", headers=_hdr(), timeout=3)
+                    st.toast("Paused", icon="⏸")
+                except Exception as _pe:
+                    st.toast(str(_pe), icon="❌")
+            if st.button("▶ Resume loop", key="rt_resume", use_container_width=True):
+                try:
+                    _req.post(f"{GW}/api/runtime/resume", headers=_hdr(), timeout=3)
+                    st.toast("Resumed", icon="▶")
+                except Exception as _re:
+                    st.toast(str(_re), icon="❌")
+        with _rc2:
+            st.markdown("**Host**")
+            if st.button("↺ Reboot host", key="rt_reboot", use_container_width=True):
+                try:
+                    _req.post(f"{GW}/api/system/reboot", headers=_hdr(), timeout=3)
+                    st.warning("Rebooting…")
+                except Exception as _rbe:
+                    st.error(str(_rbe))
+            if st.button("⏻ Shutdown host", key="rt_shutdown", use_container_width=True):
+                try:
+                    _req.post(f"{GW}/api/system/shutdown", headers=_hdr(), timeout=3)
+                    st.warning("Shutting down…")
+                except Exception as _sde:
+                    st.error(str(_sde))
 
-# ── AUTO-REFRESH ──────────────────────────────────────────────────────────────
+# ── AUTO-REFRESH ───────────────────────────────────────────────────────────────
 time.sleep(refresh_s)
 st.rerun()
