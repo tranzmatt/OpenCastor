@@ -346,29 +346,19 @@ with _tab_ctrl:
                 st.error(str(_e))
     with _gp_c:
         _gp_tok = st.session_state.api_token
-        _gp_tok_js = _gp_tok.replace('"', '\\"') if _gp_tok else ""
         _gp_host = GW.replace("http://", "").replace("https://", "").split(":")[0]
         _gp_port = GW.split(":")[-1].split("/")[0] if ":" in GW else "8000"
         _gp_proto = "https:" if GW.startswith("https") else "http:"
-        st.components.v1.html(
-            f"""<script>
-(function(){{
-  var host="{_gp_host}", port="{_gp_port}", proto="{_gp_proto}", tok="{_gp_tok_js}";
-  if(host==="127.0.0.1"||host==="localhost"||host===""){{
-    try{{var ph=window.parent.location.hostname;if(ph)host=ph;}}catch(e){{}}
-    try{{var th=window.top.location.hostname;if(th)host=th;}}catch(e){{}}
-  }}
-  var url=proto+"//"+host+":"+port+"/gamepad"+(tok?"?token="+encodeURIComponent(tok):"");
-  document.getElementById("gp-link").href=url;
-}})();
-</script>
-<a id="gp-link" href="#" target="_blank"
-   style="display:inline-flex;align-items:center;height:48px;padding:0 16px;
-          background:#0057ff;color:#fff;border-radius:8px;text-decoration:none;
-          font-size:0.9rem;border:1px solid #3b7de8;white-space:nowrap;">
-  🎮 Open Gamepad Controller →
-</a>""",
-            height=60,
+        if _gp_host in ("127.0.0.1", "localhost", ""):
+            _gp_host = f"{robot_name}.local"
+        _gp_url = (f"{_gp_proto}//{_gp_host}:{_gp_port}/gamepad"
+                   + (f"?token={_gp_tok}" if _gp_tok else ""))
+        st.markdown(
+            f'<a href="{_gp_url}" target="_blank" style="display:inline-flex;align-items:center;'
+            f'height:48px;padding:0 16px;background:#0057ff;color:#fff;border-radius:8px;'
+            f'text-decoration:none;font-size:0.9rem;border:1px solid #3b7de8;white-space:nowrap;">'
+            f'🎮 Open Gamepad Controller →</a>',
+            unsafe_allow_html=True,
         )
 
     st.divider()
@@ -512,28 +502,14 @@ with _tab_ctrl:
                 st.toast(f"STT: {_stt_e}", icon="❌")
 
         st.divider()
-        st.components.v1.html(
-            f"""<script>
-(function(){{
-  var host="{_gp_host}", port="{_gp_port}", proto="{_gp_proto}", tok="{_gp_tok_js}";
-  if(host==="127.0.0.1"||host==="localhost"||host===""){{
-    try{{var ph=window.parent.location.hostname;if(ph)host=ph;}}catch(e){{}}
-    try{{var th=window.top.location.hostname;if(th)host=th;}}catch(e){{}}
-  }}
-  var url=proto+"//"+host+":"+port+"/gamepad"+(tok?"?token="+encodeURIComponent(tok):"");
-  document.getElementById("gp-link2").href=url;
-}})();
-</script>
-<p style="color:#c9d1d9;font-size:0.85rem;font-weight:600;margin:0 0 6px">🎮 Gamepad</p>
-<a id="gp-link2" href="#" target="_blank"
-   style="display:inline-block;padding:6px 14px;background:#ffffff;color:#0057ff;
-          border-radius:6px;text-decoration:none;font-size:0.8rem;border:1px solid #d0d5dd;">
-  Open controller page →
-</a>
-<div style="color:#6b7280;font-size:0.68rem;margin-top:4px;">
-  D-pad/stick=move · A/B=stop · L=reboot · R=shutdown · Start=ESTOP
-</div>""",
-            height=90,
+        st.markdown(
+            f'<p class="sh">🎮 Gamepad</p>'
+            f'<a href="{_gp_url}" target="_blank" style="display:inline-block;padding:6px 14px;'
+            f'background:#ffffff;color:#0057ff;border-radius:6px;text-decoration:none;'
+            f'font-size:0.8rem;border:1px solid #d0d5dd;">Open controller page →</a>'
+            f'<div style="color:#6b7280;font-size:0.68rem;margin-top:4px;">'
+            f'D-pad/stick=move · A/B=soft stop · Start=ESTOP</div>',
+            unsafe_allow_html=True,
         )
 
 

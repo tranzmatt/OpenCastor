@@ -4623,97 +4623,99 @@ async def setup_wizard():
 
 @app.get("/gamepad")
 async def gamepad_page(token: str = ""):
-    """Standalone gamepad controller page — runs outside any iframe so the
-    Gamepad API is always available.  Open in any browser tab, pass the API
-    token as ?token=<value> or leave blank for open-auth gateways."""
+    """Standalone touch + physical gamepad controller.
+
+    Mobile-first D-pad with press-and-hold for continuous movement.
+    Also supports physical gamepads via the Gamepad API.
+    Pass the API token as ?token=<value> or leave blank for open-auth gateways.
+    """
     from fastapi.responses import HTMLResponse
 
+    _robot = (state.config or {}).get("metadata", {}).get("robot_name", "robot")
     _html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Gamepad — OpenCastor</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🎮 {{_robot}} — Remote</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <style>
-  *{{box-sizing:border-box;margin:0;padding:0}}
-  body{{background:#0d1117;color:#e6edf3;font-family:monospace;font-size:14px;padding:16px}}
-  h2{{font-size:1rem;color:#58a6ff;margin-bottom:12px}}
-  #gp-name{{color:#8b949e;margin-bottom:10px;font-size:0.85rem}}
-  .row{{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}}
-  .badge{{display:inline-block;padding:3px 9px;border-radius:4px;font-size:0.75rem;
-    background:#21262d;border:1px solid #30363d;transition:background 0.08s}}
-  .badge.on {{background:#1f6feb;border-color:#58a6ff;color:#fff}}
-  .badge.stp{{background:#da3633;border-color:#f85149;color:#fff}}
-  .badge.wrn{{background:#d29922;border-color:#e3b341;color:#0d1117}}
-  #gp-dir{{font-size:2rem;min-width:2.5rem;text-align:center}}
-  .vals{{margin:0 10px;line-height:1.7}}
-  #gp-linear {{color:#3fb950}}
-  #gp-angular{{color:#58a6ff}}
-  button{{padding:6px 14px;border:none;border-radius:5px;cursor:pointer;
-    font-family:monospace;font-size:0.82rem;transition:opacity 0.1s}}
-  button:active{{opacity:0.7}}
-  #gp-confirm{{display:none;background:#161b22;border:1px solid #d29922;
-    border-radius:6px;padding:8px 12px;margin-top:8px}}
-  #fb{{color:#8b949e;font-size:0.75rem;margin-left:6px}}
-  label{{color:#8b949e;font-size:0.75rem}}
-  input[type=range]{{width:130px;accent-color:#58a6ff}}
-  .map{{margin-top:10px;font-size:0.68rem;color:#6e7681;line-height:1.8}}
+:root{{--btn:min(96px,22vw);--gap:10px;--radius:14px;}}
+*{{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}}
+html,body{{height:100%;background:#0d1117;color:#e6edf3;font-family:monospace;overflow:hidden;
+  display:flex;flex-direction:column;}}
+#topbar{{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0;}}
+#robot-lbl{{color:#58a6ff;font-weight:bold;font-size:1rem;}}
+#dir-ind{{font-size:1.6rem;min-width:2rem;text-align:center;transition:opacity 0.1s;}}
+#estop-btn{{background:#da3633;color:#fff;border:none;border-radius:8px;
+  padding:9px 18px;font-size:0.9rem;font-family:monospace;font-weight:bold;
+  cursor:pointer;touch-action:manipulation;}}
+#estop-btn:active{{opacity:0.75;}}
+#dpad-wrap{{flex:1;display:flex;align-items:center;justify-content:center;padding:16px;}}
+#dpad{{display:grid;grid-template-columns:repeat(3,var(--btn));
+  grid-template-rows:repeat(3,var(--btn));gap:var(--gap);}}
+.db{{background:#21262d;border:2px solid #30363d;border-radius:var(--radius);
+  font-size:2rem;color:#e6edf3;cursor:pointer;user-select:none;touch-action:none;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 0.06s,border-color 0.06s,transform 0.06s;}}
+.db:active,.db.on{{background:#1f6feb;border-color:#58a6ff;transform:scale(0.94);}}
+#btn-stop{{font-size:1.1rem;}}
+#btn-stop.on{{background:#3d1f1f;border-color:#da3633;}}
+.db-empty{{background:transparent;border:none;pointer-events:none;}}
+#ctrl{{padding:10px 16px;border-top:1px solid #30363d;flex-shrink:0;
+  display:flex;gap:20px;align-items:center;flex-wrap:wrap;}}
+label{{color:#8b949e;font-size:0.75rem;display:flex;flex-direction:column;gap:3px;}}
+.sl-row{{display:flex;align-items:center;gap:6px;}}
+input[type=range]{{width:110px;accent-color:#58a6ff;}}
+.sl-val{{color:#e6edf3;min-width:2.5rem;}}
+#gp-pill{{margin-left:auto;font-size:0.72rem;color:#8b949e;
+  background:#161b22;border:1px solid #30363d;border-radius:20px;padding:3px 10px;}}
+#gp-pill.on{{color:#3fb950;border-color:#3fb950;}}
+#statusbar{{padding:5px 14px;background:#161b22;border-top:1px solid #30363d;
+  font-size:0.7rem;color:#8b949e;display:flex;justify-content:space-between;flex-shrink:0;}}
+#fb{{color:#8b949e;}}
+#hint{{color:#484f58;}}
 </style>
 </head>
 <body>
-<h2>🎮 OpenCastor Gamepad Drive</h2>
-<div id="gp-name">Not connected — press any button on the controller to activate</div>
-<div class="row">
-  <div>
-    <div id="gp-dir">⬜</div>
-    <div style="font-size:0.62rem;color:#6e7681;text-align:center">D-PAD</div>
-  </div>
-  <div class="vals">
-    <div id="gp-linear">↕ 0.00</div>
-    <div id="gp-angular">↔ 0.00</div>
-  </div>
-  <div class="row" style="gap:3px">
-    <span class="badge" id="btn-a">A·Stop</span>
-    <span class="badge" id="btn-b">B·Stop</span>
-    <span class="badge" id="btn-x">X·Status</span>
-    <span class="badge" id="btn-y">Y·Snap</span>
-    <span class="badge" id="btn-l">L·Reboot</span>
-    <span class="badge" id="btn-r">R·Shutdown</span>
-    <span class="badge" id="btn-st">Start·ESTOP</span>
-    <span class="badge" id="btn-sl">Sel·Clear</span>
+<div id="topbar">
+  <span id="robot-lbl">🤖 {_robot}</span>
+  <span id="dir-ind">⬜</span>
+  <button id="estop-btn">⏹ E-STOP</button>
+</div>
+<div id="dpad-wrap">
+  <div id="dpad">
+    <div class="db-empty"></div>
+    <div class="db" id="btn-fwd"  data-lin="1"  data-ang="0"  data-dir="↑">▲</div>
+    <div class="db-empty"></div>
+    <div class="db" id="btn-left" data-lin="0"  data-ang="1"  data-dir="←">◀</div>
+    <div class="db" id="btn-stop" data-lin="0"  data-ang="0"  data-dir="⬜">■</div>
+    <div class="db" id="btn-right"data-lin="0"  data-ang="-1" data-dir="→">▶</div>
+    <div class="db-empty"></div>
+    <div class="db" id="btn-back" data-lin="-1" data-ang="0"  data-dir="↓">▼</div>
+    <div class="db-empty"></div>
   </div>
 </div>
-<div class="row" style="gap:6px;margin-top:8px">
-  <button onclick="send('/api/stop')"
-    style="background:#da3633;color:#fff">⏹ E-STOP</button>
-  <button onclick="send('/api/estop/clear')"
-    style="background:#238636;color:#fff">▶ Clear</button>
-  <button onclick="confirmAct('Reboot the robot host?',()=>send('/api/system/reboot'))"
-    style="background:#d29922;color:#0d1117">↺ Reboot…</button>
-  <button onclick="confirmAct('Shut down the robot host?',()=>send('/api/system/shutdown'))"
-    style="background:#6e40c9;color:#fff">⏻ Shutdown…</button>
-  <span id="fb"></span>
+<div id="ctrl">
+  <label>Speed
+    <div class="sl-row">
+      <input type="range" id="sl-speed" min="0.1" max="1" step="0.05" value="0.7"
+        oninput="document.getElementById('sp-v').textContent=parseFloat(this.value).toFixed(2)">
+      <span class="sl-val" id="sp-v">0.70</span>
+    </div>
+  </label>
+  <label>Turn
+    <div class="sl-row">
+      <input type="range" id="sl-turn" min="0.1" max="1" step="0.05" value="0.6"
+        oninput="document.getElementById('tu-v').textContent=parseFloat(this.value).toFixed(2)">
+      <span class="sl-val" id="tu-v">0.60</span>
+    </div>
+  </label>
+  <span id="gp-pill">🎮 no gamepad</span>
 </div>
-<div id="gp-confirm">
-  <span id="confirm-msg"></span>&nbsp;
-  <button onclick="confirmYes()" style="background:#da3633;color:#fff;padding:3px 10px">Yes</button>
-  <button onclick="confirmNo()"  style="background:#21262d;color:#e6edf3;padding:3px 10px">No</button>
-</div>
-<div class="row" style="margin-top:10px;gap:16px">
-  <div><label>Drive speed<br>
-    <input type="range" id="sl-speed" min="0.1" max="1" step="0.05" value="0.7"
-      oninput="document.getElementById('sp-v').textContent=this.value">
-    <span id="sp-v">0.7</span></label></div>
-  <div><label>Turn speed<br>
-    <input type="range" id="sl-turn" min="0.1" max="1" step="0.05" value="0.6"
-      oninput="document.getElementById('tu-v').textContent=this.value">
-    <span id="tu-v">0.6</span></label></div>
-</div>
-<div class="map">
-  D-pad / left-stick = move &nbsp;·&nbsp; A/B = stop &nbsp;·&nbsp;
-  X = status &nbsp;·&nbsp; Y = snapshot &nbsp;·&nbsp;
-  L = reboot &nbsp;·&nbsp; R = shutdown &nbsp;·&nbsp;
-  Start = E-STOP &nbsp;·&nbsp; Sel = clear stop
+<div id="statusbar">
+  <span id="fb">Ready</span>
+  <span id="hint">hold=move · release=stop · Start=ESTOP · Sel=clear</span>
 </div>
 <script>
 (function(){{
@@ -4722,106 +4724,124 @@ async def gamepad_page(token: str = ""):
   const authH = TOKEN ? {{"Authorization":"Bearer "+TOKEN}} : {{}};
   const jsonH = Object.assign({{"Content-Type":"application/json"}}, authH);
 
-  let gpIdx=null, raf=null, prev={{}}, lastT=0, pendingFn=null, lastMoving=false;
+  function fb(msg, c) {{
+    const el = document.getElementById("fb");
+    el.textContent = msg; el.style.color = c || "#8b949e";
+  }}
+  function api(path, body) {{
+    return fetch(GW + path, {{
+      method: "POST", headers: body !== undefined ? jsonH : authH,
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    }}).then(r => {{
+      if (!r.ok) r.json().then(d => fb(d.detail || "error", "#f85149")).catch(() => {{}});
+      return r;
+    }}).catch(e => fb("" + e, "#f85149"));
+  }}
 
-  function fb(msg,c){{
-    const el=document.getElementById("fb");
-    el.textContent=msg; el.style.color=c||"#8b949e";
-  }}
-  function send(path,body){{
-    return fetch(GW+path,{{method:"POST",
-      headers:body!==undefined?jsonH:authH,
-      body:body!==undefined?JSON.stringify(body):undefined
-    }}).then(r=>fb(path.split("/").pop()+" "+r.status,r.ok?"#3fb950":"#f85149"))
-      .catch(e=>fb(""+e,"#f85149"));
-  }}
-  function badge(id,on,cls){{
-    const el=document.getElementById(id);
-    if(el) el.className="badge"+(on?" "+(cls||"on"):"");
-  }}
-  function confirmAct(msg,fn){{
-    pendingFn=fn;
-    document.getElementById("confirm-msg").textContent=msg;
-    document.getElementById("gp-confirm").style.display="block";
-  }}
-  window.confirmYes=function(){{
-    document.getElementById("gp-confirm").style.display="none";
-    if(pendingFn){{pendingFn();pendingFn=null;}}
-  }};
-  window.confirmNo=function(){{
-    document.getElementById("gp-confirm").style.display="none";
-    pendingFn=null; fb("Cancelled","#8b949e");
-  }};
+  let moveIv = null, activeBtn = null;
 
-  window.addEventListener("gamepadconnected",function(e){{
-    gpIdx=e.gamepad.index;
-    document.getElementById("gp-name").textContent=e.gamepad.id;
-    document.getElementById("gp-name").style.color="#3fb950";
-    fb("Connected","#3fb950");
-    if(!raf) raf=requestAnimationFrame(loop);
+  function startMove(btn) {{
+    if (activeBtn === btn) return;
+    stopMove();
+    activeBtn = btn;
+    btn.classList.add("on");
+    const lin = parseFloat(btn.dataset.lin);
+    const ang = parseFloat(btn.dataset.ang);
+    document.getElementById("dir-ind").textContent = btn.dataset.dir || "⬜";
+    function doSend() {{
+      const spd = parseFloat(document.getElementById("sl-speed").value);
+      const trn = parseFloat(document.getElementById("sl-turn").value);
+      api("/api/action", {{type:"move", linear: lin * spd, angular: ang * trn}});
+    }}
+    doSend();
+    moveIv = setInterval(doSend, 80);
+  }}
+
+  function stopMove() {{
+    if (moveIv) {{ clearInterval(moveIv); moveIv = null; }}
+    if (activeBtn) {{ activeBtn.classList.remove("on"); activeBtn = null; }}
+    document.getElementById("dir-ind").textContent = "⬜";
+    api("/api/action", {{type:"move", linear:0, angular:0}});
+  }}
+
+  document.querySelectorAll(".db").forEach(btn => {{
+    btn.addEventListener("pointerdown", e => {{
+      e.preventDefault();
+      btn.setPointerCapture(e.pointerId);
+      startMove(btn);
+    }});
+    btn.addEventListener("pointerup",     e => {{ e.preventDefault(); stopMove(); }});
+    btn.addEventListener("pointercancel", e => {{ e.preventDefault(); stopMove(); }});
   }});
-  window.addEventListener("gamepaddisconnected",function(e){{
-    if(e.gamepad.index===gpIdx){{
-      gpIdx=null;
-      if(raf){{cancelAnimationFrame(raf);raf=null;}}
-      document.getElementById("gp-name").textContent="Disconnected — press a button to reconnect";
-      document.getElementById("gp-name").style.color="#8b949e";
-      document.getElementById("gp-dir").textContent="⬜";
-    }}
+
+  document.getElementById("estop-btn").addEventListener("click", () => {{
+    stopMove();
+    api("/api/stop").then(() => fb("E-STOP active — use /api/estop/clear to resume", "#da3633"));
   }});
 
-  function dz(v){{return Math.abs(v)<0.12?0:v;}}
-  function pressed(gp,i){{const b=gp.buttons[i];return b?(typeof b==="object"?b.pressed:b>0.5):false;}}
-  function justPressed(gp,i){{const n=pressed(gp,i),w=prev[i]||false;prev[i]=n;return n&&!w;}}
+  let gpIdx = null, gpRaf = null, prev = {{}}, lastT = 0, lastMoving = false;
 
-  function loop(){{
-    raf=requestAnimationFrame(loop);
-    if(gpIdx===null)return;
-    const gps=navigator.getGamepads();
-    const gp=gps[gpIdx];
-    if(!gp)return;
-
-    const spd=parseFloat(document.getElementById("sl-speed").value);
-    const trn=parseFloat(document.getElementById("sl-turn").value);
-
-    const dU=pressed(gp,12),dD=pressed(gp,13),dL=pressed(gp,14),dR=pressed(gp,15);
-    let lin=0,ang=0;
-    if(dU||dD||dL||dR){{
-      if(dU)lin= spd; if(dD)lin=-spd;
-      if(dL)ang= trn; if(dR)ang=-trn;
-      document.getElementById("gp-dir").textContent=
-        (dU?"↑":"")+(dD?"↓":"")+(dL?"←":"")+(dR?"→":"");
-    }}else{{
-      lin=-dz(gp.axes[1]||0)*spd;
-      ang=-dz(gp.axes[0]||0)*trn;
-      document.getElementById("gp-dir").textContent=
-        (Math.abs(lin)>0.01||Math.abs(ang)>0.01)?"🕹":"⬜";
-    }}
-    document.getElementById("gp-linear").textContent ="↕ "+lin.toFixed(2);
-    document.getElementById("gp-angular").textContent="↔ "+ang.toFixed(2);
-
-    const t=Date.now();
-    const moving=Math.abs(lin)>0.01||Math.abs(ang)>0.01;
-    if((moving||lastMoving)&&t-lastT>80){{
-      lastT=t; lastMoving=moving;
-      send("/api/action",{{type:"move",linear:lin,angular:ang}});
-    }}
-
-    badge("btn-a", pressed(gp,0));  badge("btn-b", pressed(gp,1));
-    badge("btn-x", pressed(gp,2));  badge("btn-y", pressed(gp,3));
-    badge("btn-l", pressed(gp,4),"wrn"); badge("btn-r",pressed(gp,5),"wrn");
-    badge("btn-st",pressed(gp,9),"stp"); badge("btn-sl",pressed(gp,8));
-
-    if(justPressed(gp,0)||justPressed(gp,1))
-      send("/api/action",{{type:"move",linear:0,angular:0}});
-    if(justPressed(gp,2)) send("/api/command",{{instruction:"what is your current status?"}});
-    if(justPressed(gp,3)) fetch(GW+"/api/camera/snapshot",{{headers:authH}})
-      .then(()=>fb("Snapshot taken","#3fb950")).catch(()=>fb("Snapshot unavailable","#f85149"));
-    if(justPressed(gp,4)) confirmAct("Reboot the robot host?",()=>send("/api/system/reboot"));
-    if(justPressed(gp,5)) confirmAct("Shut down the robot host?",()=>send("/api/system/shutdown"));
-    if(justPressed(gp,9)) send("/api/stop");
-    if(justPressed(gp,8)) send("/api/estop/clear");
+  function pressed(gp, i) {{ return gp.buttons[i] && gp.buttons[i].pressed; }}
+  function dz(v) {{ return Math.abs(v) > 0.12 ? v : 0; }}
+  function justPressed(gp, i) {{
+    const on = pressed(gp, i), was = prev[i] || false;
+    prev[i] = on; return on && !was;
   }}
+
+  function gpLoop() {{
+    gpRaf = requestAnimationFrame(gpLoop);
+    if (gpIdx === null) return;
+    const gp = navigator.getGamepads()[gpIdx];
+    if (!gp) return;
+
+    const spd = parseFloat(document.getElementById("sl-speed").value);
+    const trn = parseFloat(document.getElementById("sl-turn").value);
+
+    const dU=pressed(gp,12), dD=pressed(gp,13), dL=pressed(gp,14), dR=pressed(gp,15);
+    let lin=0, ang=0;
+    if (dU||dD||dL||dR) {{
+      if (dU) lin= spd; if (dD) lin=-spd;
+      if (dL) ang= trn; if (dR) ang=-trn;
+    }} else {{
+      lin = -dz(gp.axes[1]||0)*spd;
+      ang = -dz(gp.axes[0]||0)*trn;
+    }}
+
+    const t = Date.now(), moving = Math.abs(lin)>0.01||Math.abs(ang)>0.01;
+    if ((moving || lastMoving) && t - lastT > 80 && !activeBtn) {{
+      lastT = t; lastMoving = moving;
+      api("/api/action", {{type:"move", linear:lin, angular:ang}});
+      document.getElementById("dir-ind").textContent =
+        !moving ? "⬜" : lin>0?"↑":lin<0?"↓":ang>0?"←":"→";
+    }}
+
+    if (justPressed(gp,0)||justPressed(gp,1))
+      api("/api/action", {{type:"move", linear:0, angular:0}});
+    if (justPressed(gp,9)) {{
+      api("/api/stop");
+      fb("E-STOP (gamepad Start)", "#da3633");
+    }}
+    if (justPressed(gp,8))
+      api("/api/estop/clear").then(() => fb("Stop cleared (gamepad Sel)", "#3fb950"));
+  }}
+
+  window.addEventListener("gamepadconnected", e => {{
+    gpIdx = e.gamepad.index;
+    const pill = document.getElementById("gp-pill");
+    pill.textContent = "🎮 " + (e.gamepad.id.slice(0,28) || "gamepad");
+    pill.className = "on";
+    fb("Gamepad connected", "#3fb950");
+    if (!gpRaf) gpRaf = requestAnimationFrame(gpLoop);
+  }});
+  window.addEventListener("gamepaddisconnected", e => {{
+    if (e.gamepad.index === gpIdx) {{
+      gpIdx = null;
+      if (gpRaf) {{ cancelAnimationFrame(gpRaf); gpRaf = null; }}
+      document.getElementById("gp-pill").textContent = "🎮 no gamepad";
+      document.getElementById("gp-pill").className = "";
+      fb("Gamepad disconnected", "#8b949e");
+    }}
+  }});
 }})();
 </script>
 </body>
