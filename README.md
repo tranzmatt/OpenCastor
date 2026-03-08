@@ -291,16 +291,14 @@ castor token --role operator        # issue JWT
 
 Full reference: [`docs/claude/cli-reference.md`](docs/claude/cli-reference.md)
 
-## What's New in v2026.3.8.2
+## What's New in v2026.3.8.3
 
-- **Animated robot face kiosk** (`GET /face`) — reactive SVG face, 3 styles, speaking mouth, listening ring, e-stop X-eyes; long-press → dashboard
-- **Closed captions on face** — TTS sentence text overlaid as frosted-glass subtitle bar when `?captions=1`
-- **Full-screen touch gamepad** (`GET /gamepad`) — press-and-hold D-pad, speed/turn sliders, physical Bluetooth gamepad polling
-- **Brain model visibility** — `/api/status` exposes `brain_primary`, `brain_secondary`, `brain_active_model`; `/api/command` returns `model_used`
-- **Dashboard UX upgrades** — Status tab shows Brain section + active-only channel pills; Chat shows `via <model>` per reply; Settings adds Terminal Access, Setup Wizard link, Closed Captions toggle
-- **Wake-up greeting** — gateway speaks `"Hello. I am <robot>. I am online and ready."` on boot
-- **Fix: camera/speaker/loop always offline** — `snapshot()` returns nested proc keys; all 5 broken dashboard key paths corrected
-- **Memory efficiency fixes** — `EpisodeStore` now enforces 10k FIFO cap; `improvement_history.json` capped at 1k entries; behavior rules deduplicated by name
+- **EpisodeStore FIFO cap** — memory store now enforces 10k episode limit with automatic FIFO eviction; prevents unbounded SQLite growth
+- **ApplyStage dedup** — `improvement_history.json` capped at 1k entries; behavior rules deduplicated by name for a leaner learning pipeline
+- **Timezone-aware datetimes** — deprecated `datetime.utcfromtimestamp()` replaced throughout with timezone-aware equivalents
+- **README refresh** — architecture diagram, Memory & Learning section, and overall structure tightened
+
+_Previous: [v2026.3.8.2](#) — animated robot face, gamepad, closed captions, brain model visibility, dashboard UX_
 
 ## Contributing
 
