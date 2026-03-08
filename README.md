@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <b>99,547 lines of Python · 6,404 tests · Python 3.10–3.13</b><br/>
+  <b>91,969 lines of Python · 6,404 tests · Python 3.10–3.13</b><br/>
   <i>Connect any AI model to any robot hardware through a single YAML config.</i>
 </p>
 
@@ -92,6 +92,16 @@ pip install -e ".[dev]"
 Supports **Linux, macOS (Apple Silicon & Intel), Windows 11, Raspberry Pi, Docker**.
 Installer flags: `--dry-run`, `--no-rpi`, `--skip-wizard`
 </details>
+
+## ✨ What's New in v2026.3.8.2
+
+- **Animated robot face kiosk** (`GET /face`) — reactive SVG face with 3 styles (friendly/kawaii/retro); speaking mouth oscillation; listening ring; e-stop X-eyes; long-press → dashboard; served at `http://robot.local:8000/face`
+- **Closed captions on face** — TTS sentence text overlaid as frosted-glass subtitle bar when `?captions=1`; toggle in dashboard Settings tab
+- **Full-screen touch gamepad** (`GET /gamepad`) — press-and-hold D-pad, speed/turn sliders, physical Bluetooth gamepad polling, soft stop (no e-stop trigger), robot hostname auto-resolved
+- **Brain model visibility** — `/api/status` exposes `brain_primary`, `brain_secondary`, `brain_active_model`; `/api/command` returns `model_used`; logs `Brain replied via <model> in <N> ms`
+- **Dashboard UX upgrades** — Status tab shows 🧠 Brain section + active-only channel pills; Chat tab shows `via <model>` per reply; Settings tab adds Terminal Access (SSH/tmux/logs), Setup Wizard link, Closed Captions toggle
+- **Wake-up greeting** — gateway speaks `"Hello. I am <robot>. I am online and ready."` on boot
+- **Fix: camera/speaker/loop always offline** — `snapshot()` returns nested `proc.hw.camera` but dashboard read flat `proc.camera`; all 5 broken proc key paths corrected
 
 ## ✨ What's New in v2026.3.8.1
 

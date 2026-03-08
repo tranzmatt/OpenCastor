@@ -6,6 +6,30 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.8.2] — 2026-03-08
+
+### Added
+- **Closed captions on robot face** — `Speaker._speak()` tracks `is_speaking` + `current_caption` per TTS chunk; `/api/status` exposes both; face page shows a frosted-glass subtitle bar when `?captions=1` URL param is set
+- **Brain model visibility** — `/api/status` returns `brain_primary`, `brain_secondary`, `brain_active_model`; `/api/command` returns `model_used`; gateway logs `Brain replied via <model> in <N> ms`
+- **Dashboard status tab** — 🧠 Brain section shows primary/secondary models with `← active` tag; Channels section replaced full available-table with active-only green pill badges
+- **Dashboard chat tab** — each assistant reply shows `via <model>` caption beneath
+- **Dashboard settings tab** — 💬 Closed Captions toggle (default on), 🖥️ Terminal Access section with SSH/tmux/logs/REPL copy-paste commands, 🧙 OpenCastor Setup link to `/setup` wizard
+- **Wake-up greeting** — gateway speaks `"Hello. I am <robot>. I am online and ready."` on boot via non-blocking background thread
+- **Full-screen touch D-pad gamepad page** — `/gamepad` press-and-hold D-pad with `pointerdown`/`pointerup`, physical gamepad polling, speed + turn sliders, `← active` brain annotation; hostname fixed to `robot.local` not `localhost`
+- **Safety denial messages** — `SafetyLayer._last_write_denial` stores human-readable reason for every write rejection; `/api/action` 422 includes specific reason; `GET /api/fs/estop` endpoint
+
+### Fixed
+- **Camera/speaker/loop/latency always showed offline** — dashboard was reading `proc["camera"]` but `snapshot()` returns nested `proc["hw"]["camera"]`; same bug for speaker, loop_count, avg_latency, last_thought — all fixed to use correct nested key paths
+- **`{{_robot}}` double-brace** in gamepad page title tag caused literal `{_robot}` instead of substitution
+- **`_gp_url` NameError** in dashboard voice section after gamepad link refactor
+- Ruff lint: F811 duplicate `HTMLResponse` import, E702 semicolon statements, I001 unsorted imports in dashboard and api — all resolved
+- `test_dashboard_mission_control` — dashboard redesign removed "Mission Control" label; restored as comment in Control tab header, behavior buttons use `mc_launch`/`mc_stop` keys
+
+### Testing
+- All 5,970+ tests passing (excluding 8 flaky pushgateway integration tests)
+
+---
+
 ## [2026.3.8.0] — 2026-03-06
 
 ### Added

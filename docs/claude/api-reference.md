@@ -26,6 +26,18 @@ Docker HEALTHCHECK endpoint. Returns uptime, brain status, driver status, active
 ### GET /api/status
 Full runtime status including active providers and channels.
 
+Response now includes:
+- `brain_primary` — `{provider, model}` from RCAN config
+- `brain_secondary` — list of `{provider, model, tags}` secondary models
+- `brain_active_model` — model name string currently handling requests
+- `speaking` — `true` while TTS audio is playing
+- `caption` — current TTS sentence being spoken (empty when silent)
+- `channels_active` — list of active channel names
+
+### GET /api/fs/estop
+Returns `{estopped: bool, proc_status: str, last_denial: str}`.
+`last_denial` is a human-readable reason for the most recent safety layer write rejection.
+
 ---
 
 ## Command & Control
@@ -39,8 +51,13 @@ Request:
 ```
 Response:
 ```json
-{"raw_text": "Moving forward at low speed.", "action": {"speed": 0.3, "direction": "forward"}}
+{
+  "raw_text": "Moving forward at low speed.",
+  "action": {"type": "move", "linear": 0.3, "angular": 0.0},
+  "model_used": "gemini-2.5-flash"
+}
 ```
+`model_used` identifies which provider/model generated the response. Also logs `Brain replied via <model> in <N> ms`.
 
 ### POST /api/command/stream
 NDJSON streaming of LLM tokens. Uses `think_stream()`; falls back to `think()` if streaming unavailable.

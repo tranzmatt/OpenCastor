@@ -451,16 +451,26 @@ async def get_status(request: Request):
     from castor.safety.authorization import DEFAULT_AUDIT_LOG_PATH
 
     _agent_cfg = (state.config or {}).get("agent", {})
-    _brain_primary = {
-        "provider": _agent_cfg.get("provider", "unknown"),
-        "model": _agent_cfg.get("model", "unknown"),
-    } if state.config else None
-    _brain_secondary = [
-        {"provider": s.get("provider"), "model": s.get("model"), "tags": s.get("tags", [])}
-        for s in _agent_cfg.get("secondary_models", [])
-    ] if state.config else []
+    _brain_primary = (
+        {
+            "provider": _agent_cfg.get("provider", "unknown"),
+            "model": _agent_cfg.get("model", "unknown"),
+        }
+        if state.config
+        else None
+    )
+    _brain_secondary = (
+        [
+            {"provider": s.get("provider"), "model": s.get("model"), "tags": s.get("tags", [])}
+            for s in _agent_cfg.get("secondary_models", [])
+        ]
+        if state.config
+        else []
+    )
     _active_brain_obj = _get_active_brain()
-    _brain_active_model = getattr(_active_brain_obj, "model_name", None) if _active_brain_obj else None
+    _brain_active_model = (
+        getattr(_active_brain_obj, "model_name", None) if _active_brain_obj else None
+    )
 
     payload = {
         "config_loaded": state.config is not None,
@@ -692,6 +702,7 @@ async def runtime_status():
 async def system_reboot(request: Request):
     """Reboot the host machine. Requires admin role."""
     import subprocess
+
     _check_min_role(request, "admin")
     subprocess.Popen(["sudo", "reboot"])
     return {"status": "rebooting"}
@@ -701,6 +712,7 @@ async def system_reboot(request: Request):
 async def system_shutdown(request: Request):
     """Shut down the host machine. Requires admin role."""
     import subprocess
+
     _check_min_role(request, "admin")
     subprocess.Popen(["sudo", "shutdown", "-h", "now"])
     return {"status": "shutting_down"}
@@ -4465,9 +4477,7 @@ async def on_startup():
 
         def _wakeup_speak():
             try:
-                state.speaker.speak(
-                    f"Hello. I am {_robot_name_wakeup}. I am online and ready."
-                )
+                state.speaker.speak(f"Hello. I am {_robot_name_wakeup}. I am online and ready.")
             except Exception as _ws_exc:
                 logger.debug("Wake-up speech failed: %s", _ws_exc)
 
@@ -4881,7 +4891,6 @@ input[type=range]{{width:110px;accent-color:#58a6ff;}}
 </script>
 </body>
 </html>"""
-    from fastapi.responses import HTMLResponse
     return HTMLResponse(content=_html)
 
 
@@ -4897,8 +4906,10 @@ async def robot_face_page(token: str = "", style: str = "friendly", captions: in
     Query params:
         style: "friendly" (default), "kawaii", "retro"
     """
-    from fastapi.responses import HTMLResponse
     import re as _re
+
+    from fastapi.responses import HTMLResponse
+
     _tok = _re.sub(r"[^A-Za-z0-9._\-]", "", token)
     _style = style if style in ("friendly", "kawaii", "retro") else "friendly"
 

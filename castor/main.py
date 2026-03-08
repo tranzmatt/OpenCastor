@@ -577,7 +577,9 @@ class Speaker:
                             pygame.mixer.init()
                             self._mixer_ready = True
                         except Exception as exc:
-                            logger.warning(f"TTS disabled -- audio init failed during playback: {exc}")
+                            logger.warning(
+                                f"TTS disabled -- audio init failed during playback: {exc}"
+                            )
                             self.enabled = False
                             return
 

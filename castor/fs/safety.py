@@ -376,7 +376,9 @@ class SafetyLayer:
 
         if self._is_locked_out(principal):
             logger.warning("WRITE denied: %s is locked out", principal)
-            self._last_write_denial = f"Principal '{principal}' is locked out due to repeated violations."
+            self._last_write_denial = (
+                f"Principal '{principal}' is locked out due to repeated violations."
+            )
             return False
 
         if not self.check_role_rate_limit(principal):
@@ -385,7 +387,9 @@ class SafetyLayer:
             return False
         if not self.check_session_timeout(principal):
             self._audit_safety(principal, path, "session_expired", "session timed out")
-            self._last_write_denial = f"Session expired for principal '{principal}'. Re-authenticate to reset."
+            self._last_write_denial = (
+                f"Session expired for principal '{principal}'. Re-authenticate to reset."
+            )
             return False
 
         if not self.perms.check_access(principal, path, "w"):

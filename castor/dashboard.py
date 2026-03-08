@@ -229,40 +229,38 @@ def _badge(mode: str) -> str:
 
 
 # ── fetch all data once per render ────────────────────────────────────────────
-health   = _get("/health")
-status   = _get("/api/status")
-proc     = _get("/api/fs/proc")
-driver   = _get("/api/driver/health")
-learner  = _get("/api/learner/stats")
-hist     = _get("/api/command/history?limit=8")
+health = _get("/health")
+status = _get("/api/status")
+proc = _get("/api/fs/proc")
+driver = _get("/api/driver/health")
+learner = _get("/api/learner/stats")
+hist = _get("/api/command/history?limit=8")
 episodes = _get("/api/memory/episodes?limit=20")
-usage    = _get("/api/usage")
-_imu_raw   = _get("/api/imu/latest")
+usage = _get("/api/usage")
+_imu_raw = _get("/api/imu/latest")
 _imu_orient = _get("/api/imu/orientation")
-_lidar_raw  = _get("/api/lidar/scan")
-_bat_raw    = _get("/api/battery/latest")
+_lidar_raw = _get("/api/lidar/scan")
+_bat_raw = _get("/api/battery/latest")
 
-_imu_mode   = _imu_raw.get("mode", "offline")  if _imu_raw   else "offline"
+_imu_mode = _imu_raw.get("mode", "offline") if _imu_raw else "offline"
 _lidar_mode = _lidar_raw.get("mode", "offline") if _lidar_raw else "offline"
-_bat_mode   = _bat_raw.get("mode", "offline")   if _bat_raw   else "offline"
+_bat_mode = _bat_raw.get("mode", "offline") if _bat_raw else "offline"
 
-robot_name     = status.get("robot_name", health.get("robot_name", "robot"))
-uptime         = health.get("uptime_s", 0)
-brain_ok       = health.get("brain")
-driver_ok      = health.get("driver")
+robot_name = status.get("robot_name", health.get("robot_name", "robot"))
+uptime = health.get("uptime_s", 0)
+brain_ok = health.get("brain")
+driver_ok = health.get("driver")
 channels_active = status.get("channels_active", health.get("channels", []))
-_proc_hw   = proc.get("hw", {})
+_proc_hw = proc.get("hw", {})
 _proc_loop = proc.get("loop", {})
-cam_ok     = str(_proc_hw.get("camera", "")).lower() in ("online", "true", "ok")
+cam_ok = str(_proc_hw.get("camera", "")).lower() in ("online", "true", "ok")
 loop_count = _proc_loop.get("iteration", 0)
-avg_lat    = _proc_loop.get("latency_ms", 0)
+avg_lat = _proc_loop.get("latency_ms", 0)
 
 # ── SIDEBAR (settings + quick actions) ────────────────────────────────────────
 with st.sidebar:
     st.markdown("### ⚙️ Settings")
-    st.session_state.gateway_url = st.text_input(
-        "Gateway URL", value=st.session_state.gateway_url
-    )
+    st.session_state.gateway_url = st.text_input("Gateway URL", value=st.session_state.gateway_url)
     st.session_state.api_token = st.text_input(
         "API Token", value=st.session_state.api_token, type="password"
     )
@@ -292,7 +290,8 @@ with st.sidebar:
 # ── back-to-face link ────────────────────────────────────────────────────────
 # Use the device's actual hostname (e.g. "alex") with .local suffix for mDNS,
 # so the link resolves correctly from the browser regardless of how GW is set.
-import socket as _socket
+import socket as _socket  # noqa: E402
+
 _gw_port = GW.split(":")[-1].split("/")[0] if GW.count(":") >= 2 else "8000"
 _hn = _socket.gethostname()
 _face_host = _hn if "." in _hn else f"{_hn}.local"
@@ -327,7 +326,7 @@ _tab_ctrl, _tab_status, _tab_chat, _tab_fleet, _tab_builder, _tab_settings = st.
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 🕹️ CONTROL TAB
+# 🕹️ CONTROL TAB  (Mission Control)
 # ═══════════════════════════════════════════════════════════════════════════════
 with _tab_ctrl:
     # E-STOP row always at top
@@ -353,13 +352,14 @@ with _tab_ctrl:
         _gp_proto = "https:" if GW.startswith("https") else "http:"
         if _gp_host in ("127.0.0.1", "localhost", ""):
             _gp_host = f"{robot_name}.local"
-        _gp_url = (f"{_gp_proto}//{_gp_host}:{_gp_port}/gamepad"
-                   + (f"?token={_gp_tok}" if _gp_tok else ""))
+        _gp_url = f"{_gp_proto}//{_gp_host}:{_gp_port}/gamepad" + (
+            f"?token={_gp_tok}" if _gp_tok else ""
+        )
         st.markdown(
             f'<a href="{_gp_url}" target="_blank" style="display:inline-flex;align-items:center;'
-            f'height:48px;padding:0 16px;background:#0057ff;color:#fff;border-radius:8px;'
+            f"height:48px;padding:0 16px;background:#0057ff;color:#fff;border-radius:8px;"
             f'text-decoration:none;font-size:0.9rem;border:1px solid #3b7de8;white-space:nowrap;">'
-            f'🎮 Open Gamepad Controller →</a>',
+            f"🎮 Open Gamepad Controller →</a>",
             unsafe_allow_html=True,
         )
 
@@ -419,17 +419,23 @@ with _tab_ctrl:
         if _depth.get("available"):
             st.markdown('<p class="sh">📏 Obstacles</p>', unsafe_allow_html=True)
             _dl, _dc, _dr = st.columns(3)
-            _dl.metric("Left",   f"{_depth.get('left_cm', 0):.0f} cm"   if _depth.get("left_cm")   else "—")
-            _dc.metric("Center", f"{_depth.get('center_cm', 0):.0f} cm" if _depth.get("center_cm") else "—")
-            _dr.metric("Right",  f"{_depth.get('right_cm', 0):.0f} cm"  if _depth.get("right_cm")  else "—")
+            _dl.metric(
+                "Left", f"{_depth.get('left_cm', 0):.0f} cm" if _depth.get("left_cm") else "—"
+            )
+            _dc.metric(
+                "Center", f"{_depth.get('center_cm', 0):.0f} cm" if _depth.get("center_cm") else "—"
+            )
+            _dr.metric(
+                "Right", f"{_depth.get('right_cm', 0):.0f} cm" if _depth.get("right_cm") else "—"
+            )
 
     with _dpad_col:
         st.markdown('<p class="sh">🕹️ Manual Drive</p>', unsafe_allow_html=True)
 
         _spd = st.slider("Speed", 0.1, 1.0, st.session_state.dp_speed, 0.05, key="dp_speed_sl")
-        _trn = st.slider("Turn",  0.1, 1.0, st.session_state.dp_turn,  0.05, key="dp_turn_sl")
+        _trn = st.slider("Turn", 0.1, 1.0, st.session_state.dp_turn, 0.05, key="dp_turn_sl")
         st.session_state.dp_speed = _spd
-        st.session_state.dp_turn  = _trn
+        st.session_state.dp_turn = _trn
 
         # D-pad grid  [  ] [▲] [  ]
         #             [◀] [■] [▶]
@@ -442,9 +448,14 @@ with _tab_ctrl:
             try:
                 _req.post(
                     f"{GW}/api/action",
-                    json={"type": "move", "linear": round(lin, 2), "angular": round(ang, 2),
-                          "duration_ms": 600},
-                    headers=_hdr(), timeout=2,
+                    json={
+                        "type": "move",
+                        "linear": round(lin, 2),
+                        "angular": round(ang, 2),
+                        "duration_ms": 600,
+                    },
+                    headers=_hdr(),
+                    timeout=2,
                 )
             except Exception:
                 pass
@@ -461,7 +472,8 @@ with _tab_ctrl:
                     _req.post(
                         f"{GW}/api/action",
                         json={"type": "move", "linear": 0.0, "angular": 0.0},
-                        headers=_hdr(), timeout=2,
+                        headers=_hdr(),
+                        timeout=2,
                     )
                 except Exception:
                     pass
@@ -494,6 +506,7 @@ with _tab_ctrl:
         if st.button("🎤 Server Mic (STT)", use_container_width=True, key="stt_ctrl"):
             try:
                 import speech_recognition as _sr
+
                 rec = _sr.Recognizer()
                 with _sr.Microphone() as src:
                     st.toast("Listening…", icon="🎤")
@@ -507,10 +520,10 @@ with _tab_ctrl:
         st.markdown(
             f'<p class="sh">🎮 Gamepad</p>'
             f'<a href="{_gp_url}" target="_blank" style="display:inline-block;padding:6px 14px;'
-            f'background:#ffffff;color:#0057ff;border-radius:6px;text-decoration:none;'
+            f"background:#ffffff;color:#0057ff;border-radius:6px;text-decoration:none;"
             f'font-size:0.8rem;border:1px solid #d0d5dd;">Open controller page →</a>'
             f'<div style="color:#6b7280;font-size:0.68rem;margin-top:4px;">'
-            f'D-pad/stick=move · A/B=soft stop · Start=ESTOP</div>',
+            f"D-pad/stick=move · A/B=soft stop · Start=ESTOP</div>",
             unsafe_allow_html=True,
         )
 
@@ -522,11 +535,21 @@ with _tab_status:
     # ── Sensor badges row ──────────────────────────────────────────────────────
     _s1, _s2, _s3, _s4, _s5 = st.columns(5)
     _sensors = [
-        ("🧭 IMU",    _imu_mode,   _imu_raw.get("model", "") if _imu_raw else ""),
-        ("📡 LiDAR",  _lidar_mode, "RPLidar" if _lidar_mode == "hardware" else "none"),
-        ("🔋 Battery", _bat_mode,  f"{_bat_raw.get('voltage_v', 0):.1f}V" if _bat_raw and _bat_raw.get("voltage_v") else "no sensor"),
-        ("🦾 Driver",  driver.get("mode", "offline"), (driver.get("driver_type") or "—").replace("Driver", "")),
-        ("📷 Camera",  "hardware" if cam_ok else "offline", "live" if cam_ok else "no signal"),
+        ("🧭 IMU", _imu_mode, _imu_raw.get("model", "") if _imu_raw else ""),
+        ("📡 LiDAR", _lidar_mode, "RPLidar" if _lidar_mode == "hardware" else "none"),
+        (
+            "🔋 Battery",
+            _bat_mode,
+            f"{_bat_raw.get('voltage_v', 0):.1f}V"
+            if _bat_raw and _bat_raw.get("voltage_v")
+            else "no sensor",
+        ),
+        (
+            "🦾 Driver",
+            driver.get("mode", "offline"),
+            (driver.get("driver_type") or "—").replace("Driver", ""),
+        ),
+        ("📷 Camera", "hardware" if cam_ok else "offline", "live" if cam_ok else "no signal"),
     ]
     for col, (name, mode, detail) in zip([_s1, _s2, _s3, _s4, _s5], _sensors, strict=False):
         col.markdown(
@@ -541,12 +564,12 @@ with _tab_status:
     speaker_ok = str(_proc_hw.get("speaker", "")).lower() in ("online", "true", "ok")
     _today = (usage.get("daily") or [{}])[-1] if usage.get("daily") else {}
     _mc1, _mc2, _mc3, _mc4, _mc5, _mc6 = st.columns(6)
-    _mc1.metric("Uptime",   _fmt_uptime(uptime))
-    _mc2.metric("Loops",    str(loop_count))
-    _mc3.metric("Latency",  f"{avg_lat:.0f} ms" if avg_lat else "—")
-    _mc4.metric("Camera",   "live ●" if cam_ok else "offline ○")
-    _mc5.metric("Speaker",  "online" if speaker_ok else "offline")
-    _mc6.metric("Tokens",   f"{_today.get('total_tokens', 0):,}")
+    _mc1.metric("Uptime", _fmt_uptime(uptime))
+    _mc2.metric("Loops", str(loop_count))
+    _mc3.metric("Latency", f"{avg_lat:.0f} ms" if avg_lat else "—")
+    _mc4.metric("Camera", "live ●" if cam_ok else "offline ○")
+    _mc5.metric("Speaker", "online" if speaker_ok else "offline")
+    _mc6.metric("Tokens", f"{_today.get('total_tokens', 0):,}")
 
     _lt_raw = proc.get("brain", {}).get("last_thought") or {}
     last_thought = str(_lt_raw.get("raw_text", "") if isinstance(_lt_raw, dict) else _lt_raw)
@@ -562,7 +585,9 @@ with _tab_status:
         st.markdown('<p class="sh o">🦾 Driver</p>', unsafe_allow_html=True)
         _dc1, _dc2 = st.columns(2)
         _drv_mode = driver.get("mode", "?")
-        _drv_type = (driver.get("driver_type") or "—").replace("PCA9685RC", "RC").replace("Driver", "")
+        _drv_type = (
+            (driver.get("driver_type") or "—").replace("PCA9685RC", "RC").replace("Driver", "")
+        )
         _dc1.metric("Mode", (_drv_mode or "—").capitalize())
         _dc2.metric("Type", _drv_type)
         if driver.get("error"):
@@ -597,14 +622,21 @@ with _tab_status:
     _bam = status.get("brain_active_model")
     if _bp:
         _bp_label = f"{_bp.get('provider', '?')} / {_bp.get('model', '?')}"
-        _active_tag = " ← active" if (_bam and _bp.get("model") and _bam.endswith(_bp["model"])) else ""
+        _active_tag = (
+            " ← active" if (_bam and _bp.get("model") and _bam.endswith(_bp["model"])) else ""
+        )
         st.markdown(f"**Primary:** `{_bp_label}`{_active_tag}")
     if _bs:
         for _s in _bs:
             _s_label = f"{_s.get('provider', '?')} / {_s.get('model', '?')}"
             _s_tags = ", ".join(_s.get("tags") or [])
-            _active_tag2 = " ← active" if (_bam and _s.get("model") and _bam.endswith(_s["model"])) else ""
-            st.markdown(f"**Secondary:** `{_s_label}`{_active_tag2}" + (f" — _{_s_tags}_" if _s_tags else ""))
+            _active_tag2 = (
+                " ← active" if (_bam and _s.get("model") and _bam.endswith(_s["model"])) else ""
+            )
+            st.markdown(
+                f"**Secondary:** `{_s_label}`{_active_tag2}"
+                + (f" — _{_s_tags}_" if _s_tags else "")
+            )
     elif not _bp:
         st.caption("No brain config")
 
@@ -614,14 +646,18 @@ with _tab_status:
     st.markdown('<p class="sh">📡 Channels</p>', unsafe_allow_html=True)
     _ch_active = set(channels_active)
     _CH_NAMES = {
-        "whatsapp": "WhatsApp", "whatsapp_twilio": "WhatsApp (Twilio)",
-        "telegram": "Telegram", "discord": "Discord", "slack": "Slack",
-        "mqtt": "MQTT", "homeassistant": "Home Assistant",
+        "whatsapp": "WhatsApp",
+        "whatsapp_twilio": "WhatsApp (Twilio)",
+        "telegram": "Telegram",
+        "discord": "Discord",
+        "slack": "Slack",
+        "mqtt": "MQTT",
+        "homeassistant": "Home Assistant",
     }
     if _ch_active:
         _badges = " ".join(
             f'<span style="background:#1a6e3c;color:#fff;padding:2px 10px;border-radius:12px;font-size:0.85rem;">'
-            f'🟢 {_CH_NAMES.get(_cn, _cn.replace("_", " ").title())}</span>'
+            f"🟢 {_CH_NAMES.get(_cn, _cn.replace('_', ' ').title())}</span>"
             for _cn in sorted(_ch_active)
         )
         st.markdown(_badges, unsafe_allow_html=True)
@@ -637,7 +673,7 @@ with _tab_status:
         if learner.get("available"):
             _l1, _l2 = st.columns(2)
             _l1.metric("Episodes", learner.get("episodes_analyzed", 0))
-            _l2.metric("Applied",  learner.get("improvements_applied", 0))
+            _l2.metric("Applied", learner.get("improvements_applied", 0))
         else:
             st.caption("No data yet")
 
@@ -647,7 +683,7 @@ with _tab_status:
         if _cs.get("entries") is not None:
             _cc1, _cc2 = st.columns(2)
             _cc1.metric("Hit rate", f"{_cs.get('hit_rate_pct', 0):.1f}%")
-            _cc2.metric("Entries",  _cs.get("entries", 0))
+            _cc2.metric("Entries", _cs.get("entries", 0))
         else:
             st.caption("No data")
 
@@ -667,11 +703,15 @@ with _tab_status:
     if _det.get("detections") is not None:
         st.markdown('<p class="sh">👁 Detection</p>', unsafe_allow_html=True)
         _dets = _det.get("detections", [])
-        st.caption(f"Mode: {_det.get('mode','mock')} · {_det.get('latency_ms',0):.0f}ms · {len(_dets)} objects")
+        st.caption(
+            f"Mode: {_det.get('mode', 'mock')} · {_det.get('latency_ms', 0):.0f}ms · {len(_dets)} objects"
+        )
         if _dets:
             for _d in _dets[:5]:
                 _conf = _d.get("confidence", 0)
-                st.write(f"{'🟢' if _conf > 0.7 else '🟡'} **{_d.get('class','?')}** ({_conf:.0%})")
+                st.write(
+                    f"{'🟢' if _conf > 0.7 else '🟡'} **{_d.get('class', '?')}** ({_conf:.0%})"
+                )
 
     st.divider()
 
@@ -680,16 +720,23 @@ with _tab_status:
     _hist_entries = hist.get("history", [])
     if _hist_entries:
         import pandas as _pd2
+
         _hist_rows = []
         for _e in reversed(_hist_entries):
             _ts = _e.get("ts", "")
-            _hist_rows.append({
-                "Time":     _ts[11:16] if len(_ts) > 15 else _ts[:5],
-                "Command":  str(_e.get("instruction", ""))[:40],
-                "Response": str(_e.get("action") or _e.get("raw_text") or "")[:60],
-            })
-        st.dataframe(_pd2.DataFrame(_hist_rows), hide_index=True, use_container_width=True,
-                     height=min(220, 36 + 36 * len(_hist_rows)))
+            _hist_rows.append(
+                {
+                    "Time": _ts[11:16] if len(_ts) > 15 else _ts[:5],
+                    "Command": str(_e.get("instruction", ""))[:40],
+                    "Response": str(_e.get("action") or _e.get("raw_text") or "")[:60],
+                }
+            )
+        st.dataframe(
+            _pd2.DataFrame(_hist_rows),
+            hide_index=True,
+            use_container_width=True,
+            height=min(220, 36 + 36 * len(_hist_rows)),
+        )
     else:
         st.caption("No commands yet")
 
@@ -698,9 +745,9 @@ with _tab_status:
         st.divider()
         st.markdown('<p class="sh">🧭 IMU Orientation</p>', unsafe_allow_html=True)
         _io1, _io2, _io3 = st.columns(3)
-        _io1.metric("Yaw",   f"{_imu_orient.get('yaw_deg',   0):.1f}°")
+        _io1.metric("Yaw", f"{_imu_orient.get('yaw_deg', 0):.1f}°")
         _io2.metric("Pitch", f"{_imu_orient.get('pitch_deg', 0):.1f}°")
-        _io3.metric("Roll",  f"{_imu_orient.get('roll_deg',  0):.1f}°")
+        _io3.metric("Roll", f"{_imu_orient.get('roll_deg', 0):.1f}°")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -742,16 +789,22 @@ with _tab_chat:
         with st.spinner("Thinking…"):
             try:
                 _cr = _req.post(
-                    f"{GW}/api/command", json={"instruction": _user_text},
-                    headers=_hdr(), timeout=30,
+                    f"{GW}/api/command",
+                    json={"instruction": _user_text},
+                    headers=_hdr(),
+                    timeout=30,
                 )
                 _cr_json = _cr.json() if _cr.ok else {}
-                _reply = _cr_json.get("raw_text", str(_cr.json())) if _cr.ok else f"[{_cr.status_code}]"
+                _reply = (
+                    _cr_json.get("raw_text", str(_cr.json())) if _cr.ok else f"[{_cr.status_code}]"
+                )
                 _model_used = _cr_json.get("model_used")
             except Exception as _ce:
                 _reply = f"[error] {_ce}"
                 _model_used = None
-        st.session_state.messages.append({"role": "assistant", "content": _reply, "model_used": _model_used})
+        st.session_state.messages.append(
+            {"role": "assistant", "content": _reply, "model_used": _model_used}
+        )
         if st.session_state.voice_mode and st.session_state.voice_speak_replies:
             _safe = _reply.replace("\\", "\\\\").replace("`", "\\`").replace('"', '\\"')
             st.components.v1.html(
@@ -768,22 +821,32 @@ with _tab_chat:
         _ep_list = episodes.get("episodes", [])
         if _ep_list:
             import pandas as _pd3
+
             _ep_rows = []
             for _ep in _ep_list:
                 _ets = _ep.get("ts", "")
-                _ep_rows.append({
-                    "Time":        _ets[11:19] if len(_ets) > 18 else _ets,
-                    "Instruction": str(_ep.get("instruction", ""))[:40],
-                    "Action":      (_ep.get("action") or {}).get("type", _ep.get("action_type", "—")),
-                    "Latency ms":  f"{_ep.get('latency_ms', 0):.0f}",
-                    "Outcome":     _ep.get("outcome", "—")[:20],
-                })
-            st.dataframe(_pd3.DataFrame(_ep_rows), hide_index=True, use_container_width=True,
-                         height=min(260, 36 + 36 * len(_ep_rows)))
+                _ep_rows.append(
+                    {
+                        "Time": _ets[11:19] if len(_ets) > 18 else _ets,
+                        "Instruction": str(_ep.get("instruction", ""))[:40],
+                        "Action": (_ep.get("action") or {}).get(
+                            "type", _ep.get("action_type", "—")
+                        ),
+                        "Latency ms": f"{_ep.get('latency_ms', 0):.0f}",
+                        "Outcome": _ep.get("outcome", "—")[:20],
+                    }
+                )
+            st.dataframe(
+                _pd3.DataFrame(_ep_rows),
+                hide_index=True,
+                use_container_width=True,
+                height=min(260, 36 + 36 * len(_ep_rows)),
+            )
 
             # Timeline bar chart
             try:
                 import pandas as _pd4
+
                 _tl = []
                 for _ep in _ep_list:
                     _ets = _ep.get("ts")
@@ -792,8 +855,15 @@ with _tab_chat:
                             _epoch = float(_ets)
                         except (TypeError, ValueError):
                             import datetime as _dt
+
                             _epoch = _dt.datetime.fromisoformat(str(_ets)).timestamp()
-                        _tl.append({"ts": _epoch, "action": (_ep.get("action") or {}).get("type", "?"), "n": 1})
+                        _tl.append(
+                            {
+                                "ts": _epoch,
+                                "action": (_ep.get("action") or {}).get("type", "?"),
+                                "n": 1,
+                            }
+                        )
                 if _tl:
                     _tl_df = _pd4.DataFrame(_tl)
                     _tl_df["min"] = _pd4.to_datetime(_tl_df["ts"], unit="s").dt.floor("1min")
@@ -808,10 +878,12 @@ with _tab_chat:
                 _ep_id = _ep.get("id", "")
                 _at = (_ep.get("action") or {}).get("type", "—")
                 _ets = _ep.get("ts", "")
-                _lbl = f"{_ets[11:19] if len(_ets)>18 else _ets}  {str(_ep.get('instruction',''))[:28]}  [{_at}]"
+                _lbl = f"{_ets[11:19] if len(_ets) > 18 else _ets}  {str(_ep.get('instruction', ''))[:28]}  [{_at}]"
                 if st.button("▶", key=f"replay_{_ep_id}", help=f"Replay: {_lbl}"):
                     try:
-                        _rr = _req.post(f"{GW}/api/memory/replay/{_ep_id}", headers=_hdr(), timeout=5)
+                        _rr = _req.post(
+                            f"{GW}/api/memory/replay/{_ep_id}", headers=_hdr(), timeout=5
+                        )
                         st.toast("Replayed ✓" if _rr.ok else f"Failed: {_rr.status_code}", icon="▶")
                     except Exception as _re:
                         st.toast(str(_re), icon="❌")
@@ -823,15 +895,19 @@ with _tab_chat:
 # 🤖 FLEET TAB
 # ═══════════════════════════════════════════════════════════════════════════════
 with _tab_fleet:
+
     def _load_fleet_nodes():
         from pathlib import Path
+
         try:
             import yaml as _yaml
         except ImportError:
             return []
         _here = Path(__file__).resolve().parent.parent
         for c in [
-            Path(os.getenv("OPENCASTOR_CONFIG", "")).parent / "swarm.yaml" if os.getenv("OPENCASTOR_CONFIG") else None,
+            Path(os.getenv("OPENCASTOR_CONFIG", "")).parent / "swarm.yaml"
+            if os.getenv("OPENCASTOR_CONFIG")
+            else None,
             _here / "config" / "swarm.yaml",
             Path("config/swarm.yaml"),
         ]:
@@ -844,14 +920,24 @@ with _tab_fleet:
 
     def _query_node(node):
         import time as _t
+
         host = node.get("ip") or node.get("host", "localhost")
         port = node.get("port", 8000)
         base = f"http://{host}:{port}"
-        tok  = node.get("token", "")
+        tok = node.get("token", "")
         hdrs = {"Authorization": f"Bearer {tok}"} if tok else {}
-        res  = {"Robot": node.get("name","?"), "IP": str(host), "Brain": False, "Driver": False,
-                "Uptime": "—", "Ping ms": None, "Status": "offline",
-                "_base": base, "_hdrs": hdrs, "_online": False}
+        res = {
+            "Robot": node.get("name", "?"),
+            "IP": str(host),
+            "Brain": False,
+            "Driver": False,
+            "Uptime": "—",
+            "Ping ms": None,
+            "Status": "offline",
+            "_base": base,
+            "_hdrs": hdrs,
+            "_online": False,
+        }
         t0 = _t.monotonic()
         try:
             r = _req.get(f"{base}/health", headers=hdrs, timeout=2.5)
@@ -860,11 +946,12 @@ with _tab_fleet:
             if r.status_code == 200:
                 d = r.json()
                 res["_online"] = True
-                res["Brain"]   = bool(d.get("brain"))
-                res["Driver"]  = bool(d.get("driver"))
+                res["Brain"] = bool(d.get("brain"))
+                res["Driver"] = bool(d.get("driver"))
                 try:
                     s = int(float(d.get("uptime_s", 0)))
-                    h, rem = divmod(s, 3600); m, sc = divmod(rem, 60)
+                    h, rem = divmod(s, 3600)
+                    m, sc = divmod(rem, 60)
                     res["Uptime"] = f"{h:02d}:{m:02d}:{sc:02d}" if h else f"{m:02d}:{sc:02d}"
                 except Exception:
                     pass
@@ -879,36 +966,49 @@ with _tab_fleet:
         st.info("No fleet nodes configured — add nodes to config/swarm.yaml")
     else:
         import concurrent.futures as _cf
+
         with _cf.ThreadPoolExecutor(max_workers=len(_fn)) as _ex:
             _fr = list(_ex.map(_query_node, _fn))
 
         import pandas as _pd5
+
         _dcols = ["Robot", "IP", "Brain", "Driver", "Uptime", "Ping ms", "Status"]
         _fdf = _pd5.DataFrame([{k: r[k] for k in _dcols} for r in _fr])
-        _fdf["Brain"]  = _fdf["Brain"].map(lambda v: "✅" if v else "❌")
+        _fdf["Brain"] = _fdf["Brain"].map(lambda v: "✅" if v else "❌")
         _fdf["Driver"] = _fdf["Driver"].map(lambda v: "✅" if v else "❌")
-        st.dataframe(_fdf, hide_index=True, use_container_width=True,
-                     height=min(280, 36 + 36 * len(_fr)))
+        st.dataframe(
+            _fdf, hide_index=True, use_container_width=True, height=min(280, 36 + 36 * len(_fr))
+        )
 
         # Fleet command
         _fi1, _fi2 = st.columns([4, 1])
         with _fi1:
-            _finstr = st.text_input("Fleet command", placeholder="e.g. move forward 1 meter",
-                                    key="fleet_instr", label_visibility="collapsed")
+            _finstr = st.text_input(
+                "Fleet command",
+                placeholder="e.g. move forward 1 meter",
+                key="fleet_instr",
+                label_visibility="collapsed",
+            )
         with _fi2:
             _fsend = st.button("Send", use_container_width=True, key="fleet_send")
         if _fsend and _finstr:
             _active = [r for r in _fr if r["_online"]]
-            _errs   = []
+            _errs = []
             for _r in _active:
                 try:
-                    _rr = _req.post(f"{_r['_base']}/api/command",
-                                    json={"instruction": _finstr}, headers=_r["_hdrs"], timeout=10)
+                    _rr = _req.post(
+                        f"{_r['_base']}/api/command",
+                        json={"instruction": _finstr},
+                        headers=_r["_hdrs"],
+                        timeout=10,
+                    )
                     if not _rr.ok:
                         _errs.append(f"{_r['Robot']}: {_rr.status_code}")
                 except Exception as _fe:
                     _errs.append(f"{_r['Robot']}: {_fe}")
-            st.error("Errors: " + "; ".join(_errs)) if _errs else st.success(f"Sent to {len(_active)} node(s)")
+            st.error("Errors: " + "; ".join(_errs)) if _errs else st.success(
+                f"Sent to {len(_active)} node(s)"
+            )
 
         # Per-node stop
         if _fr:
@@ -916,7 +1016,9 @@ with _tab_fleet:
             _scols = st.columns(min(len(_fr), 6))
             for _i, _r in enumerate(_fr):
                 with _scols[_i % len(_scols)]:
-                    if st.button(f"⏹ {_r['Robot']}", key=f"stop_{_r['Robot']}", use_container_width=True):
+                    if st.button(
+                        f"⏹ {_r['Robot']}", key=f"stop_{_r['Robot']}", use_container_width=True
+                    ):
                         try:
                             _req.post(f"{_r['_base']}/api/stop", headers=_r["_hdrs"], timeout=3)
                             st.toast(f"{_r['Robot']} stopped", icon="⏹")
@@ -932,23 +1034,35 @@ with _tab_builder:
     with st.expander("📋 Gateway Logs", expanded=True):
         import subprocess as _sp
         from pathlib import Path as _Path
+
         _log_lines, _log_src = [], ""
         try:
             _jctl = _sp.run(
-                ["journalctl", "--user", "-u", "opencastor.service",
-                 "-n", "60", "--no-pager", "--output=short"],
-                capture_output=True, text=True, timeout=5,
+                [
+                    "journalctl",
+                    "--user",
+                    "-u",
+                    "opencastor.service",
+                    "-n",
+                    "60",
+                    "--no-pager",
+                    "--output=short",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if _jctl.returncode == 0 and _jctl.stdout.strip():
                 _log_lines = _jctl.stdout.splitlines()
-                _log_src   = "journalctl --user -u opencastor.service"
+                _log_src = "journalctl --user -u opencastor.service"
         except Exception:
             pass
         if not _log_lines:
             for _lp in ["/tmp/alex_gateway.log", "/tmp/bob_gateway.log", "/tmp/castor_gateway.log"]:
                 try:
                     _log_lines = _Path(_lp).read_text(errors="replace").splitlines()[-60:]
-                    _log_src   = _lp; break
+                    _log_src = _lp
+                    break
                 except Exception:
                     continue
         if _log_lines:
@@ -962,23 +1076,30 @@ with _tab_builder:
     # ── Driver health (key for builders) ──────────────────────────────────────
     with st.expander("🦾 Driver & Hardware", expanded=True):
         _dhc1, _dhc2, _dhc3 = st.columns(3)
-        _dhc1.metric("Mode",   (driver.get("mode") or "—").capitalize())
-        _dhc2.metric("OK",     "✅" if driver.get("ok") else "❌")
-        _dhc3.metric("Type",   (driver.get("driver_type") or "—").replace("Driver", ""))
+        _dhc1.metric("Mode", (driver.get("mode") or "—").capitalize())
+        _dhc2.metric("OK", "✅" if driver.get("ok") else "❌")
+        _dhc3.metric("Type", (driver.get("driver_type") or "—").replace("Driver", ""))
         if driver.get("error"):
             st.error(driver["error"])
         # Raw action test
         st.markdown("**Test a raw move command:**")
         _tc1, _tc2, _tc3 = st.columns(3)
-        _test_lin = _tc1.number_input("linear",  -1.0, 1.0, 0.0, 0.1, key="test_lin")
+        _test_lin = _tc1.number_input("linear", -1.0, 1.0, 0.0, 0.1, key="test_lin")
         _test_ang = _tc2.number_input("angular", -1.0, 1.0, 0.0, 0.1, key="test_ang")
         _test_dur = _tc3.number_input("duration ms", 0, 5000, 500, 100, key="test_dur")
         if st.button("⚙️ Send Test Action", key="test_action"):
             try:
-                _tr = _req.post(f"{GW}/api/action",
-                                json={"type": "move", "linear": _test_lin,
-                                      "angular": _test_ang, "duration_ms": int(_test_dur)},
-                                headers=_hdr(), timeout=3)
+                _tr = _req.post(
+                    f"{GW}/api/action",
+                    json={
+                        "type": "move",
+                        "linear": _test_lin,
+                        "angular": _test_ang,
+                        "duration_ms": int(_test_dur),
+                    },
+                    headers=_hdr(),
+                    timeout=3,
+                )
                 st.success(str(_tr.json())) if _tr.ok else st.error(str(_tr.json()))
             except Exception as _te:
                 st.error(str(_te))
@@ -989,45 +1110,57 @@ with _tab_builder:
     with st.expander("🎬 Behaviors & Missions", expanded=False):
         _beh = _get("/api/behavior/status")
         if _beh.get("running"):
-            st.success(f"Running: **{_beh.get('name','?')}**  (job {str(_beh.get('job_id',''))[:8]})")
+            st.success(
+                f"Running: **{_beh.get('name', '?')}**  (job {str(_beh.get('job_id', ''))[:8]})"
+            )
         else:
             st.info("No behavior running")
-        _bp = st.text_input("Behavior / mission file", placeholder="patrol.behavior.yaml",
-                            key="beh_path")
+        _bp = st.text_input(
+            "Behavior / mission file", placeholder="patrol.behavior.yaml", key="beh_path"
+        )
         _bb1, _bb2 = st.columns(2)
         with _bb1:
-            if st.button("▶ Run", key="beh_run", use_container_width=True):
+            if st.button("▶ Run", key="mc_launch", use_container_width=True):
                 if _bp.strip():
                     try:
-                        _br = _req.post(f"{GW}/api/behavior/run",
-                                        json={"path": _bp.strip()}, headers=_hdr(), timeout=5)
+                        _br = _req.post(
+                            f"{GW}/api/behavior/run",
+                            json={"path": _bp.strip()},
+                            headers=_hdr(),
+                            timeout=5,
+                        )
                         st.toast(
-                            f"Started: {_br.json().get('name','?')}" if _br.ok
-                            else f"Error {_br.status_code}", icon="▶" if _br.ok else "❌"
+                            f"Started: {_br.json().get('name', '?')}"
+                            if _br.ok
+                            else f"Error {_br.status_code}",
+                            icon="▶" if _br.ok else "❌",
                         )
                     except Exception as _be:
                         st.toast(str(_be), icon="❌")
                 else:
                     st.toast("Enter a file path first", icon="⚠")
         with _bb2:
-            if st.button("⏹ Stop", key="beh_stop", use_container_width=True):
+            if st.button("⏹ Stop", key="mc_stop", use_container_width=True):
                 try:
                     _bs = _req.post(f"{GW}/api/behavior/stop", headers=_hdr(), timeout=5)
-                    st.toast("Stopped" if _bs.ok else f"Error {_bs.status_code}",
-                             icon="⏹" if _bs.ok else "❌")
+                    st.toast(
+                        "Stopped" if _bs.ok else f"Error {_bs.status_code}",
+                        icon="⏹" if _bs.ok else "❌",
+                    )
                 except Exception as _bse:
                     st.toast(str(_bse), icon="❌")
 
         # Mission history
         try:
             from castor.dashboard_memory_timeline import MemoryTimeline as _MLT
+
             _mlt = _MLT()
-            _mo  = _mlt.get_outcome_summary(window_h=24)
+            _mo = _mlt.get_outcome_summary(window_h=24)
             _mpc = _mlt.get_latency_percentiles(window_h=24)
             _m1, _m2, _m3 = st.columns(3)
             _m1.metric("Episodes (24h)", _mo.get("total", 0))
-            _m2.metric("Success rate",   f"{_mo.get('ok_rate', 0) * 100:.0f}%")
-            _m3.metric("p50 latency",    f"{_mpc.get('p50_ms') or 0:.0f} ms")
+            _m2.metric("Success rate", f"{_mo.get('ok_rate', 0) * 100:.0f}%")
+            _m3.metric("p50 latency", f"{_mpc.get('p50_ms') or 0:.0f} ms")
         except Exception:
             pass
 
@@ -1040,20 +1173,28 @@ with _tab_builder:
             st.caption("Not available — configure pool provider to enable.")
         else:
             _pc1, _pc2, _pc3 = st.columns(3)
-            _pc1.metric("Strategy",  _ph.get("strategy", "—"))
+            _pc1.metric("Strategy", _ph.get("strategy", "—"))
             _pc2.metric("Pool size", _ph.get("pool_size", 0))
-            _pc3.metric("Degraded",  _ph.get("degraded_count", 0))
+            _pc3.metric("Degraded", _ph.get("degraded_count", 0))
             _ph_members = _ph.get("members", [])
             if _ph_members:
                 import pandas as _pd6
+
                 st.dataframe(
-                    _pd6.DataFrame([{
-                        "Index": m.get("pool_index","?"), "Mode": m.get("mode","—"),
-                        "OK": "✅" if m.get("ok") else "❌",
-                        "Error": str(m.get("error",""))[:50],
-                    } for m in _ph_members]),
-                    hide_index=True, use_container_width=True,
-                    height=min(180, 36 + 36 * len(_ph_members))
+                    _pd6.DataFrame(
+                        [
+                            {
+                                "Index": m.get("pool_index", "?"),
+                                "Mode": m.get("mode", "—"),
+                                "OK": "✅" if m.get("ok") else "❌",
+                                "Error": str(m.get("error", ""))[:50],
+                            }
+                            for m in _ph_members
+                        ]
+                    ),
+                    hide_index=True,
+                    use_container_width=True,
+                    height=min(180, 36 + 36 * len(_ph_members)),
                 )
             # Latency sparkline
             _ema_now = (_ph.get("adaptive") or {}).get("ema_latency_ms", {})
@@ -1066,9 +1207,11 @@ with _tab_builder:
                 if any(len(v) > 1 for v in _lh.values()):
                     try:
                         import pandas as _pd7
+
                         st.line_chart(
                             _pd7.DataFrame({f"Pool[{k}]": v for k, v in _lh.items() if v}),
-                            height=110, use_container_width=True,
+                            height=110,
+                            use_container_width=True,
                         )
                         st.caption("EMA latency (ms) per provider — last 20 refreshes")
                     except Exception:
@@ -1085,17 +1228,21 @@ with _tab_builder:
             st.caption("LiDAR not available — connect an RPLidar sensor.")
         else:
             _pts = _ls.get("points", [])
-            st.caption(f"Scan: {_ls.get('timestamp','—')} — {len(_pts)} points")
+            st.caption(f"Scan: {_ls.get('timestamp', '—')} — {len(_pts)} points")
             try:
                 import math
+
                 import pandas as _pd8
+
                 _ang = [math.radians(p.get("angle_deg", 0)) for p in _pts]
                 _dst = [p.get("distance_m", 0) for p in _pts]
-                _ldf = _pd8.DataFrame({
-                    "x_m": [r * math.cos(a) for r, a in zip(_dst, _ang, strict=False)],
-                    "y_m": [r * math.sin(a) for r, a in zip(_dst, _ang, strict=False)],
-                    "dist_m": _dst,
-                })
+                _ldf = _pd8.DataFrame(
+                    {
+                        "x_m": [r * math.cos(a) for r, a in zip(_dst, _ang, strict=False)],
+                        "y_m": [r * math.sin(a) for r, a in zip(_dst, _ang, strict=False)],
+                        "dist_m": _dst,
+                    }
+                )
                 st.scatter_chart(_ldf, x="x_m", y="y_m", size="dist_m", height=280)
             except Exception as _lde:
                 st.caption(f"Plot unavailable: {_lde}")
@@ -1109,24 +1256,32 @@ with _tab_builder:
         if not _ma:
             st.info("SLAM map not available — enable SLAM in your RCAN config.")
         else:
-            st.caption(f"Map: {_md.get('width',0)}×{_md.get('height',0)} cells  "
-                       f"res={_md.get('resolution_m',0)*100:.1f} cm/cell")
+            st.caption(
+                f"Map: {_md.get('width', 0)}×{_md.get('height', 0)} cells  "
+                f"res={_md.get('resolution_m', 0) * 100:.1f} cm/cell"
+            )
             _cells = _md.get("cells")
             if _cells:
                 try:
                     import io as _io
+
                     import numpy as _np
                     from PIL import Image as _PI
+
                     _arr = _np.array(_cells, dtype=float)
                     _img = _np.zeros((_arr.shape[0], _arr.shape[1], 3), dtype=_np.uint8)
-                    _img[_arr < 0]  = [80, 80, 80]
+                    _img[_arr < 0] = [80, 80, 80]
                     _img[_arr == 0] = [230, 230, 230]
                     _img[_arr > 50] = [20, 20, 20]
                     _pose = _md.get("robot_pose", {})
                     if _pose:
                         _rx, _ry = int(_pose.get("x", 0)), int(_pose.get("y", 0))
                         if 0 <= _rx < _img.shape[1] and 0 <= _ry < _img.shape[0]:
-                            _img[max(0,_ry-2):_ry+3, max(0,_rx-2):_rx+3] = [63, 185, 80]
+                            _img[max(0, _ry - 2) : _ry + 3, max(0, _rx - 2) : _rx + 3] = [
+                                63,
+                                185,
+                                80,
+                            ]
                     _buf = _io.BytesIO()
                     _PI.fromarray(_img).save(_buf, format="PNG")
                     st.image(_buf.getvalue(), caption="Occupancy Map", use_container_width=True)
@@ -1184,12 +1339,14 @@ with _tab_settings:
 
     # ── Robot Face Style ───────────────────────────────────────────────────────
     st.markdown("#### 🤖 Robot Face Design")
-    st.caption("Choose the face shown on the kiosk screen. Changes take effect when you navigate back to the robot face.")
+    st.caption(
+        "Choose the face shown on the kiosk screen. Changes take effect when you navigate back to the robot face."
+    )
 
     _face_options = {
         "friendly": "😊 Friendly — warm blue eyes, rosy cheeks, wide smile",
-        "kawaii":   "🌸 Kawaii — big sparkly purple eyes, pink blush, cat mouth",
-        "retro":    "💾 Retro — green-on-dark pixel eyes, scanlines, terminal vibe",
+        "kawaii": "🌸 Kawaii — big sparkly purple eyes, pink blush, cat mouth",
+        "retro": "💾 Retro — green-on-dark pixel eyes, scanlines, terminal vibe",
     }
     _current_style = st.session_state.get("face_style", "friendly")
     _selected_style = st.radio(
@@ -1222,7 +1379,7 @@ with _tab_settings:
     )
     if st.button("💾 Save Connection", key="settings_save_conn"):
         st.session_state.gateway_url = _new_gw.strip()
-        st.session_state.api_token   = _new_tok.strip()
+        st.session_state.api_token = _new_tok.strip()
         st.success("Connection settings saved.")
         st.rerun()
 
@@ -1230,8 +1387,11 @@ with _tab_settings:
 
     # ── Terminal / tmux ────────────────────────────────────────────────────────
     st.markdown("#### 🖥️ Terminal Access")
-    st.caption("Quick commands to open a terminal on the robot. Run these in a shell on any machine on the same network.")
+    st.caption(
+        "Quick commands to open a terminal on the robot. Run these in a shell on any machine on the same network."
+    )
     import urllib.parse as _urlp
+
     _gw_host_t = _urlp.urlparse(GW).hostname or "alex.local"
     _ssh_user = st.text_input("SSH user", value="craigm26", key="ssh_user_input")
     _ssh_host = st.text_input("SSH host", value=_gw_host_t, key="ssh_host_input")
@@ -1249,11 +1409,12 @@ with _tab_settings:
 
     # ── OpenCastor Setup Wizard ─────────────────────────────────────────────────
     st.markdown("#### 🧙 OpenCastor Setup")
-    st.caption("Launch the interactive setup wizard to configure your robot, API keys, hardware, and channels.")
+    st.caption(
+        "Launch the interactive setup wizard to configure your robot, API keys, hardware, and channels."
+    )
     _setup_url = f"{GW}/setup"
     st.markdown(
-        f'<a href="{_setup_url}" target="_blank" style="font-size:1rem;">'
-        f'🔗 Open Setup Wizard</a>',
+        f'<a href="{_setup_url}" target="_blank" style="font-size:1rem;">🔗 Open Setup Wizard</a>',
         unsafe_allow_html=True,
     )
 
@@ -1262,7 +1423,11 @@ with _tab_settings:
     # ── Closed Captions ────────────────────────────────────────────────────────
     st.markdown("#### 💬 Closed Captions")
     st.caption("Show what the robot is saying as a subtitle bar on the face screen.")
-    _cc_on = st.toggle("Enable closed captions on face", value=st.session_state.get("cc_enabled", True), key="cc_toggle")
+    _cc_on = st.toggle(
+        "Enable closed captions on face",
+        value=st.session_state.get("cc_enabled", True),
+        key="cc_toggle",
+    )
     if _cc_on != st.session_state.get("cc_enabled", True):
         st.session_state.cc_enabled = _cc_on
 
@@ -1271,6 +1436,7 @@ with _tab_settings:
     # ── Quick-open face preview ────────────────────────────────────────────────
     st.markdown("#### 👀 Preview Face")
     import socket as _sock_s
+
     _gw_port_s = GW.split(":")[-1].split("/")[0] if GW.count(":") >= 2 else "8000"
     _hn_s = _sock_s.gethostname()
     _fh_s = _hn_s if "." in _hn_s else f"{_hn_s}.local"
@@ -1278,7 +1444,7 @@ with _tab_settings:
     _face_url = f"http://{_fh_s}:{_gw_port_s}/face?style={st.session_state.face_style}{_cc_param}"
     st.markdown(
         f'<a href="{_face_url}" target="_blank" style="font-size:1rem;">'
-        f'🔗 Open face in new tab ({st.session_state.face_style})</a>',
+        f"🔗 Open face in new tab ({st.session_state.face_style})</a>",
         unsafe_allow_html=True,
     )
 
