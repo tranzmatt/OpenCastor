@@ -512,14 +512,28 @@ with _tab_ctrl:
                 st.toast(f"STT: {_stt_e}", icon="❌")
 
         st.divider()
-        st.markdown(
-            f'<p class="sh">🎮 Gamepad</p>'
-            f'<a href="{_gp_url}" target="_blank" style="display:inline-block;padding:6px 14px;'
-            f'background:#ffffff;color:#0057ff;border-radius:6px;text-decoration:none;'
-            f'font-size:0.8rem;border:1px solid #d0d5dd;">Open controller page →</a>'
-            f'<div style="color:#6b7280;font-size:0.68rem;margin-top:4px;">'
-            f'D-pad/stick=move · A/B=stop · L=reboot · R=shutdown · Start=ESTOP</div>',
-            unsafe_allow_html=True,
+        st.components.v1.html(
+            f"""<script>
+(function(){{
+  var host="{_gp_host}", port="{_gp_port}", proto="{_gp_proto}", tok="{_gp_tok_js}";
+  if(host==="127.0.0.1"||host==="localhost"||host===""){{
+    try{{var ph=window.parent.location.hostname;if(ph)host=ph;}}catch(e){{}}
+    try{{var th=window.top.location.hostname;if(th)host=th;}}catch(e){{}}
+  }}
+  var url=proto+"//"+host+":"+port+"/gamepad"+(tok?"?token="+encodeURIComponent(tok):"");
+  document.getElementById("gp-link2").href=url;
+}})();
+</script>
+<p style="color:#c9d1d9;font-size:0.85rem;font-weight:600;margin:0 0 6px">🎮 Gamepad</p>
+<a id="gp-link2" href="#" target="_blank"
+   style="display:inline-block;padding:6px 14px;background:#ffffff;color:#0057ff;
+          border-radius:6px;text-decoration:none;font-size:0.8rem;border:1px solid #d0d5dd;">
+  Open controller page →
+</a>
+<div style="color:#6b7280;font-size:0.68rem;margin-top:4px;">
+  D-pad/stick=move · A/B=stop · L=reboot · R=shutdown · Start=ESTOP
+</div>""",
+            height=90,
         )
 
 
