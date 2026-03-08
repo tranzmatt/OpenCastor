@@ -346,13 +346,29 @@ with _tab_ctrl:
                 st.error(str(_e))
     with _gp_c:
         _gp_tok = st.session_state.api_token
-        _gp_url = f"{GW.rstrip('/')}/gamepad" + (f"?token={_gp_tok}" if _gp_tok else "")
-        st.markdown(
-            f'<a href="{_gp_url}" target="_blank" style="display:inline-flex;align-items:center;'
-            f'height:48px;padding:0 16px;background:#0057ff;color:#fff;border-radius:8px;'
-            f'text-decoration:none;font-size:0.9rem;border:1px solid #3b7de8;white-space:nowrap;">'
-            f"🎮 Open Gamepad Controller →</a>",
-            unsafe_allow_html=True,
+        _gp_tok_js = _gp_tok.replace('"', '\\"') if _gp_tok else ""
+        _gp_host = GW.replace("http://", "").replace("https://", "").split(":")[0]
+        _gp_port = GW.split(":")[-1].split("/")[0] if ":" in GW else "8000"
+        _gp_proto = "https:" if GW.startswith("https") else "http:"
+        st.components.v1.html(
+            f"""<script>
+(function(){{
+  var host="{_gp_host}", port="{_gp_port}", proto="{_gp_proto}", tok="{_gp_tok_js}";
+  if(host==="127.0.0.1"||host==="localhost"||host===""){{
+    try{{var ph=window.parent.location.hostname;if(ph)host=ph;}}catch(e){{}}
+    try{{var th=window.top.location.hostname;if(th)host=th;}}catch(e){{}}
+  }}
+  var url=proto+"//"+host+":"+port+"/gamepad"+(tok?"?token="+encodeURIComponent(tok):"");
+  document.getElementById("gp-link").href=url;
+}})();
+</script>
+<a id="gp-link" href="#" target="_blank"
+   style="display:inline-flex;align-items:center;height:48px;padding:0 16px;
+          background:#0057ff;color:#fff;border-radius:8px;text-decoration:none;
+          font-size:0.9rem;border:1px solid #3b7de8;white-space:nowrap;">
+  🎮 Open Gamepad Controller →
+</a>""",
+            height=60,
         )
 
     st.divider()
@@ -450,7 +466,11 @@ with _tab_ctrl:
         with _r2b:
             if st.button("■", use_container_width=True, key="dp_stop", help="Stop", type="primary"):
                 try:
-                    _req.post(f"{GW}/api/stop", headers=_hdr(), timeout=2)
+                    _req.post(
+                        f"{GW}/api/action",
+                        json={"type": "move", "linear": 0.0, "angular": 0.0},
+                        headers=_hdr(), timeout=2,
+                    )
                 except Exception:
                     pass
         with _r2c:

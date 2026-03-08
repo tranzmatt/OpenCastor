@@ -108,6 +108,9 @@ class SafetyLayer:
         # Emergency stop flag
         self._estop = False
 
+        # Last write denial reason (set on every return False in write())
+        self._last_write_denial: str = ""
+
         # Safety telemetry
         from castor.safety.state import SafetyTelemetry
 
@@ -368,29 +371,35 @@ class SafetyLayer:
         if self._estop and path.startswith("/dev/motor"):
             logger.warning("WRITE denied: emergency stop active")
             self._audit_safety(principal, path, "deny_estop", "e-stop active, motor writes blocked")
+            self._last_write_denial = "Emergency stop is active. POST /api/estop/clear to resume."
             return False
 
         if self._is_locked_out(principal):
             logger.warning("WRITE denied: %s is locked out", principal)
+            self._last_write_denial = f"Principal '{principal}' is locked out due to repeated violations."
             return False
 
         if not self.check_role_rate_limit(principal):
             self._audit_safety(principal, path, "role_rate_limited", "rate limit exceeded")
+            self._last_write_denial = f"Rate limit exceeded for principal '{principal}'."
             return False
         if not self.check_session_timeout(principal):
             self._audit_safety(principal, path, "session_expired", "session timed out")
+            self._last_write_denial = f"Session expired for principal '{principal}'. Re-authenticate to reset."
             return False
 
         if not self.perms.check_access(principal, path, "w"):
             self._audit_access(principal, path, "w", False)
             self._record_violation(principal, path, "w", "permission denied")
             self._audit_safety(principal, path, "deny_write", "permission denied")
+            self._last_write_denial = f"Principal '{principal}' lacks write permission on '{path}'."
             return False
 
         if self.capability_broker and principal != "root":
             lease_token = (meta or {}).get("lease_token")
             if not lease_token:
                 self._audit_safety(principal, path, "deny_lease", "missing capability lease")
+                self._last_write_denial = "Missing capability lease token."
                 return False
             required_scope = self._required_scope_for_path(path)
             if not self.capability_broker.validate_lease(
@@ -405,6 +414,7 @@ class SafetyLayer:
                 self._audit_safety(
                     principal, path, "deny_lease", "invalid or expired capability lease"
                 )
+                self._last_write_denial = "Invalid or expired capability lease."
                 return False
 
         # Anti-subversion scan for AI-generated /dev/ writes
@@ -419,6 +429,9 @@ class SafetyLayer:
                         "; ".join(subversion_result.reasons),
                     )
                     if subversion_result.verdict.value == "block":
+                        self._last_write_denial = (
+                            f"Anti-subversion block: {'; '.join(subversion_result.reasons)}"
+                        )
                         return False
             except Exception as exc:
                 logger.error("Anti-subversion scan failed (allowing write): %s", exc)
@@ -432,6 +445,7 @@ class SafetyLayer:
                         "WRITE denied: bounds violation on %s: %s", path, bounds_result.details
                     )
                     self._audit_safety(principal, path, "bounds_violation", bounds_result.details)
+                    self._last_write_denial = f"Bounds violation: {bounds_result.details}"
                     return False
                 if bounds_result.status == "warning":
                     logger.info("Bounds warning on %s: %s", path, bounds_result.details)
@@ -451,6 +465,7 @@ class SafetyLayer:
                         critical[0].message,
                     )
                     self._audit_safety(principal, path, "protocol_violation", critical[0].message)
+                    self._last_write_denial = f"Safety protocol violation: {critical[0].message}"
                     return False
                 for v in protocol_violations:
                     if v.severity == "violation":
@@ -458,6 +473,7 @@ class SafetyLayer:
                             "WRITE denied: protocol violation on %s: %s", path, v.message
                         )
                         self._audit_safety(principal, path, "protocol_violation", v.message)
+                        self._last_write_denial = f"Safety protocol violation: {v.message}"
                         return False
                     if v.severity == "warning":
                         logger.info("Protocol warning on %s: %s", path, v.message)
@@ -470,6 +486,7 @@ class SafetyLayer:
             if not self._check_motor_rate():
                 self._audit_safety(principal, path, "rate_limited", "motor command rate exceeded")
                 logger.warning("Motor rate limit hit by %s", principal)
+                self._last_write_denial = "Motor command rate limit exceeded."
                 return False
             data = self._clamp_motor_data(data)
 
@@ -592,6 +609,11 @@ class SafetyLayer:
     @property
     def is_estopped(self) -> bool:
         return self._estop
+
+    @property
+    def last_write_denial(self) -> str:
+        """Human-readable reason for the most recent write() returning False."""
+        return self._last_write_denial
 
     # ------------------------------------------------------------------
     # Policy management

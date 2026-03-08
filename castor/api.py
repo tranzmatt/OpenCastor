@@ -4801,8 +4801,10 @@ async def gamepad_page(token: str = ""):
     document.getElementById("gp-angular").textContent="↔ "+ang.toFixed(2);
 
     const t=Date.now();
-    if((Math.abs(lin)>0.01||Math.abs(ang)>0.01)&&t-lastT>80){{
-      lastT=t; send("/api/action",{{type:"move",linear:lin,angular:ang}});
+    const moving=Math.abs(lin)>0.01||Math.abs(ang)>0.01;
+    if((moving||lastMoving)&&t-lastT>80){{
+      lastT=t; lastMoving=moving;
+      send("/api/action",{{type:"move",linear:lin,angular:ang}});
     }}
 
     badge("btn-a", pressed(gp,0));  badge("btn-b", pressed(gp,1));
@@ -4810,7 +4812,8 @@ async def gamepad_page(token: str = ""):
     badge("btn-l", pressed(gp,4),"wrn"); badge("btn-r",pressed(gp,5),"wrn");
     badge("btn-st",pressed(gp,9),"stp"); badge("btn-sl",pressed(gp,8));
 
-    if(justPressed(gp,0)||justPressed(gp,1)) send("/api/stop");
+    if(justPressed(gp,0)||justPressed(gp,1))
+      send("/api/action",{{type:"move",linear:0,angular:0}});
     if(justPressed(gp,2)) send("/api/command",{{instruction:"what is your current status?"}});
     if(justPressed(gp,3)) fetch(GW+"/api/camera/snapshot",{{headers:authH}})
       .then(()=>fb("Snapshot taken","#3fb950")).catch(()=>fb("Snapshot unavailable","#f85149"));

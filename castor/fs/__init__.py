@@ -236,6 +236,11 @@ class CastorFS:
     def is_estopped(self) -> bool:
         return self.safety.is_estopped
 
+    @property
+    def last_write_denial(self) -> str:
+        """Reason the most recent write() was denied by the safety layer."""
+        return self.safety.last_write_denial
+
     # ------------------------------------------------------------------
     # Pipeline builder
     # ------------------------------------------------------------------
