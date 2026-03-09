@@ -47,11 +47,10 @@ def test_api_status_includes_camera_fields(monkeypatch):
     mock_cam = MagicMock()
     mock_cam.model = "USB 0"
     mock_cam.composite_mode = "primary_only"
-    state.camera = mock_cam
+    monkeypatch.setattr(state, "camera", mock_cam, raising=False)
     client = TestClient(app)
     resp = client.get("/api/status")
     assert resp.status_code == 200
     data = resp.json()
     assert "camera_model" in data
     assert "camera_mode" in data
-    state.camera = None

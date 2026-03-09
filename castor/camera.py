@@ -171,8 +171,8 @@ class _OakCameraSource:
                 frame = pkt.getCvFrame()
                 with self._lock:
                     self._last_frame = frame
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("OAK camera '%s' read error: %s", self.cam_id, exc)
         with self._lock:
             return self._last_frame
 
@@ -181,8 +181,8 @@ class _OakCameraSource:
         if self._device:
             try:
                 self._device.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("OAK camera '%s' failed to close: %s", self.cam_id, exc)
             self._device = None
             self._pipeline = None
             self._queue = None
