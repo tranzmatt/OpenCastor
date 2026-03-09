@@ -10,6 +10,7 @@ import logging
 import os
 import threading
 import time
+from typing import Optional
 
 import yaml
 
@@ -640,6 +641,29 @@ class Listener:
             self._log.warning("STT disabled -- speech_recognition not installed")
             self.enabled = False
 
+        # Auto-detect USB microphone device index
+        self._mic_index: Optional[int] = audio_cfg.get("mic_device_index", None)
+        if HAS_SR:
+            from castor.voice import detect_usb_microphone
+
+            mic_info = detect_usb_microphone()
+            if mic_info["found"]:
+                if self._mic_index is None:
+                    self._mic_index = mic_info["index"]
+                # Auto-enable STT if mic found and not explicitly disabled
+                if not audio_cfg.get("stt_enabled") and audio_cfg.get("stt_enabled") is not False:
+                    self.enabled = True
+                    self._log.info(
+                        "STT auto-enabled: USB mic detected (%s, index %d)",
+                        mic_info["name"],
+                        mic_info["index"],
+                    )
+            else:
+                if self.enabled:
+                    self._log.warning(
+                        "STT enabled in config but no audio input device found"
+                    )
+
     def listen_once(self):
         """Capture one phrase from the microphone and return the transcript.
 
@@ -654,7 +678,10 @@ class Listener:
             recognizer = sr.Recognizer()
             recognizer.energy_threshold = self.energy_threshold
             recognizer.pause_threshold = self.pause_threshold
-            with sr.Microphone() as source:
+            mic_kwargs = {}
+            if self._mic_index is not None:
+                mic_kwargs["device_index"] = self._mic_index
+            with sr.Microphone(**mic_kwargs) as source:
                 self._log.debug("Listener: calibrating ambient noise…")
                 recognizer.adjust_for_ambient_noise(source, duration=0.3)
                 self._log.debug("Listener: recording phrase…")

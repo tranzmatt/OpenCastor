@@ -1934,6 +1934,19 @@ async def ws_telemetry(websocket: WebSocket, token: str = ""):
 # ---------------------------------------------------------------------------
 
 
+@app.get("/api/voice/devices", dependencies=[Depends(verify_token)])
+async def voice_devices():
+    """Return available audio input devices on the server.
+
+    Returns:
+        200: {"devices": [{"index": N, "name": "...", "default": bool}, ...]}
+    """
+    from castor.voice import list_audio_input_devices
+
+    devices = await asyncio.to_thread(list_audio_input_devices)
+    return {"devices": devices}
+
+
 @app.post("/api/voice/listen", dependencies=[Depends(verify_token)])
 async def voice_listen():
     """Capture one microphone phrase and return transcript + brain thought.
@@ -1943,15 +1956,20 @@ async def voice_listen():
         503: {"error": "..."} if listener is not available
     """
     if state.listener is None:
-        raise HTTPException(status_code=503, detail="Listener not available")
+        raise HTTPException(
+            status_code=503, detail={"error": "STT listener not initialized", "code": "HTTP_503"}
+        )
     if not state.listener.enabled:
         raise HTTPException(
-            status_code=503, detail="STT not enabled (set audio.stt_enabled: true in config)"
+            status_code=503, detail={"error": "no audio input device", "code": "HTTP_503"}
         )
 
     transcript = await asyncio.to_thread(state.listener.listen_once)
     if transcript is None:
-        raise HTTPException(status_code=503, detail="Could not capture audio or recognise speech")
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "Could not capture audio or recognise speech", "code": "HTTP_503"},
+        )
 
     thought_dict: Optional[dict] = None
     if state.brain and transcript:

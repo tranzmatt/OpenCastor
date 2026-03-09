@@ -536,14 +536,20 @@ with _tab_ctrl:
 
         if st.button("🎤 Server Mic (STT)", use_container_width=True, key="stt_ctrl"):
             try:
-                import speech_recognition as _sr
-
-                rec = _sr.Recognizer()
-                with _sr.Microphone() as src:
-                    st.toast("Listening…", icon="🎤")
-                    audio = rec.listen(src, timeout=8, phrase_time_limit=30)
-                    text = rec.recognize_google(audio)
-                    st.session_state["voice_input"] = text
+                with st.spinner("Listening…"):
+                    resp = _req.post(f"{GW}/api/voice/listen", headers=_hdr(), timeout=20)
+                if resp.ok:
+                    data = resp.json()
+                    text = data.get("transcript", "")
+                    if text:
+                        st.session_state["voice_input"] = text
+                        st.toast(f"Heard: {text[:60]}", icon="🎤")
+                    else:
+                        st.toast("No speech detected", icon="🎤")
+                else:
+                    err = resp.json().get("detail", {})
+                    msg = err.get("error", str(resp.status_code)) if isinstance(err, dict) else str(err)
+                    st.toast(f"STT: {msg}", icon="❌")
             except Exception as _stt_e:
                 st.toast(f"STT: {_stt_e}", icon="❌")
 
