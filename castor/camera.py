@@ -59,6 +59,14 @@ try:
 except ImportError:
     HAS_NUMPY = False
 
+try:
+    import depthai as dai
+
+    HAS_DEPTHAI = True
+except ImportError:
+    HAS_DEPTHAI = False
+    logger.debug("depthai not available — OAK camera disabled")
+
 
 # ---------------------------------------------------------------------------
 # CompositeMode
@@ -118,6 +126,73 @@ class _CameraSource:
             return self._last_frame
 
 
+class _OakCameraSource:
+    """DepthAI (OAK-D / OAK-4 Pro) camera source."""
+
+    def __init__(self, cam_id: str, width: int = 640, height: int = 480) -> None:
+        self.cam_id = cam_id
+        self.width = width
+        self.height = height
+        self._pipeline: Optional[Any] = None
+        self._queue: Optional[Any] = None
+        self._device: Optional[Any] = None
+        self._last_frame: Optional[Any] = None
+        self._lock = threading.Lock()
+
+    def open(self) -> bool:
+        """Open the OAK camera pipeline. Returns False if depthai is unavailable."""
+        if not HAS_DEPTHAI:
+            logger.warning("depthai not installed — OAK camera '%s' unavailable", self.cam_id)
+            return False
+        try:
+            pipeline = dai.Pipeline()
+            cam_node = pipeline.create(dai.node.ColorCamera)
+            cam_node.setPreviewSize(self.width, self.height)
+            cam_node.setInterleaved(False)
+            xout = pipeline.create(dai.node.XLinkOut)
+            xout.setStreamName("rgb")
+            cam_node.preview.link(xout.input)
+            self._pipeline = pipeline
+            self._device = dai.Device(pipeline)
+            self._queue = self._device.getOutputQueue(name="rgb", maxSize=4, blocking=False)
+            logger.info("OAK camera '%s' opened (%dx%d)", self.cam_id, self.width, self.height)
+            return True
+        except Exception as exc:
+            logger.error("OAK camera '%s' failed to open: %s", self.cam_id, exc)
+            return False
+
+    def read(self) -> Optional[Any]:
+        """Return the latest BGR frame from the OAK camera, or cached last frame."""
+        if self._queue is None:
+            return self._last_frame
+        try:
+            pkt = self._queue.tryGet()
+            if pkt is not None:
+                frame = pkt.getCvFrame()
+                with self._lock:
+                    self._last_frame = frame
+        except Exception:
+            pass
+        with self._lock:
+            return self._last_frame
+
+    def close(self) -> None:
+        """Release OAK device resources."""
+        if self._device:
+            try:
+                self._device.close()
+            except Exception:
+                pass
+            self._device = None
+            self._pipeline = None
+            self._queue = None
+
+    @property
+    def last_frame(self) -> Optional[Any]:
+        with self._lock:
+            return self._last_frame
+
+
 # ---------------------------------------------------------------------------
 # CameraManager
 # ---------------------------------------------------------------------------
@@ -144,7 +219,7 @@ class CameraManager:
     ) -> None:
         self._mode = composite_mode if composite_mode in COMPOSITE_MODES else "primary_only"
         self._jpeg_quality = jpeg_quality
-        self._sources: Dict[str, _CameraSource] = {}
+        self._sources: Dict[str, Any] = {}
         self._primary_id: Optional[str] = None
         self._is_open = False
 
@@ -157,12 +232,16 @@ class CameraManager:
 
         for cam_cfg in configs:
             cam_id = cam_cfg.get("id", f"cam{len(self._sources)}")
+            cam_type = cam_cfg.get("type", "usb")
             index = int(cam_cfg.get("index", len(self._sources)))
             res = cam_cfg.get("resolution", [640, 480])
             width, height = (res[0], res[1]) if isinstance(res, (list, tuple)) else (640, 480)
             role = cam_cfg.get("role", "secondary")
 
-            src = _CameraSource(cam_id, index, width, height)
+            if cam_type in ("oak_d", "oak", "oak4"):
+                src: Any = _OakCameraSource(cam_id, width, height)
+            else:
+                src = _CameraSource(cam_id, index, width, height)
             self._sources[cam_id] = src
 
             if role == "primary" and self._primary_id is None:
@@ -220,6 +299,35 @@ class CameraManager:
     @property
     def primary_id(self) -> Optional[str]:
         return self._primary_id
+
+    @property
+    def model(self) -> str:
+        """Human-readable camera model string."""
+        for src in self._sources.values():
+            if isinstance(src, _OakCameraSource):
+                return "OAK-4 Pro"
+        if self._primary_id:
+            idx = getattr(self._sources.get(self._primary_id), "index", 0)
+            return f"USB {idx}"
+        return "unknown"
+
+    @property
+    def composite_mode(self) -> str:
+        """Active composite mode name."""
+        return self._mode
+
+    def is_available(self) -> bool:
+        """Return True if at least one camera source has an open capture."""
+        if not self._is_open:
+            return False
+        for src in self._sources.values():
+            if isinstance(src, _OakCameraSource):
+                if src._device is not None:
+                    return True
+            else:
+                if src._cap is not None and src._cap.isOpened():
+                    return True
+        return False
 
     # ------------------------------------------------------------------
     # Composite strategies

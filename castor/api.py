@@ -532,6 +532,13 @@ async def get_status(request: Request):
     else:
         payload["provider_fallback"] = {"enabled": False}
 
+    # Camera model + mode
+    _cam_obj = getattr(state, "camera", None)
+    payload["camera_model"] = getattr(_cam_obj, "model", "unknown") if _cam_obj else "unknown"
+    payload["camera_mode"] = (
+        getattr(_cam_obj, "composite_mode", "primary_only") if _cam_obj else "primary_only"
+    )
+
     return _maybe_wrap_rcan(payload, request)
 
 

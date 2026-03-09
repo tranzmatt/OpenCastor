@@ -340,6 +340,13 @@ with _tab_ctrl:
         _gw_host = GW.replace("http://", "").replace("https://", "").split(":")[0]
         _gw_port = GW.split(":")[-1].split("/")[0] if ":" in GW else "8000"
         _gw_proto = "https:" if GW.startswith("https") else "http:"
+        if _gw_host in ("127.0.0.1", "localhost", ""):
+            import socket as _socket
+
+            try:
+                _gw_host = _socket.gethostbyname(_socket.gethostname())
+            except Exception:
+                pass
         _cam_border = "2px solid #007a2f" if cam_ok else "2px solid #c00000"
         _cam_anim = "none" if cam_ok else "cam-pulse 2s ease-in-out infinite"
         st.components.v1.html(
@@ -367,8 +374,7 @@ with _tab_ctrl:
   var tok="{_tok_js}", port="{_gw_port}", cfgHost="{_gw_host}", proto="{_gw_proto}";
   var host=cfgHost;
   if(host==="127.0.0.1"||host==="localhost"||host===""){{
-    try{{var ph=window.parent.location.hostname;if(ph)host=ph;}}catch(e){{}}
-    try{{var th=window.top.location.hostname;if(th)host=th;}}catch(e){{}}
+    try{{var wh=window.location.hostname;if(wh&&wh!=="")host=wh;}}catch(e){{}}
   }}
   var base=proto+"//"+host+":"+port+"/api/stream/mjpeg";
   var url=tok?base+"?token="+encodeURIComponent(tok):base;
@@ -456,8 +462,7 @@ with _tab_ctrl:
   var tok="{_tok_js}", cfgHost="{_gw_host}", port="{_gw_port}", proto="{_gw_proto}";
   var host=cfgHost;
   if(host==="127.0.0.1"||host==="localhost"||host===""){{
-    try{{var ph=window.parent.location.hostname;if(ph)host=ph;}}catch(e){{}}
-    try{{var th=window.top.location.hostname;if(th)host=th;}}catch(e){{}}
+    try{{var wh=window.location.hostname;if(wh&&wh!=="")host=wh;}}catch(e){{}}
   }}
   var base=proto+"//"+host+":"+port+"/api/action";
   function hdrs(){{
@@ -564,7 +569,11 @@ with _tab_status:
             driver.get("mode", "offline"),
             (driver.get("driver_type") or "—").replace("Driver", ""),
         ),
-        ("📷 Camera", "hardware" if cam_ok else "offline", "live" if cam_ok else "no signal"),
+        (
+            "📷 Camera",
+            "hardware" if cam_ok else "offline",
+            status.get("camera_model", "USB 0") if cam_ok else "no signal",
+        ),
     ]
     for col, (name, mode, detail) in zip([_s1, _s2, _s3, _s4, _s5], _sensors, strict=False):
         col.markdown(
