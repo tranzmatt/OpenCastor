@@ -310,8 +310,8 @@ st.markdown(
 )
 
 # ── TABS ──────────────────────────────────────────────────────────────────────
-_tab_ctrl, _tab_status, _tab_chat, _tab_fleet, _tab_builder, _tab_settings = st.tabs(
-    ["🕹️ Control", "📊 Status", "💬 Chat", "🤖 Fleet", "🔧 Builder", "⚙️ Settings"]
+_tab_ctrl, _tab_status, _tab_chat, _tab_fleet, _tab_builder, _tab_emb, _tab_settings = st.tabs(
+    ["🕹️ Control", "📊 Status", "💬 Chat", "🤖 Fleet", "🔧 Builder", "🧠 Embedding", "⚙️ Settings"]
 )
 
 
@@ -1375,6 +1375,62 @@ with _tab_builder:
                     st.error(str(_sde))
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 🧠 EMBEDDING TAB
+# ═══════════════════════════════════════════════════════════════════════════════
+with _tab_emb:
+    st.subheader("🧠 Embedding Interpreter")
+    try:
+        _emb_r = _req.get(f"{GW}/api/interpreter/status", headers=_hdr(), timeout=3)
+        _emb_d = _emb_r.json() if _emb_r.status_code == 200 else {"enabled": False}
+    except Exception:
+        _emb_d = {"enabled": False}
+
+    if not _emb_d.get("enabled"):
+        st.info(
+            "Embedding Interpreter is disabled. Enable it in your RCAN config:\n\n"
+            "```yaml\ninterpreter:\n  enabled: true\n  backend: auto\n```"
+        )
+    else:
+        # Status cards
+        _ec1, _ec2, _ec3, _ec4 = st.columns(4)
+        with _ec1:
+            st.metric("Backend", _emb_d.get("backend", "—"))
+        with _ec2:
+            st.metric("Episodes", _emb_d.get("episode_count", 0))
+        with _ec3:
+            _sim = _emb_d.get("last_goal_similarity")
+            st.metric("Goal Similarity", f"{_sim:.2f}" if _sim is not None else "—")
+        with _ec4:
+            st.metric("Escalations", _emb_d.get("escalations_session", 0))
+
+        st.caption(
+            f"Backend: {_emb_d.get('backend', '?')} · "
+            f"Dims: {_emb_d.get('dimensions', '?')} · "
+            f"Avg latency: {_emb_d.get('avg_latency_ms') or '—'}ms"
+        )
+
+        # Recent episodes table
+        _recent = _emb_d.get("recent_episodes", [])
+        if _recent:
+            st.subheader("Recent Episodes")
+            import pandas as _pd
+
+            _ep_rows = []
+            for ep in _recent[-10:]:
+                _ep_rows.append(
+                    {
+                        "Timestamp": ep.get("timestamp", "")[:19].replace("T", " "),
+                        "Instruction": ep.get("instruction", "")[:40],
+                        "Action": ep.get("action_type", "?"),
+                        "Outcome": ep.get("outcome", "?"),
+                        "Similarity": round(ep.get("goal_similarity", 0), 3),
+                    }
+                )
+            st.dataframe(_pd.DataFrame(_ep_rows), use_container_width=True, hide_index=True)
+        else:
+            st.info("No episodes stored yet. Run the robot to populate the episode store.")
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ⚙️ SETTINGS TAB
 # ═══════════════════════════════════════════════════════════════════════════════
 with _tab_settings:
@@ -1490,6 +1546,48 @@ with _tab_settings:
         f"🔗 Open face in new tab ({st.session_state.face_style})</a>",
         unsafe_allow_html=True,
     )
+
+    st.divider()
+
+    with st.expander("🧪 Test Suite", expanded=False):
+        st.caption("Run the automated test suite from the dashboard.")
+        _tc1, _tc2 = st.columns(2)
+        with _tc1:
+            if st.button("▶ Run full test suite", key="run_full_tests"):
+                try:
+                    _req.post(
+                        f"{GW}/api/test/run", json={"suite": "full"}, headers=_hdr(), timeout=5
+                    )
+                    st.toast("Test suite started!", icon="🧪")
+                except Exception as _e:
+                    st.error(str(_e))
+        with _tc2:
+            if st.button("▶ Run embedding tests", key="run_emb_tests"):
+                try:
+                    _req.post(
+                        f"{GW}/api/test/run",
+                        json={"suite": "embedding"},
+                        headers=_hdr(),
+                        timeout=5,
+                    )
+                    st.toast("Embedding tests started!", icon="🧠")
+                except Exception as _e:
+                    st.error(str(_e))
+        try:
+            _tr = _req.get(f"{GW}/api/test/status", headers=_hdr(), timeout=3)
+            _trd = _tr.json() if _tr.status_code == 200 else {}
+        except Exception:
+            _trd = {}
+        if _trd.get("running"):
+            st.info("⏳ Test suite running…")
+        elif _trd.get("result"):
+            _res = _trd["result"]
+            if _res.get("passed"):
+                st.success(f"✅ Tests passed (suite: {_res.get('suite', '?')})")
+            else:
+                st.error(f"❌ Tests failed (suite: {_res.get('suite', '?')})")
+            if _res.get("stdout"):
+                st.code(_res["stdout"][-2000:], language="text")
 
 
 # ── AUTO-REFRESH ───────────────────────────────────────────────────────────────

@@ -36,6 +36,7 @@ OPTIONAL_TOP_LEVEL: List[str] = [
     "geofence",
     "hailo_vision",
     "hailo_confidence",
+    "interpreter",
 ]
 
 # Required keys inside the 'agent' block
@@ -173,6 +174,34 @@ def validate_rcan_config(config: dict) -> Tuple[bool, List[str]]:
                     f"offline_fallback.provider must be one of: "
                     f"{', '.join(sorted(_VALID_FALLBACK_PROVIDERS))} "
                     f"(got '{provider or '<empty>'}')"
+                )
+
+    # ── interpreter block ────────────────────────────────────────────────────
+    if "interpreter" in config:
+        interp = config["interpreter"]
+        if not isinstance(interp, dict):
+            errors.append(f"interpreter must be a mapping (got {type(interp).__name__!r})")
+            return len(errors) == 0, errors
+        valid_backends = {"auto", "local", "local_extended", "gemini", "mock"}
+        backend = str(interp.get("backend", "auto"))
+        if backend not in valid_backends:
+            errors.append(
+                f"interpreter.backend must be one of {sorted(valid_backends)} (got '{backend}')"
+            )
+        gemini_cfg = interp.get("gemini", {})
+        if isinstance(gemini_cfg, dict):
+            dims = gemini_cfg.get("dimensions", 1536)
+            if dims not in (768, 1536, 3072):
+                errors.append(
+                    f"interpreter.gemini.dimensions must be 768, 1536, or 3072 (got {dims})"
+                )
+        if backend == "gemini":
+            import os as _os
+
+            if not _os.getenv("GOOGLE_API_KEY"):
+                logger.warning(
+                    "interpreter.backend=gemini but GOOGLE_API_KEY not set — "
+                    "will run in mock mode at runtime"
                 )
 
     return len(errors) == 0, errors
