@@ -635,6 +635,132 @@ def get_audio_config() -> dict:
     }
 
 
+def detect_usb_microphone() -> dict:
+    """Detect the first connected USB microphone input device.
+
+    Tries PyAudio first, then sounddevice as fallback.
+
+    Returns:
+        Dict with keys: ``found`` (bool), ``index`` (int or None), ``name`` (str).
+    """
+    # Try PyAudio
+    try:
+        import pyaudio
+
+        pa = pyaudio.PyAudio()
+        try:
+            for i in range(pa.get_device_count()):
+                info = pa.get_device_info_by_index(i)
+                if info.get("maxInputChannels", 0) > 0:
+                    name = info.get("name", "")
+                    if "usb" in name.lower() or "USB" in name:
+                        logger.info("Audio input: %s (index %d)", name, i)
+                        return {"found": True, "index": i, "name": name}
+            # No USB mic found — return default input device info
+            try:
+                default_idx = pa.get_default_input_device_info().get("index", 0)
+                default_name = pa.get_default_input_device_info().get("name", "default")
+                logger.info("Audio input (default): %s (index %d)", default_name, default_idx)
+                return {"found": True, "index": default_idx, "name": default_name}
+            except Exception:
+                pass
+        finally:
+            pa.terminate()
+    except ImportError:
+        pass
+    except Exception as exc:
+        logger.debug("detect_usb_microphone: pyaudio error: %s", exc)
+
+    # Try sounddevice
+    try:
+        import sounddevice as sd
+
+        devices = sd.query_devices()
+        for i, dev in enumerate(devices):
+            if dev.get("max_input_channels", 0) > 0:
+                name = dev.get("name", "")
+                if "usb" in name.lower() or "USB" in name:
+                    logger.info("Audio input: %s (index %d)", name, i)
+                    return {"found": True, "index": i, "name": name}
+        # No USB found — use default input
+        try:
+            default = sd.default.device[0]
+            default_name = sd.query_devices(default).get("name", "default")
+            return {"found": True, "index": default, "name": default_name}
+        except Exception:
+            pass
+    except ImportError:
+        pass
+    except Exception as exc:
+        logger.debug("detect_usb_microphone: sounddevice error: %s", exc)
+
+    logger.warning("No audio input device found — PTT and STT will be unavailable")
+    return {"found": False, "index": None, "name": ""}
+
+
+def list_audio_input_devices() -> list:
+    """Return all available audio input devices.
+
+    Returns:
+        List of dicts with keys: ``index`` (int), ``name`` (str), ``default`` (bool).
+    """
+    devices = []
+    # Try PyAudio
+    try:
+        import pyaudio
+
+        pa = pyaudio.PyAudio()
+        try:
+            default_idx = -1
+            try:
+                default_idx = pa.get_default_input_device_info().get("index", -1)
+            except Exception:
+                pass
+            for i in range(pa.get_device_count()):
+                info = pa.get_device_info_by_index(i)
+                if info.get("maxInputChannels", 0) > 0:
+                    devices.append(
+                        {
+                            "index": i,
+                            "name": info.get("name", f"device {i}"),
+                            "default": i == default_idx,
+                        }
+                    )
+        finally:
+            pa.terminate()
+        return devices
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    # Try sounddevice
+    try:
+        import sounddevice as sd
+
+        default_idx = -1
+        try:
+            default_idx = sd.default.device[0]
+        except Exception:
+            pass
+        for i, dev in enumerate(sd.query_devices()):
+            if dev.get("max_input_channels", 0) > 0:
+                devices.append(
+                    {
+                        "index": i,
+                        "name": dev.get("name", f"device {i}"),
+                        "default": i == default_idx,
+                    }
+                )
+        return devices
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    return devices
+
+
 # ---------------------------------------------------------------------------
 # Wake-word detection
 # ---------------------------------------------------------------------------

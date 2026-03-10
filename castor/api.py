@@ -532,6 +532,13 @@ async def get_status(request: Request):
     else:
         payload["provider_fallback"] = {"enabled": False}
 
+    # Camera model + mode
+    _cam_obj = getattr(state, "camera", None)
+    payload["camera_model"] = getattr(_cam_obj, "model", "unknown") if _cam_obj else "unknown"
+    payload["camera_mode"] = (
+        getattr(_cam_obj, "composite_mode", "primary_only") if _cam_obj else "primary_only"
+    )
+
     return _maybe_wrap_rcan(payload, request)
 
 
@@ -1927,6 +1934,19 @@ async def ws_telemetry(websocket: WebSocket, token: str = ""):
 # ---------------------------------------------------------------------------
 
 
+@app.get("/api/voice/devices", dependencies=[Depends(verify_token)])
+async def voice_devices():
+    """Return available audio input devices on the server.
+
+    Returns:
+        200: {"devices": [{"index": N, "name": "...", "default": bool}, ...]}
+    """
+    from castor.voice import list_audio_input_devices
+
+    devices = await asyncio.to_thread(list_audio_input_devices)
+    return {"devices": devices}
+
+
 @app.post("/api/voice/listen", dependencies=[Depends(verify_token)])
 async def voice_listen():
     """Capture one microphone phrase and return transcript + brain thought.
@@ -1936,15 +1956,15 @@ async def voice_listen():
         503: {"error": "..."} if listener is not available
     """
     if state.listener is None:
-        raise HTTPException(status_code=503, detail="Listener not available")
+        raise HTTPException(status_code=503, detail="STT listener not initialized")
     if not state.listener.enabled:
-        raise HTTPException(
-            status_code=503, detail="STT not enabled (set audio.stt_enabled: true in config)"
-        )
+        raise HTTPException(status_code=503, detail="no audio input device")
 
     transcript = await asyncio.to_thread(state.listener.listen_once)
     if transcript is None:
-        raise HTTPException(status_code=503, detail="Could not capture audio or recognise speech")
+        raise HTTPException(
+            status_code=503, detail="Could not capture audio or recognise speech"
+        )
 
     thought_dict: Optional[dict] = None
     if state.brain and transcript:
@@ -4483,6 +4503,55 @@ async def on_startup():
 
         _threading.Thread(target=_wakeup_speak, daemon=True).start()
         logger.info("Wake-up greeting queued for %s", _robot_name_wakeup)
+
+    # Auto-start wake word detection if CASTOR_HOTWORD is set or
+    # audio.wake_word_enabled: true in RCAN config.
+    # Retries once after 3 s if the mic is not yet ready.
+    _ww_enabled = bool(os.getenv("CASTOR_HOTWORD", "")) or (
+        (state.config or {}).get("audio", {}).get("wake_word_enabled", False)
+    )
+    if _ww_enabled:
+
+        async def _start_hotword_with_retry():
+            from castor.hotword import get_detector
+
+            async def _on_wake():
+                if state.listener and getattr(state.listener, "enabled", False):
+                    logger.info("Wake word detected — triggering STT listen")
+
+            _env_phrase = os.getenv("CASTOR_HOTWORD", "")
+            _robot_name = (state.config or {}).get("metadata", {}).get("robot_name", "")
+            _wake_phrase = _env_phrase or _robot_name or "hey castor"
+
+            for attempt in (1, 2):
+                try:
+                    det = get_detector(wake_phrase=_wake_phrase)
+                    det.start(
+                        on_wake=lambda: asyncio.run_coroutine_threadsafe(
+                            _on_wake(), asyncio.get_event_loop()
+                        )
+                    )
+                    logger.info(
+                        "Wake word active: %r via %s (auto-started on boot)",
+                        _wake_phrase,
+                        det.status.get("engine", "unknown"),
+                    )
+                    return
+                except Exception as _ww_exc:
+                    if attempt == 1:
+                        logger.debug(
+                            "Wake word start attempt %d failed: %s — retrying in 3 s",
+                            attempt,
+                            _ww_exc,
+                        )
+                        await asyncio.sleep(3)
+                    else:
+                        logger.warning(
+                            "Wake word auto-start failed after retry: %s", _ww_exc
+                        )
+
+        asyncio.create_task(_start_hotword_with_retry())
+        logger.debug("Wake word auto-start task queued (phrase will log on success)")
 
     provider = get_jwt_secret_provider()
     try:
