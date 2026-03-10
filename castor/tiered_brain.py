@@ -191,6 +191,20 @@ class TieredBrain:
             except Exception as exc:
                 logger.debug("Layer 3 not available: %s", exc)
 
+        # Embedding Interpreter (optional — config-gated, best-effort)
+        self.interpreter = None
+        if config.get("interpreter", {}).get("enabled", False):
+            try:
+                from .embedding_interpreter import EmbeddingInterpreter
+
+                self.interpreter = EmbeddingInterpreter(config.get("interpreter", {}))
+                logger.info(
+                    "EmbeddingInterpreter enabled (backend=%s)",
+                    config.get("interpreter", {}).get("backend", "auto"),
+                )
+            except Exception as exc:
+                logger.warning("EmbeddingInterpreter not available: %s", exc)
+
         # Stats
         self.stats = {
             "reactive_count": 0,
@@ -198,6 +212,8 @@ class TieredBrain:
             "planner_count": 0,
             "swarm_count": 0,
             "total_ticks": 0,
+            "interpreter_pre_count": 0,
+            "interpreter_escalations": 0,
         }
 
     def think(
@@ -216,6 +232,25 @@ class TieredBrain:
             )
             return Thought(f"Reactive: {reactive_action.get('reason', '')}", reactive_action)
 
+        # Layer 2 escalation flag — may be set early by interpreter
+        should_plan = False
+
+        # Interpreter pre-think (non-blocking — catches all exceptions)
+        scene_ctx = None
+        if self.interpreter:
+            try:
+                scene_ctx = self.interpreter.pre_think(image_bytes, instruction, sensor_data)
+                self.stats["interpreter_pre_count"] += 1
+                if scene_ctx.should_escalate:
+                    should_plan = True
+                    self.stats["interpreter_escalations"] += 1
+                    logger.info(
+                        "Interpreter: goal_similarity=%.2f → forcing L2 escalation",
+                        scene_ctx.goal_similarity,
+                    )
+            except Exception as exc:
+                logger.debug("Interpreter pre_think (non-fatal): %s", exc)
+
         # Layer 1: Fast brain
         t0 = time.time()
         thought = self.fast.think(image_bytes, instruction)
@@ -227,7 +262,6 @@ class TieredBrain:
             logger.info(f"Fast brain ({fast_ms:.0f}ms): {thought.action.get('type', '?')}")
 
         # Layer 2: Planner (periodic or on escalation)
-        should_plan = False
         if self.planner and self.planner_interval > 0:
             if self.tick_count % self.planner_interval == 0:
                 should_plan = True
@@ -252,6 +286,16 @@ class TieredBrain:
                     f"Current task: {instruction}\n\n"
                     f"Provide a high-level plan or corrected action as JSON."
                 )
+
+                # Inject RAG context from embedding interpreter
+                if scene_ctx and self.interpreter:
+                    try:
+                        rag = self.interpreter.format_rag_context(scene_ctx)
+                        if rag:
+                            plan_instruction = rag + "\n\n" + plan_instruction
+                    except Exception:
+                        pass
+
                 t0 = time.time()
                 plan_thought = self.planner.think(image_bytes, plan_instruction)
                 plan_ms = (time.time() - t0) * 1000
@@ -265,6 +309,12 @@ class TieredBrain:
                         f"Planner ({plan_ms:.0f}ms): {plan_thought.action.get('type', '?')}"
                     )
                     # Planner overrides fast brain when it has a plan
+                    # Interpreter post-think: store episode for planner path
+                    if self.interpreter and scene_ctx:
+                        try:
+                            self.interpreter.post_think(scene_ctx, plan_thought)
+                        except Exception as exc:
+                            logger.debug("Interpreter post_think (non-fatal): %s", exc)
                     return plan_thought
             except Exception as e:
                 logger.warning(f"Planner error (non-fatal): {e}")
@@ -283,6 +333,13 @@ class TieredBrain:
             except Exception as exc:
                 logger.debug("Layer 3 error (non-fatal): %s", exc)
 
+        # Interpreter post-think: store episode
+        if self.interpreter and scene_ctx:
+            try:
+                self.interpreter.post_think(scene_ctx, thought)
+            except Exception as exc:
+                logger.debug("Interpreter post_think (non-fatal): %s", exc)
+
         return thought
 
     def get_stats(self) -> dict:
@@ -298,4 +355,6 @@ class TieredBrain:
         # Include prompt cache stats from planner if available
         if self.planner and hasattr(self.planner, "cache_stats"):
             stats["cache"] = self.planner.cache_stats
+        if self.interpreter and hasattr(self.interpreter, "status"):
+            stats["interpreter"] = self.interpreter.status()
         return stats
