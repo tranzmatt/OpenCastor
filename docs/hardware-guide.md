@@ -365,6 +365,31 @@ i2cdetect -y 1     # Raspberry Pi I2C bus 1
 
 ---
 
+## HLabs ACB v2.0 (BLDC Motor Controller)
+
+The **HLaboratories Actuator Control Board v2.0** is an open-source STM32G474-based BLDC
+controller with USB-C and CAN Bus (1Mbit/s) support. OpenCastor provides a full driver,
+auto-detection, calibration flow, real-time telemetry at 50Hz, and three RCAN profiles
+for common robot configurations (single-axis, 3-DOF arm, 6-DOF biped).
+
+```bash
+pip install opencastor[hlabs]   # installs python-can dependency
+```
+
+```yaml
+drivers:
+- id: left_wheel
+  protocol: acb
+  port: auto        # auto-detect by USB VID/PID
+  node_id: 1
+  pole_pairs: 7
+```
+
+→ See the **[HLabs ACB v2.0 Guide](hardware/hlabs-acb.md)** for full wiring diagrams,
+CAN Bus setup, calibration, firmware flash, and profiles.
+
+---
+
 ## 📚 Additional Resources
 
 - **OpenCastor Discord:** [discord.gg/jMjA8B26Bq](https://discord.gg/jMjA8B26Bq) — `#second-hand-hardware` channel

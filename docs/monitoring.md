@@ -91,6 +91,54 @@ from castor.telemetry import init_otel
 init_otel()
 ```
 
+## Embedding Metrics (`opencastor_embedding_*`)
+
+The `EmbeddingInterpreter` emits its own Prometheus metrics for monitoring semantic
+perception performance:
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `opencastor_embedding_encode_total` | Counter | `backend`, `modality` | Total encode operations |
+| `opencastor_embedding_encode_errors_total` | Counter | `backend`, `error_type` | Failed encodes by error class |
+| `opencastor_embedding_latency_ms` | Histogram | `backend`, `modality` | Encode latency distribution |
+| `opencastor_embedding_store_size` | Gauge | `backend` | Episode vector store size |
+| `opencastor_embedding_rag_hits_total` | Counter | `backend` | RAG queries returning ≥1 result |
+
+**Label values:**
+
+- `backend`: `clip`, `siglip2`, `imagebind`, `clap`, `gemini`, `mock`
+- `modality`: `image`, `audio`, `text`
+- `error_type`: `timeout`, `decode_error`, `backend_unavailable`, `dimension_mismatch`
+
+**Example Prometheus queries:**
+
+```promql
+# Embedding latency p95 by backend
+histogram_quantile(0.95, rate(opencastor_embedding_latency_ms_bucket[5m]))
+
+# Error rate for CLIP backend
+rate(opencastor_embedding_encode_errors_total{backend="clip"}[5m])
+
+# RAG hit rate (fraction of think() calls with memory context)
+rate(opencastor_embedding_rag_hits_total[5m])
+  / rate(opencastor_loops_total[5m])
+```
+
+Access the raw metrics:
+
+```bash
+curl http://localhost:8000/api/metrics | grep opencastor_embedding
+```
+
+Or check backend status:
+
+```bash
+curl http://localhost:8000/api/interpreter/status
+# {"backend": "clip", "episode_count": 412, "dims": 512, "index_type": "faiss"}
+```
+
+→ See [embedding-interpreter.md](embedding-interpreter.md) for full EmbeddingInterpreter docs.
+
 ## RCAN Config
 
 ```yaml

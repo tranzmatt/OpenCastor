@@ -6,6 +6,31 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.10.1] — 2026-03-10
+
+### Added
+- **EmbeddingInterpreter** — local-first multimodal semantic perception layer; three-tier design: CLIP/SigLIP2 (Tier 0, free default), ImageBind/CLAP (Tier 1, experimental), Gemini Embedding 2 (Tier 2, premium); auto-tier selection with graceful fallback; episode vector store at `~/.opencastor/episodes/`; RAG context injection into `TieredBrain` pre/post hooks; `interpreter:` RCAN block (optional); Streamlit Embedding tab; TUI pane; Prometheus metrics (`opencastor_embedding_*`); benchmark suite; test suite runner in dashboard
+- **HLabs ACB v2.0 hardware support** — full driver for the HLaboratories Actuator Control Board v2.0 (STM32G474, 3-phase BLDC, 12V–30V, 40A); USB-C serial + CAN Bus (1Mbit/s) transports; `port: auto` USB VID/PID detection; motor calibration flow (pole pairs → zero electrical angle → PID push); real-time encoder telemetry at 50Hz (pos/vel/current/voltage/errors); firmware flash via DFU mode (`castor flash`); RCAN profiles (`hlabs/acb-single`, `hlabs/acb-arm-3dof`, `hlabs/acb-biped-6dof`); `/api/hardware/scan`; setup wizard onboarding flow; install with `pip install opencastor[hlabs]`
+
+### Fixed
+- `AcbDriver.move()` signature aligned with `DriverBase` (was `dict`, now `float, float`) — prevented runtime `TypeError` when used as primary driver
+- CAN transport no longer falsely reports hardware mode when `python-can` is unavailable
+- Calibration `None` response now correctly reported as failure (not misreported as success)
+- USB serial timeout always restored via `try/finally` (was leaked on exception)
+- Dashboard ACB telemetry uses real driver ID from config (was hardcoded to `"acb"`, causing 404s)
+- `close()` now joins telemetry background thread to avoid races
+- Flash CLI `--id` argument now wires to driver lookup; SSRF-safe firmware URL validation (GitHub releases only)
+- Wizard `pole_pairs`/`can_node_id` inputs wrapped in `try/except` (was crashing on non-integer input)
+- `profiles.py` module shadow removed; `castor/profiles/**/*.yaml` added to package-data
+- `get_active_profile()` return type corrected to `Optional[str]`
+- `EmbeddingInterpreter._null_context()` returns correct dimensions with `is_null` flag; swarm path now calls `post_think()`; test suite uses `flush()` instead of `time.sleep()`
+- Anthropic CLI OAuth path now supports `cache_control` system prompt lists
+
+### Statistics
+- 94,438 lines of Python · 6,459 tests
+
+---
+
 ## [2026.3.10.0] — 2026-03-10
 
 ### Added

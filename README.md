@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <b>167,186 lines of Python · 6,392 tests · Python 3.10–3.13</b><br/>
+  <b>94,438 lines of Python · 6,459 tests · Python 3.10–3.13</b><br/>
   <i>Connect any AI model to any robot hardware through a single YAML config.</i>
 </p>
 
@@ -291,14 +291,12 @@ castor token --role operator        # issue JWT
 
 Full reference: [`docs/claude/cli-reference.md`](docs/claude/cli-reference.md)
 
-## What's New in v2026.3.8.3
+## What's New in v2026.3.10.1
 
-- **EpisodeStore FIFO cap** — memory store now enforces 10k episode limit with automatic FIFO eviction; prevents unbounded SQLite growth
-- **ApplyStage dedup** — `improvement_history.json` capped at 1k entries; behavior rules deduplicated by name for a leaner learning pipeline
-- **Timezone-aware datetimes** — deprecated `datetime.utcfromtimestamp()` replaced throughout with timezone-aware equivalents
-- **README refresh** — architecture diagram, Memory & Learning section, and overall structure tightened
+- **EmbeddingInterpreter** — local-first multimodal semantic perception with CLIP/SigLIP2 (Tier 0, free default, no API key), ImageBind/CLAP (Tier 1, experimental), or Gemini Embedding 2 (Tier 2, 3072-dim MRL). Builds a persistent episode vector store at `~/.opencastor/episodes/` and injects RAG context into TieredBrain pre/post hooks so robots recognize familiar patterns across sessions. Prometheus metrics (`opencastor_embedding_*`), Streamlit Embedding tab, and benchmark suite included.
+- **HLabs ACB v2.0 hardware support** — first-class driver for the HLaboratories Actuator Control Board v2.0 (STM32G474, 3-phase BLDC, 12V–30V, 40A). USB-C serial + CAN Bus (1Mbit/s, 11-bit ARB ID) dual transport; `port: auto` VID/PID auto-detection; motor calibration flow (pole pairs → zero electrical angle → PID); real-time encoder telemetry at 50Hz; firmware flash via DFU mode (`castor flash`); three RCAN profiles (`hlabs/acb-single`, `hlabs/acb-arm-3dof`, `hlabs/acb-biped-6dof`). Install with `pip install opencastor[hlabs]`.
 
-_Previous: [v2026.3.8.2](#) — animated robot face, gamepad, closed captions, brain model visibility, dashboard UX_
+**Full changelog:** [CHANGELOG.md](CHANGELOG.md) · [Release notes](https://opencastor.com/changelog)
 
 ## Contributing
 
