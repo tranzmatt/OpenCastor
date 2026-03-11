@@ -6,6 +6,45 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.11.0] - 2026-03-11
+
+### Added
+- **Plug-and-play hardware auto-detection** — `castor scan` now identifies 12+ hardware types by USB VID/PID, I2C address, PCIe, and network discovery
+  - Intel RealSense D4xx/L515 (VID `0x8086`)
+  - Luxonis OAK-D / OAK-D-Lite / OAK-D-Pro (VID `0x03E7`)
+  - ODrive v3 / Pro / S1 (VID `0x1209`)
+  - VESC motor controller (disambiguated by product string)
+  - Hailo-8 NPU (PCIe lspci + `/dev/hailo0` + Python)
+  - Google Coral USB / M.2 TPU
+  - Arduino family (VID `0x2341` + CH340/FTDI clones)
+  - Adafruit CircuitPython boards (VID `0x239A`)
+  - Dynamixel U2D2 explicit VID/PID (high-confidence, no longer inferred from any serial port)
+  - RPLidar / YDLIDAR USB adapters
+  - Raspberry Pi AI Camera (IMX500) via picamera2
+  - I2C device name lookup table (BNO055, VL53L1X, SSD1306, ADS1115, BME280, LSM6DSO, HMC5883L, and more)
+  - Pollen Robotics Reachy 2 / Reachy Mini via mDNS/hostname discovery
+- **Feetech STS3215 driver** (`FeetechDriver`) — serial bus servos used in SO-ARM100/101 and LeRobot kits; `port: auto` via CH340 detection
+- **Pollen Robotics Reachy driver** (`ReachyDriver`) — Reachy 2 and Reachy Mini via `reachy2-sdk` (gRPC); `host: auto` via mDNS
+- **`port: auto` wiring** in ODrive, Dynamixel, and LiDAR drivers — no manual port config required
+- **LeRobot RCAN profiles** — `castor/profiles/lerobot/`:
+  - `so-arm101-follower.yaml`, `so-arm101-leader.yaml`, `so-arm101-bimanual.yaml`
+  - `koch-arm.yaml` (Dynamixel XL430/XL330 via U2D2), `aloha.yaml` (ALOHA bimanual)
+- **Pollen Robotics profiles** — `pollen/reachy2.yaml`, `pollen/reachy-mini.yaml`
+- **Additional profiles** — `odrive/differential.yaml`, `coral/tpu-inference.yaml`, `arduino/uno.yaml`
+- **Optional dependency groups** — `pip install opencastor[lerobot]` (Feetech + Dynamixel SDKs), `pip install opencastor[reachy]` (reachy2-sdk + zeroconf)
+- **`scan_usb_descriptors()` memoization** — `lsusb` called once per scan regardless of how many detectors run
+- **`invalidate_usb_descriptors_cache()`** — programmatic cache invalidation for hot-plug or test scenarios
+- Wizard `generate_preset_config()` resolves `castor/profiles/{id}.yaml` for slash-style preset IDs (e.g. `pollen/reachy2`)
+
+### Fixed
+- `detect_feetech_usb()` no longer misroutes Arduino Nano CH340 clones to `lerobot/so-arm101-follower`
+- `detect_reachy_network()` hostname probes now run concurrently in daemon threads; no blocking `getaddrinfo`
+- `_auto_detect_vesc_port()` ODrive-USB fallback removed — prevents ODrive port being opened as VESC serial link
+- `print_scan_results()` now includes all detected categories (`vesc`, `circuitpython`, `lidar`, `imx500`)
+- `suggest_preset()` correctly distinguishes Reachy Mini from Reachy 2 via hostname check
+
+---
+
 ## [2026.3.10.1] — 2026-03-10
 
 ### Added
