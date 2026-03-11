@@ -6,6 +6,40 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.10.0] — 2026-03-10
+
+### Added
+- **EmbeddingInterpreter** — local-first multimodal semantic perception layer; three-tier design (CLIP Tier 0, ImageBind/CLAP Tier 1, Gemini Embedding 2 Tier 2); episode vector store at `~/.opencastor/episodes/`; RAG context injection into `TieredBrain.think()` pre/post hooks; `auto` backend walks tiers with graceful fallback to mock (#501–#516)
+- **CLIP provider** (Tier 0) — `openai/clip-vit-base-patch32`, 512-dim, CPU-only, zero-cost default; singleton helper prevents repeated model loads
+- **Gemini Embedding 2 provider** (Tier 2) — `gemini-embedding-2-preview`, 3072/1536/768 MRL dims, L2-normalised, MIME magic-byte detection for PNG/JPEG/WAV
+- **ImageBind provider** (Tier 1, experimental) — CC BY-NC 4.0, 6-modality (RGB/depth/audio/text/IMU/thermal); temp-file `try/finally` cleanup
+- **CLAP provider** (Tier 1) — local audio-text embedding via `laion/clap-htsat-unfused`
+- **Embedding metrics** — Prometheus counters/histograms with `backend`, `modality`, `error_type` labels via `ProviderLatencyTracker`
+- **Streamlit Embedding tab** — live backend status, episode count, top-k RAG preview, backend switcher; `/api/interpreter/status` endpoint (409 for concurrent test runs)
+- **TUI embedding pane** — `_run_embedding_loop()` in `dashboard_tui.py`; reads `OPENCASTOR_API_TOKEN` for authenticated deployments
+- **Benchmark suite** — `run_embedding_benchmark()` in `benchmarker.py`; skips Gemini when no API key (records as `skipped`)
+- **Test suite runner** — pytest runner in dashboard Settings tab
+- **Setup wizard** — embedding tier selection step; invokes `_google_auth_flow()` when Gemini/Auto selected and key is absent
+- **RCAN `interpreter:` block** — added to `OPTIONAL_TOP_LEVEL` in `config_validation.py`; type-guards against scalar values; validates `backend` enum and `gemini.dimensions`
+- **Multi-vector episode store schema doc** — `docs/design/episode-store-schema.md`
+- **ImageBind setup guide** — `docs/setup/imagebind-setup.md`
+
+### Fixed
+- `_null_context()` returned `(1,)` embedding causing dimension mismatch in episode store; now returns zero vector matching backend's declared dims; `SceneContext.is_null` flag prevents storing null episodes
+- TieredBrain swarm branch bypassed `post_think()` — episode store now records swarm actions too
+- `ClipEmbeddingProvider` was re-instantiated on every `_select_backend()` call; now uses singleton via `get_clip_provider()`
+- Gemini `embed_text()` / `embed_scene()` returned raw vectors; now L2-normalised to honour `EmbeddingBackend.embed()` unit-norm contract
+- `embed_scene()` hardcoded `image/jpeg` / `audio/mpeg` MIME types; `_mime_from_bytes()` helper now detects from magic bytes (PNG, JPEG, WAV)
+- Config validation crashed on `interpreter: true` (non-dict) with `AttributeError`; `isinstance` guard added
+- TUI embedding pane polled `/api/interpreter/status` without auth headers; passes `Authorization: Bearer` from `OPENCASTOR_API_TOKEN`
+- Test flakiness: replaced `time.sleep()` waits with `EmbeddingInterpreter.flush()` (joins background store thread)
+- Anthropic CLI path (`_think_via_cli`) now passes `cache_control` content blocks via updated `ClaudeOAuthClient.create_message(system: str | list[dict])` instead of plain string (#517)
+
+### Statistics
+- 6,459 tests collected
+
+---
+
 ## [2026.3.8.3] — 2026-03-08
 
 ### Fixed
