@@ -18,6 +18,8 @@ castor scan
 
 **Full documentation:** [docs/hardware/auto-detect.md](hardware/auto-detect.md)
 
+**Upgrading or reinstalling?** See [docs/install/upgrade.md](install/upgrade.md) for Pi OS PEP 668, venv setup, and systemd service migration.
+
 ---
 
 ## Supported Platforms
