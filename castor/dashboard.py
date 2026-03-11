@@ -237,7 +237,7 @@ _acb_telemetry: dict = {}
 _driver_type = driver.get("driver_type", "") if driver else ""
 if "AcbDriver" in _driver_type:
     # Single AcbDriver — fetch using driver_id from health check (if available)
-    _acb_id = driver.get("id", "acb") if driver else "acb"
+    _acb_id = (driver.get("driver_id") or driver.get("id", "acb")) if driver else "acb"
     _telem = _get(f"/api/drivers/{_acb_id}/telemetry")
     if _telem and not _telem.get("error"):
         _acb_telemetry[_acb_id] = _telem

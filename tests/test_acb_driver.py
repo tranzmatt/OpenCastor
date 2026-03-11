@@ -31,13 +31,13 @@ import pytest
 
 
 def _make_acb_driver(config: dict | None = None, *, force_mock: bool = True):
-    """Construct an AcbDriver in mock mode."""
+    """Construct an AcbDriver in mock mode with telemetry disabled."""
     with patch("castor.drivers.acb_driver.HAS_PYSERIAL", False), patch(
         "castor.drivers.acb_driver.HAS_CAN_TRANSPORT", False
     ):
         from castor.drivers.acb_driver import AcbDriver
 
-        cfg = {"id": "test_motor", "mock": True, **(config or {})}
+        cfg = {"id": "test_motor", "mock": True, "telemetry_hz": 0, **(config or {})}
         drv = AcbDriver(cfg)
     return drv
 
@@ -56,8 +56,8 @@ class TestAcbDriverMock:
 
     def test_move_mock_no_raise(self):
         drv = _make_acb_driver()
-        drv.move({"linear": 0.5})
-        drv.move({"linear": -1.0, "angular": 0.1})
+        drv.move(0.5)
+        drv.move(-1.0, 0.1)
         drv.close()
 
     def test_set_velocity_mock(self):
@@ -113,10 +113,10 @@ class TestAcbDriverMock:
         drv.close()
         drv.close()  # second close must not raise
 
-    def test_linear_x_alias(self):
-        """linear_x should work as a fallback for linear."""
+    def test_move_with_angular_ignored(self):
+        """angular param is accepted but ignored for single-axis ACB."""
         drv = _make_acb_driver()
-        drv.move({"linear_x": 0.3})
+        drv.move(linear=0.3, angular=0.5)
         drv.close()
 
     def test_control_mode_stored(self):
@@ -129,10 +129,15 @@ class TestAcbDriverMock:
         assert drv._pole_pairs == 14
         drv.close()
 
-    def test_telemetry_thread_started(self):
-        drv = _make_acb_driver()
+    def test_telemetry_thread_started_when_hz_nonzero(self):
+        drv = _make_acb_driver({"telemetry_hz": 10})
         assert drv._telemetry_thread is not None
         assert drv._telemetry_thread.daemon is True
+        drv.close()
+
+    def test_telemetry_thread_not_started_when_hz_zero(self):
+        drv = _make_acb_driver({"telemetry_hz": 0})
+        assert drv._telemetry_thread is None
         drv.close()
 
 
@@ -217,7 +222,7 @@ class TestAcbDriverUsb:
         with patch("castor.drivers.acb_driver.HAS_PYSERIAL", False):
             from castor.drivers.acb_driver import AcbDriver
 
-            drv = AcbDriver({"id": "usb_test", "mock": True, "port": "/dev/ttyACM0"})
+            drv = AcbDriver({"id": "usb_test", "mock": True, "telemetry_hz": 0, "port": "/dev/ttyACM0"})
 
         # Force hardware mode with the mock serial — telemetry loop runs in mock,
         # so it calls get_encoder() which returns zeros (mode check is first).
@@ -370,14 +375,21 @@ class TestHardwareDetect:
         return port
 
     def test_detect_acb_usb_finds_stm32(self):
-        stm32_port = self._make_port_info(0x0483, 0x5740, "/dev/ttyACM0", "STM32 Virtual COM")
-
-        with patch("castor.hardware_detect.detect_acb_usb") as mock_detect:
-            mock_detect.return_value = ["/dev/ttyACM0"]
+        fake_port = self._make_port_info(0x0483, 0x5740, "/dev/ttyACM0", "STM32 Virtual COM")
+        with patch("serial.tools.list_ports.comports", return_value=[fake_port]):
             from castor.hardware_detect import detect_acb_usb
 
-            ports = mock_detect()
-        assert "/dev/ttyACM0" in ports
+            result = detect_acb_usb()
+        assert "/dev/ttyACM0" in result
+
+    def test_detect_acb_dfu_not_returned(self):
+        """DFU mode devices must NOT appear in usable port list."""
+        fake_port = self._make_port_info(0x0483, 0xDF11, "/dev/ttyACM1", "STM32 DFU")
+        with patch("serial.tools.list_ports.comports", return_value=[fake_port]):
+            from castor.hardware_detect import detect_acb_usb
+
+            result = detect_acb_usb()
+        assert "/dev/ttyACM1" not in result
 
     def test_detect_acb_usb_warns_on_dfu(self):
         from castor.hardware_detect import KNOWN_HLABS_DEVICES
@@ -522,11 +534,12 @@ class TestAcbDriverRegistration:
 
 class TestAcbApiEndpoints:
     @pytest.fixture()
-    def client(self):
+    def client(self, monkeypatch):
         from fastapi.testclient import TestClient
 
         import castor.api as _api
 
+        monkeypatch.setattr(_api, "API_TOKEN", None)
         _api.state.driver = None
         return TestClient(_api.app)
 
@@ -582,13 +595,21 @@ class TestAcbApiEndpoints:
             _api.state.driver = None
 
     def test_flash_requires_confirm(self, client):
-        r = client.post(
-            "/api/drivers/motor_0/flash",
-            json={"confirm": False, "firmware_url": None},
-        )
-        assert r.status_code == 200
-        data = r.json()
-        assert data["status"] == "confirm_required"
+        import castor.api as _api
+
+        drv = _make_acb_driver({"id": "motor_0"})
+        _api.state.driver = drv
+        try:
+            r = client.post(
+                "/api/drivers/motor_0/flash",
+                json={"confirm": False, "firmware_url": None},
+            )
+            assert r.status_code == 200
+            data = r.json()
+            assert data["status"] == "confirm_required"
+        finally:
+            drv.close()
+            _api.state.driver = None
 
 
 # ---------------------------------------------------------------------------

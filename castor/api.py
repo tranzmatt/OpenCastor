@@ -7143,6 +7143,14 @@ async def flash_driver(driver_id: str, body: _FlashRequest, request: Request):
     High current MOSFETs are present on the ACB v2.0 board.
     """
     _check_min_role(request, "admin")
+
+    # Validate driver_id refers to a real AcbDriver
+    drv = _find_acb_driver(driver_id)
+    if drv is None:
+        raise HTTPException(
+            status_code=404, detail=f"ACB driver '{driver_id}' not found or not an AcbDriver"
+        )
+
     if not body.confirm:
         return {
             "status": "confirm_required",
@@ -7154,7 +7162,15 @@ async def flash_driver(driver_id: str, body: _FlashRequest, request: Request):
 
     import pathlib as _pathlib
     import subprocess as _subprocess
+    import urllib.parse as _urllib_parse
     import urllib.request as _urllib_request
+
+    _ALLOWED_FIRMWARE_HOSTS = {
+        "github.com",
+        "objects.githubusercontent.com",
+        "releases.githubusercontent.com",
+    }
+    _MAX_FIRMWARE_BYTES = 10 * 1024 * 1024  # 10 MB
 
     firmware_url = body.firmware_url
     version_tag = body.version or "latest"
@@ -7179,12 +7195,30 @@ async def flash_driver(driver_id: str, body: _FlashRequest, request: Request):
         except Exception as exc:
             return {"status": "error", "message": f"Failed to fetch release info: {exc}"}
 
-    # Download if not cached
+    # Validate firmware_url against allowlist (SSRF prevention)
+    _parsed = _urllib_parse.urlparse(firmware_url)
+    if _parsed.scheme != "https" or _parsed.hostname not in _ALLOWED_FIRMWARE_HOSTS:
+        raise HTTPException(
+            status_code=400,
+            detail="firmware_url must be an HTTPS GitHub releases URL",
+        )
+
+    # Download if not cached (with size limit)
     cache_file = cache_dir / f"acb-v2.0-{version_tag}.bin"
     if not cache_file.exists():
         try:
             with _urllib_request.urlopen(firmware_url, timeout=30) as resp:  # noqa: S310
-                cache_file.write_bytes(resp.read())
+                chunks = []
+                total = 0
+                while True:
+                    chunk = resp.read(65536)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > _MAX_FIRMWARE_BYTES:
+                        raise ValueError("Firmware exceeds 10 MB size limit")
+                    chunks.append(chunk)
+                cache_file.write_bytes(b"".join(chunks))
         except Exception as exc:
             return {"status": "error", "message": f"Download failed: {exc}"}
 

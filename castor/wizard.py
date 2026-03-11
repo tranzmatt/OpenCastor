@@ -2246,7 +2246,10 @@ def _acb_onboarding_flow(detected_ports: list) -> dict:
             ports_or_nodes[idx].split("/")[-1] if idx < len(ports_or_nodes) else f"motor_{idx}"
         )
         joint_id = input_default("  Joint ID", default_id).strip() or default_id
-        pole_pairs = int(input_default("  Pole pairs", "7").strip() or "7")
+        try:
+            pole_pairs = int(input_default("  Pole pairs", "7").strip() or "7")
+        except ValueError:
+            pole_pairs = 7  # sensible default for HLabs Motor Test Mount
 
         print(f"  Control modes: {', '.join(_CONTROL_MODES)}")
         ctrl_mode = input_default("  Control mode", "velocity").strip().lower()
@@ -2280,9 +2283,12 @@ def _acb_onboarding_flow(detected_ports: list) -> dict:
             entry["transport"] = "can"
             entry["can_interface"] = input_default("  CAN interface", "socketcan").strip()
             entry["can_channel"] = input_default("  CAN channel", "can0").strip()
-            entry["can_node_id"] = int(
-                input_default("  CAN node ID", str(idx + 1)).strip() or str(idx + 1)
-            )
+            try:
+                entry["can_node_id"] = int(
+                    input_default("  CAN node ID", str(idx + 1)).strip() or str(idx + 1)
+                )
+            except ValueError:
+                entry["can_node_id"] = idx + 1
 
         driver_entries.append(entry)
 

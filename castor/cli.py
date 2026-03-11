@@ -1932,11 +1932,32 @@ def cmd_flash(args) -> None:
     firmware_path = getattr(args, "firmware", None)
     version = getattr(args, "version", None) or "latest"
     confirm = getattr(args, "confirm", False)
+    driver_id = getattr(args, "id", "acb") or "acb"
 
     print()
     print("  \u26a0\ufe0f  WARNING: Use a current-limiting PSU during firmware flashing.")
     print("        High current MOSFETs are present on the ACB v2.0 board.")
     print()
+
+    # Validate driver_id against the loaded RCAN config (if available)
+    config_path = getattr(args, "config", None)
+    if config_path:
+        try:
+            import yaml as _yaml
+
+            with open(config_path) as _fh:
+                _rcan = _yaml.safe_load(_fh)
+            _driver_ids = [d.get("id") for d in (_rcan or {}).get("drivers", [])]
+            if driver_id not in _driver_ids:
+                print(
+                    f"  Warning: driver id '{driver_id}' not found in {config_path}."
+                    f"  Known driver IDs: {_driver_ids}"
+                )
+                print("  Proceeding anyway — ensure the correct device is connected.")
+                print()
+        except Exception as _exc:
+            print(f"  Warning: could not validate driver id against config: {_exc}")
+            print()
 
     if not confirm:
         try:

@@ -22,6 +22,7 @@ import logging
 import os
 import pathlib
 import shutil
+from typing import Optional
 
 import yaml
 
@@ -123,7 +124,7 @@ def remove_profile(name: str) -> bool:
     return False
 
 
-def get_active_profile() -> str:
+def get_active_profile() -> Optional[str]:
     """Get the name of the currently active profile, or None."""
     try:
         if os.path.exists(_ACTIVE_FILE):

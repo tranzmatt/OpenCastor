@@ -293,13 +293,20 @@ class AcbDriver(DriverBase):
                 channel=config.get("can_channel", "can0"),
                 bitrate=int(config.get("can_bitrate", 1_000_000)),
             )
-            self._mode = "hardware"
-            logger.info(
-                "ACB connected via CAN node_id=%d on %s/%s",
-                self._can_node_id,
-                config.get("can_interface", "socketcan"),
-                config.get("can_channel", "can0"),
-            )
+            if self._can.connected:
+                self._mode = "hardware"
+                logger.info(
+                    "ACB connected via CAN node_id=%d on %s/%s",
+                    self._can_node_id,
+                    config.get("can_interface", "socketcan"),
+                    config.get("can_channel", "can0"),
+                )
+            else:
+                logger.warning(
+                    "ACB CAN bus failed to open (%s/%s) — mock mode",
+                    config.get("can_interface", "socketcan"),
+                    config.get("can_channel", "can0"),
+                )
         except Exception as exc:
             logger.warning("ACB CAN init failed: %s — mock mode", exc)
 
@@ -354,6 +361,8 @@ class AcbDriver(DriverBase):
 
     def _start_telemetry_loop(self) -> None:
         """Spawn the background encoder polling thread."""
+        if self._telemetry_hz <= 0:
+            return
         self._running = True
         self._telemetry_thread = threading.Thread(
             target=self._telemetry_loop,
@@ -395,15 +404,16 @@ class AcbDriver(DriverBase):
 
     # ── DriverBase interface ──────────────────────────────────────────────────
 
-    def move(self, action: dict) -> None:
-        """Map linear/angular action dict to velocity setpoint.
+    def move(self, linear: float = 0.0, angular: float = 0.0) -> None:
+        """Map linear speed to velocity setpoint.
 
-        For a single-axis ACB, ``linear`` (or ``linear_x``) scales to velocity.
+        For a single-axis ACB joint, ``linear`` scales to the velocity setpoint;
+        ``angular`` is ignored (single-axis device, not a differential drive).
 
         Args:
-            action: Dict with ``linear``/``linear_x`` and/or ``angular``/``angular_z`` floats.
+            linear:  Forward/backward speed in [-1.0, 1.0].  Scaled by ``max_velocity``.
+            angular: Not used for single-axis ACB joints.
         """
-        linear = float(action.get("linear", action.get("linear_x", 0.0)))
         vel = linear * self._max_velocity
 
         if self._mode == "mock":
@@ -531,7 +541,15 @@ class AcbDriver(DriverBase):
 
             # 2. Trigger encoder calibration with extended timeout
             resp = self._send_calibration_cmd({"cmd": "calibrate_encoder"}, timeout_s=10.0)
-            zero_angle = float(resp.get("zero_electrical_angle", 0.0)) if resp else 0.0
+            if resp is None:
+                return CalibrationResult(
+                    success=False,
+                    zero_electrical_angle=0.0,
+                    pole_pairs=self._pole_pairs,
+                    pid_applied=pid,
+                    error="No response from ACB — transport error or timeout",
+                )
+            zero_angle = float(resp.get("zero_electrical_angle", 0.0))
 
             # 3. Push PID values
             for key, val in pid.items():
@@ -577,14 +595,17 @@ class AcbDriver(DriverBase):
         """
         if self._transport_type == "usb" and self._serial_conn:
             if timeout_s != 2.0:
+                raw = b""
                 try:
                     with self._serial_lock:
                         old_timeout = self._serial_conn.timeout
                         self._serial_conn.timeout = timeout_s
-                        payload = (json.dumps(cmd) + "\n").encode()
-                        self._serial_conn.write(payload)
-                        raw = self._serial_conn.readline()
-                        self._serial_conn.timeout = old_timeout
+                        try:
+                            payload = (json.dumps(cmd) + "\n").encode()
+                            self._serial_conn.write(payload)
+                            raw = self._serial_conn.readline()
+                        finally:
+                            self._serial_conn.timeout = old_timeout
                     if raw:
                         return json.loads(raw.decode().strip())
                 except Exception as exc:
@@ -619,6 +640,8 @@ class AcbDriver(DriverBase):
     def close(self) -> None:
         """Stop the motor, terminate telemetry thread, and release resources."""
         self._running = False
+        if hasattr(self, "_telemetry_thread") and self._telemetry_thread is not None:
+            self._telemetry_thread.join(timeout=2.0)
         self.stop()
         if self._serial_conn:
             try:
@@ -642,6 +665,7 @@ class AcbDriver(DriverBase):
             and ``error``.
         """
         base: dict = {
+            "driver_id": self._driver_id,
             "transport": self._transport_type,
             "control_mode": self._control_mode,
             "pole_pairs": self._pole_pairs,

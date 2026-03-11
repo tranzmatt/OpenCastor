@@ -106,6 +106,11 @@ class CanTransport:
             logger.debug("CAN recv error: %s", exc)
             return None
 
+    @property
+    def connected(self) -> bool:
+        """True when the CAN bus is open and ready."""
+        return self._bus is not None
+
     def close(self) -> None:
         """Shut down the CAN bus connection."""
         if self._bus:

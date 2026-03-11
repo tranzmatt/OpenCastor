@@ -164,6 +164,7 @@ include = ["castor*"]
 
 [tool.setuptools.package-data]
 castor = ["py.typed"]
+"castor.profiles" = ["**/*.yaml"]
 
 [tool.ruff]
 line-length = 100
