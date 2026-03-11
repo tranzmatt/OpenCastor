@@ -31,6 +31,7 @@ from fastapi import (
     FastAPI,
     File,
     HTTPException,
+    Query,
     Request,
     UploadFile,
     WebSocket,
@@ -472,12 +473,15 @@ async def get_status(request: Request):
         getattr(_active_brain_obj, "model_name", None) if _active_brain_obj else None
     )
 
+    import castor as _castor_pkg
+
     payload = {
         "config_loaded": state.config is not None,
         "robot_name": (
             state.config.get("metadata", {}).get("robot_name") if state.config else None
         ),
         "ruri": state.ruri,
+        "version": _castor_pkg.__version__,
         "providers": list_available_providers(),
         "channels_available": list_available_channels(),
         "channels_active": list(state.channels.keys()),
@@ -7047,14 +7051,35 @@ async def test_status():
 
 
 @app.get("/api/hardware/scan", dependencies=[Depends(verify_token)])
-async def hardware_scan():
-    """Scan for connected HLabs and other supported USB hardware.
+async def hardware_scan(
+    refresh: bool = Query(False, description="Force fresh scan, bypass cache"),
+):
+    """Scan for all connected hardware and suggest a preset configuration.
 
-    Returns detected device lists keyed by device class, plus a timestamp.
+    Returns full detect_hardware() output plus a suggested RCAN preset.
     """
-    from castor.hardware_detect import detect_all_hlabs
+    from castor.hardware_detect import (
+        detect_hardware,
+        invalidate_hardware_cache,
+        suggest_preset,
+    )
 
-    return {"devices": detect_all_hlabs(), "timestamp": time.time()}
+    if refresh:
+        invalidate_hardware_cache()
+    hw = detect_hardware()
+    preset, confidence, reason = suggest_preset(hw)
+    return {
+        "devices": {
+            **hw,
+            "suggested_preset": {
+                "preset": preset,
+                "confidence": confidence,
+                "reason": reason,
+            },
+        },
+        "timestamp": time.time(),
+        "cached": not refresh,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -7322,7 +7347,59 @@ def _setup_signal_handlers() -> None:
     signal.signal(signal.SIGINT, _handle_signal)
 
 
+def _assert_port_free(host: str, port: int) -> None:
+    """Raise RuntimeError if *port* on *host* is already in use (#556)."""
+    import socket as _socket
+
+    with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as s:
+        s.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+        try:
+            s.bind((host, port))
+        except OSError:
+            raise RuntimeError(
+                f"Port {port} already in use. "
+                f"Stop the existing gateway with: castor stop\n"
+                f"Or kill the process: fuser -k {port}/tcp"
+            ) from None
+
+
+def _write_pid_file() -> "Path":
+    """Write current PID to ~/.opencastor/gateway.pid, killing stale process (#556)."""
+    from pathlib import Path as _Path
+
+    pid_dir = _Path.home() / ".opencastor"
+    pid_dir.mkdir(parents=True, exist_ok=True)
+    pid_file = pid_dir / "gateway.pid"
+    if pid_file.exists():
+        try:
+            old_pid = int(pid_file.read_text().strip())
+            try:
+                import psutil  # type: ignore[import]
+
+                if psutil.pid_exists(old_pid):
+                    logger.warning(
+                        "Killing stale gateway (pid %d) — use 'castor stop' for clean shutdown",
+                        old_pid,
+                    )
+                    os.kill(old_pid, signal.SIGTERM)
+                    time.sleep(1)
+            except ImportError:
+                pass  # psutil optional — skip stale check
+        except (ValueError, ProcessLookupError, OSError):
+            pass
+    pid_file.write_text(str(os.getpid()))
+    return pid_file
+
+
+def _cleanup_pid_file(pid_file: "Path") -> None:
+    """Remove gateway PID file on exit (#556)."""
+    with contextlib.suppress(OSError):
+        pid_file.unlink()
+
+
 def main():
+    import atexit
+
     import uvicorn
 
     load_dotenv_if_available()
@@ -7335,6 +7412,11 @@ def main():
     args = parser.parse_args()
 
     os.environ["OPENCASTOR_CONFIG"] = args.config
+
+    # Pre-flight checks (#556)
+    _assert_port_free(args.host, args.port)
+    pid_file = _write_pid_file()
+    atexit.register(_cleanup_pid_file, pid_file)
 
     uvicorn.run(
         "castor.api:app",

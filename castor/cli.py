@@ -1238,8 +1238,59 @@ def cmd_safety(args) -> None:
 
 
 def cmd_scan(args) -> None:
-    """castor scan — placeholder."""
-    print("castor scan: coming soon.")
+    """castor scan — detect connected hardware and suggest a preset."""
+    import json as _json
+
+    from castor.hardware_detect import (
+        detect_hardware,
+        invalidate_hardware_cache,
+        print_scan_results,
+        suggest_extras,
+        suggest_preset,
+    )
+
+    refresh = getattr(args, "refresh", False)
+    json_out = getattr(args, "json", False)
+    preset_only = getattr(args, "preset_only", False)
+
+    if refresh:
+        invalidate_hardware_cache()
+
+    hw = detect_hardware()
+    preset, confidence, reason = suggest_preset(hw)
+
+    if json_out:
+        print(
+            _json.dumps(
+                {
+                    **hw,
+                    "suggested_preset": {
+                        "preset": preset,
+                        "confidence": confidence,
+                        "reason": reason,
+                    },
+                },
+                default=str,
+                indent=2,
+            )
+        )
+        return
+
+    if preset_only:
+        print(f"{preset} ({confidence}): {reason}")
+        return
+
+    print_scan_results(hw)
+    print(f"\n  Suggested preset: {preset} ({confidence})")
+    print(f"  Reason: {reason}")
+
+    extras = suggest_extras(hw)
+    if extras:
+        print("\n  Hardware detected — consider installing:")
+        for pkg in extras:
+            print(f"    pip install {pkg}")
+
+    print("\n  Run 'castor wizard' to generate a full RCAN config.\n")
 
 
 def cmd_schedule(args) -> None:
@@ -1271,6 +1322,31 @@ def cmd_schedule(args) -> None:
         install_crontab()
     else:
         print("  Usage: castor schedule <list|add|remove|install>")
+
+
+def cmd_stop(args) -> None:
+    """castor stop — gracefully stop the running gateway via PID file (#556)."""
+    import signal as _signal
+    from pathlib import Path
+
+    pid_file = Path.home() / ".opencastor" / "gateway.pid"
+    if not pid_file.exists():
+        print("  No gateway.pid found — gateway may not be running.")
+        return
+    try:
+        pid = int(pid_file.read_text().strip())
+    except (ValueError, OSError) as exc:
+        print(f"  Could not read PID file: {exc}")
+        return
+    try:
+        os.kill(pid, _signal.SIGTERM)
+        print(f"  Sent SIGTERM to gateway (pid {pid}).")
+        pid_file.unlink(missing_ok=True)
+    except ProcessLookupError:
+        print(f"  Gateway (pid {pid}) is not running — cleaning up stale PID file.")
+        pid_file.unlink(missing_ok=True)
+    except PermissionError:
+        print(f"  Permission denied when stopping pid {pid}.")
 
 
 def cmd_search(args) -> None:
@@ -1370,25 +1446,94 @@ def cmd_update_check(args) -> None:
 
 
 def cmd_upgrade(args) -> None:
-    """castor upgrade — upgrade castor to the latest PyPI release."""
+    """castor upgrade — upgrade OpenCastor to the latest version (#554)."""
     import subprocess
     import sys
+    from pathlib import Path
+
+    import castor
 
     verbose = getattr(args, "verbose", False)
-    pip_cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "opencastor"]
+    check_only = getattr(args, "check_only", False)
+    venv = getattr(args, "venv", None)
+
+    print(f"  Current version: {castor.__version__}")
+
+    # Detect git install
+    repo = Path(__file__).parent.parent
+    is_git = (repo / ".git").exists()
+
+    if check_only:
+        if is_git:
+            result = subprocess.run(
+                ["git", "fetch", "origin", "main", "--dry-run"],
+                cwd=repo,
+                capture_output=True,
+                text=True,
+            )
+            print(f"  Repo: {repo}")
+            result2 = subprocess.run(
+                ["git", "log", "HEAD..origin/main", "--oneline"],
+                cwd=repo,
+                capture_output=True,
+                text=True,
+            )
+            commits = result2.stdout.strip()
+            if commits:
+                print(f"  Pending commits:\n{commits}")
+            else:
+                print("  Already up to date.")
+        else:
+            print("  Not a git install — check PyPI for latest version.")
+        return
+
+    if is_git:
+        print("  Pulling latest from origin/main...")
+        pull = subprocess.run(
+            ["git", "pull", "origin", "main"],
+            cwd=repo,
+            capture_output=not verbose,
+            text=True,
+        )
+        if pull.returncode != 0:
+            print(f"  git pull failed: {pull.stderr}")
+            return
+        if verbose and pull.stdout:
+            print(pull.stdout)
+
+    python = (venv.rstrip("/") + "/bin/python") if venv else sys.executable
+    pip_cmd = [python, "-m", "pip", "install", "-e", str(repo)]
     if verbose:
         pip_cmd.append("-v")
-    result = subprocess.run(pip_cmd)
-    if result.returncode == 0:
-        print("  Upgrade complete. Running health check...")
-        from castor.doctor import print_report, run_all_checks
-
-        print_report(run_all_checks())
     else:
-        msg = "  Upgrade failed."
-        if not verbose:
-            msg += " Re-run with --verbose for details."
-        print(msg)
+        pip_cmd.append("-q")
+
+    print(f"  Installing with: {python}")
+    result = subprocess.run(pip_cmd, capture_output=not verbose)
+    if result.returncode != 0:
+        print("  Upgrade failed. Re-run with --verbose for details.")
+        return
+
+    # Restart services (best-effort)
+    subprocess.run(
+        ["systemctl", "--user", "restart", "castor-gateway.service"],
+        capture_output=True,
+    )
+    subprocess.run(
+        ["systemctl", "--user", "restart", "castor-dashboard.service"],
+        capture_output=True,
+    )
+
+    # Reload to get new version string
+    import importlib
+
+    try:
+        importlib.reload(castor)
+    except Exception:
+        pass
+
+    print(f"  Upgraded to: {castor.__version__}")
+    print("  Run 'castor doctor' to verify.")
 
 
 def cmd_validate(args) -> None:
@@ -2701,8 +2846,17 @@ def main() -> None:
     p_migrate.add_argument("--dry-run", action="store_true", help="Show changes without modifying")
 
     # castor upgrade
-    p_upgrade = sub.add_parser("upgrade", help="Upgrade OpenCastor and run health check")
+    p_upgrade = sub.add_parser("upgrade", help="Upgrade OpenCastor to latest version")
     p_upgrade.add_argument("--verbose", "-v", action="store_true", help="Show pip output")
+    p_upgrade.add_argument(
+        "--check",
+        action="store_true",
+        dest="check_only",
+        help="Show available updates without upgrading",
+    )
+    p_upgrade.add_argument(
+        "--venv", default=None, metavar="PATH", help="Path to venv (default: current Python)"
+    )
 
     # castor install-service
     p_svc = sub.add_parser(
@@ -3470,6 +3624,20 @@ def main() -> None:
         default=True,
         help="Print suggested RCAN config snippets (default: true)",
     )
+    p_scan.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Force fresh scan, bypass TTL cache",
+    )
+    p_scan.add_argument(
+        "--preset-only",
+        action="store_true",
+        dest="preset_only",
+        help="Only print suggested preset name + confidence",
+    )
+
+    # castor stop — send SIGTERM to running gateway (#556)
+    sub.add_parser("stop", help="Stop the running gateway (reads ~/.opencastor/gateway.pid)")
 
     # castor daemon — systemd auto-start service management
     p_daemon = sub.add_parser(
@@ -3764,6 +3932,7 @@ def main() -> None:
         "flash": cmd_flash,
         "hub": cmd_hub,
         "scan": cmd_scan,
+        "stop": cmd_stop,
         "daemon": cmd_daemon,
         "deploy": cmd_deploy,
         # Issue #348

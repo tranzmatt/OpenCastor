@@ -16,10 +16,19 @@ import os
 import socket
 import subprocess
 import sys
+import time as _time
+
+# Suppress libcamera / picamera2 noise before any camera-related imports (#558)
+os.environ.setdefault("LIBCAMERA_LOG_LEVELS", "*:FATAL")
 
 # Module-level cache for lsusb output — avoids running lsusb multiple times
 # per detect_hardware() call. Reset by invalidate_usb_descriptors_cache().
 _USB_DESCRIPTORS_CACHE: list | None = None
+
+# Module-level TTL cache for detect_hardware() result (#553)
+_HARDWARE_CACHE: dict | None = None
+_HARDWARE_CACHE_TS: float = 0.0
+_HARDWARE_CACHE_TTL: float = 30.0
 
 logger = logging.getLogger("OpenCastor.HardwareDetect")
 
@@ -243,21 +252,49 @@ def invalidate_usb_descriptors_cache() -> None:
     _USB_DESCRIPTORS_CACHE = None
 
 
+def invalidate_hardware_cache() -> None:
+    """Clear the detect_hardware() result cache and the lsusb sub-cache (#553)."""
+    global _HARDWARE_CACHE, _HARDWARE_CACHE_TS
+    _HARDWARE_CACHE = None
+    _HARDWARE_CACHE_TS = 0.0
+    invalidate_usb_descriptors_cache()
+
+
+def _get_v4l2_device_name(dev_entry: str) -> str | None:
+    """Read device name from /sys/class/video4linux/{entry}/name (#552).
+
+    Args:
+        dev_entry: Bare device name, e.g. ``"video0"``.
+
+    Returns:
+        Human-readable device name string, or ``None`` if not readable.
+    """
+    path = f"/sys/class/video4linux/{dev_entry}/name"
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
 def scan_cameras() -> list:
     """Detect available camera devices.
 
     Returns:
-        List of dicts: ``{"type": "csi"|"usb", "device": str, "accessible": bool}``.
+        List of dicts: ``{"type": "csi"|"usb", "device": str, "accessible": bool,
+        "name": str|None}``.
     """
     cameras = []
 
     for entry in sorted(os.listdir("/dev")) if os.path.isdir("/dev") else []:
         if entry.startswith("video"):
+            device_path = f"/dev/{entry}"
             cameras.append(
                 {
                     "type": "usb",
-                    "device": f"/dev/{entry}",
-                    "accessible": os.access(f"/dev/{entry}", os.R_OK),
+                    "device": device_path,
+                    "accessible": os.access(device_path, os.R_OK),
+                    "name": _get_v4l2_device_name(entry),
                 }
             )
 
@@ -358,12 +395,13 @@ def detect_oakd_usb() -> list:
     if results:
         return results
 
-    # lsusb fallback
+    # lsusb fallback — normalise to lowercase so hex case doesn't matter (#546)
     lines = _scan_lsusb_for_vid("03e7")
     for ln in lines:
+        ln_lower = ln.lower()
         for key, model in KNOWN_OAKD_DEVICES.items():
             vid_pid_spaced = key.replace(":", " ")
-            if vid_pid_spaced in ln or key in ln:
+            if vid_pid_spaced in ln_lower or key in ln_lower:
                 results.append({"port": "usb", "vid_pid": key, "model": model})
 
     if results:
@@ -692,33 +730,9 @@ def detect_reachy_network(timeout: float = 2.0) -> list:
 # ---------------------------------------------------------------------------
 
 
-def detect_hardware() -> dict:
-    """Run all hardware scans and return a combined result dict.
-
-    Returns::
-
-        {
-            "i2c_devices": [...],
-            "usb_serial": [...],
-            "usb_descriptors": [...],
-            "cameras": [...],
-            "platform": "rpi"|"jetson"|"generic",
-            "realsense": [...],
-            "oakd": [...],
-            "odrive": [...],
-            "vesc": [...],
-            "feetech": [...],
-            "arduino": [...],
-            "circuitpython": [...],
-            "dynamixel": [...],
-            "lidar": [...],
-            "hailo": [...],
-            "coral": [...],
-            "imx500": [...],
-            "reachy": [...],
-        }
-    """
-    result = {
+def _run_all_detectors() -> dict:
+    """Execute all hardware scans and return a combined result dict (uncached)."""
+    return {
         "i2c_devices": scan_i2c(),
         "usb_serial": scan_usb_serial(),
         "usb_descriptors": scan_usb_descriptors(),
@@ -738,6 +752,41 @@ def detect_hardware() -> dict:
         "imx500": detect_imx500_camera(),
         "reachy": detect_reachy_network(),
     }
+
+
+def detect_hardware(refresh: bool = False) -> dict:
+    """Run all hardware scans and return a combined result dict.
+
+    Results are cached for :data:`_HARDWARE_CACHE_TTL` seconds (30 s by default).
+    Pass ``refresh=True`` to force a fresh scan and reset both this cache and
+    the lsusb sub-cache.
+
+    Returns::
+
+        {
+            "i2c_devices": [...],
+            "usb_serial": [...],
+            "usb_descriptors": [...],
+            "cameras": [...],
+            "platform": "rpi"|"jetson"|"generic",
+            "realsense": [...],
+            "oakd": [...],
+            ...
+        }
+    """
+    global _HARDWARE_CACHE, _HARDWARE_CACHE_TS
+    now = _time.monotonic()
+    if (
+        not refresh
+        and _HARDWARE_CACHE is not None
+        and (now - _HARDWARE_CACHE_TS) < _HARDWARE_CACHE_TTL
+    ):
+        return _HARDWARE_CACHE
+    if refresh:
+        invalidate_usb_descriptors_cache()
+    result = _run_all_detectors()
+    _HARDWARE_CACHE = result
+    _HARDWARE_CACHE_TS = _time.monotonic()
     return result
 
 
@@ -991,3 +1040,42 @@ def print_scan_results(hw: dict, colors_class=None):
                 print(f"    {item}")
 
     print()
+
+
+# ---------------------------------------------------------------------------
+# suggest_extras (#555)
+# ---------------------------------------------------------------------------
+
+#: Maps detected hardware keys to pip packages that may be needed.
+_HARDWARE_EXTRAS: dict = {
+    "oakd": ["depthai"],
+    "reachy": ["reachy2-sdk", "zeroconf"],
+    "feetech": ["feetech-servo-sdk"],
+    "dynamixel": ["dynamixel-sdk"],
+    "hailo": ["hailo-platform"],
+    "coral": ["tflite-runtime"],
+    "realsense": ["pyrealsense2"],
+    "circuitpython": ["adafruit-circuitpython-bundle"],
+    "arduino": [],  # no extra needed — standard serial
+}
+
+
+def suggest_extras(hw: dict) -> list[str]:
+    """Return pip package suggestions for detected hardware that are not yet importable.
+
+    Args:
+        hw: Result dict from :func:`detect_hardware`.
+
+    Returns:
+        Ordered, deduplicated list of pip install strings, e.g. ``["depthai"]``.
+    """
+    suggestions: list[str] = []
+    for hw_key, packages in _HARDWARE_EXTRAS.items():
+        if hw.get(hw_key):
+            for pkg in packages:
+                import_name = pkg.replace("-", "_").split("[")[0]
+                try:
+                    __import__(import_name)
+                except ImportError:
+                    suggestions.append(pkg)
+    return list(dict.fromkeys(suggestions))  # deduplicate, preserve order
