@@ -6,6 +6,35 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.12.0] — 2026-03-11
+
+### Added
+- `castor scan` CLI subcommand — detects connected hardware, prints full scan results with optional `--json`, `--refresh`, `--preset-only` flags (#547)
+- `castor doctor` now checks hardware dependencies — warns on missing optional packages for detected devices (depthai for OAK-D, reachy2-sdk, etc.) (#548)
+- `castor upgrade` enhanced — git pull + pip install -e + systemd service restart, `--check` (preview pending commits) and `--venv PATH` flags (#554)
+- `castor stop` command — reads `~/.opencastor/gateway.pid`, sends SIGTERM for clean shutdown (#556)
+- Gateway PID file (`~/.opencastor/gateway.pid`) + port-in-use detection on startup (#556)
+- `detect_hardware()` 30-second TTL cache + `invalidate_hardware_cache()` helper (#553)
+- `scan_cameras()` enriches each `/dev/videoN` entry with v4l2 device name from sysfs (#552)
+- `suggest_extras(hw)` maps detected hardware keys to missing pip packages (#555)
+- `/api/hardware/scan` now returns full `detect_hardware()` output + `suggest_preset()` result; supports `?refresh=true` (#543)
+- `/api/status` now includes `version` field (#545)
+- `docs/install/upgrade.md` — comprehensive upgrade guide: Pi OS PEP 668, `--system-site-packages`, systemd service migration, troubleshooting (#557)
+
+### Fixed
+- `scservo-sdk>=1.0` renamed to `feetech-servo-sdk` in `[lerobot]` optional dep group — package now exists on PyPI (#544)
+- OAK-D SR (VID/PID `03e7:f63b`) lsusb output normalized to lowercase before model name lookup — no longer misdetected as bootloader/lite (#546)
+- Systemd service templates now use `python -m castor.cli gateway` (not hardcoded `castor` binary path) — survives venv migrations (#549)
+- Dashboard service template uses `python -m streamlit run` (not `streamlit` binary) — works with `--system-site-packages` venvs (#550)
+- Systemd services now include `KillMode=control-group`, `TimeoutStopSec=15`, `SendSIGKILL=yes`, `ExecStartPre` port cleanup (#551)
+- `LIBCAMERA_LOG_LEVELS=*:FATAL` set at `hardware_detect.py` import time — suppresses noisy libcamera stderr during scans (#558)
+
+### Tests
+- 12 new tests for OAK-D SR detection (#546), TTL cache (#553), v4l2 device name (#552), `suggest_extras()` (#555)
+- 342 tests passing total; 0 ruff lint issues
+
+---
+
 ## [2026.3.11.0] - 2026-03-11
 
 ### Added
