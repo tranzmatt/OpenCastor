@@ -291,10 +291,21 @@ castor token --role operator        # issue JWT
 
 Full reference: [`docs/claude/cli-reference.md`](docs/claude/cli-reference.md)
 
-## What's New in v2026.3.11.0
+## What's New in v2026.3.12.0
 
-### 🔌 v2026.3.11.0 — Plug-and-Play Hardware Detection
-12+ hardware types auto-detected on `castor scan`: RealSense, OAK-D, ODrive, VESC, Hailo-8, Coral TPU, Arduino, CircuitPython, Dynamixel, RPLidar, Reachy, and more. New drivers for Feetech STS3215 servos (SO-ARM101) and Pollen Robotics Reachy. LeRobot RCAN profiles included. `port: auto` wiring across all major drivers.
+### 🔧 v2026.3.12.0 — Install DX
+
+- **`castor scan`** — hardware scan CLI with `--json` / `--refresh` / `--preset-only`
+- **`castor doctor` hardware checks** — warns if depthai, reachy2-sdk, etc. are missing for detected hardware
+- **`castor upgrade`** — git pull + pip install + service restart in one command; `castor stop` for clean shutdown
+- **Gateway hardening** — PID file, port-in-use detection, `KillMode=control-group` in systemd services
+- **`/api/hardware/scan`** wired to full `detect_hardware()` output with caching and `?refresh=true`
+- **Venv-agnostic systemd** — service templates now use `python -m castor.cli` and `python -m streamlit`
+- **`feetech-servo-sdk`** — fixed PyPI package name for LeRobot servo support
+- **OAK-D SR detection fix** — PID `f63b` now correctly identified as "Luxonis OAK-D SR"
+- **[Upgrade guide](docs/install/upgrade.md)** — Pi OS PEP 668, `--system-site-packages`, migration docs
+
+> Previous: [v2026.3.11.0](CHANGELOG.md#20263110--2026-03-11) — Hardware Auto-Detection, LeRobot & Reachy support
 
 ### Previous: v2026.3.10.1
 
