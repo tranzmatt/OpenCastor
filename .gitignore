@@ -25,3 +25,4 @@ bob.rcan.yaml
 alex.rcan.yaml
 9.rcan.yaml
 .worktrees/
+config/swarm.yaml
