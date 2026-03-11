@@ -1,5 +1,5 @@
 """
-OpenCastor Profiles -- manage named config profiles.
+OpenCastor Profiles -- manage named config profiles and load hardware presets.
 
 Switch between pre-saved .rcan.yaml configs without remembering file paths.
 Profiles are symlinks or copies in ``~/.opencastor/profiles/``.
@@ -9,16 +9,30 @@ Usage:
     castor profile save indoor --config robot.rcan.yaml  # Save a profile
     castor profile use indoor                     # Activate a profile
     castor profile remove indoor                  # Delete a profile
+
+Hardware presets (read-only, bundled with OpenCastor)::
+
+    from castor.profiles import load_profile
+    cfg = load_profile("hlabs/acb-single")  # returns dict
 """
+
+from __future__ import annotations
 
 import logging
 import os
+import pathlib
 import shutil
+from typing import Optional
+
+import yaml
 
 logger = logging.getLogger("OpenCastor.Profiles")
 
 _PROFILES_DIR = os.path.expanduser("~/.opencastor/profiles")
 _ACTIVE_FILE = os.path.expanduser("~/.opencastor/active-profile")
+
+# Root directory containing bundled hardware profile YAML files
+_PRESETS_ROOT = pathlib.Path(__file__).parent
 
 
 def _ensure_dir():
@@ -110,7 +124,7 @@ def remove_profile(name: str) -> bool:
     return False
 
 
-def get_active_profile() -> str:
+def get_active_profile() -> Optional[str]:
     """Get the name of the currently active profile, or None."""
     try:
         if os.path.exists(_ACTIVE_FILE):
@@ -166,3 +180,36 @@ def print_profiles(profiles: list):
         if active:
             print(f"\n  Active: {active}")
         print()
+
+
+def load_profile(name: str) -> dict:
+    """Load a bundled hardware profile by name.
+
+    Profiles are YAML files stored under ``castor/profiles/``.
+
+    Args:
+        name: Profile path relative to the profiles directory, without the
+              ``.yaml`` extension.  E.g. ``"hlabs/acb-single"``.
+
+    Returns:
+        Parsed YAML dict.
+
+    Raises:
+        FileNotFoundError: If the profile YAML does not exist.
+        ValueError:        If ``name`` contains path traversal components.
+    """
+    # Safety: reject names that look like path traversal
+    if ".." in name or name.startswith("/"):
+        raise ValueError(f"Invalid profile name: {name!r}")
+
+    yaml_path = _PRESETS_ROOT / f"{name}.yaml"
+    if not yaml_path.exists():
+        raise FileNotFoundError(f"Hardware profile not found: {name!r} (looked at {yaml_path})")
+
+    with open(yaml_path) as fh:
+        data = yaml.safe_load(fh)
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Profile {name!r} did not parse to a dict")
+
+    return data
