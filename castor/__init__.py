@@ -5,6 +5,6 @@ try:
 
     __version__ = _pkg_version("opencastor")
 except Exception:
-    __version__ = "2026.3.10.1"  # fallback
+    __version__ = "2026.3.11.0"  # fallback
 
 __all__ = ["__version__"]
