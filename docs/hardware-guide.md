@@ -6,17 +6,53 @@
 
 ---
 
-## 🔍 Peripheral Auto-Detection
+## 🔍 Auto-Detection (v2026.3.11.0+)
 
-Before reading further, try the automatic peripheral scanner:
+OpenCastor can identify 12+ hardware types automatically — no manual port config needed.
 
 ```bash
 castor scan
 ```
 
-OpenCastor will detect USB cameras, depth cameras (OAK-D, RealSense), NPU accelerators
-(Hailo-8, Coral), LiDAR sensors, I²C devices (PCA9685, MPU-6050), serial devices
-(Arduino, STM32), and more — then suggest the right RCAN config snippets for each.
+`castor scan` detects USB cameras, depth cameras (OAK-D, RealSense), NPU accelerators (Hailo-8, Coral), LiDAR sensors, I²C devices (PCA9685, MPU-6050, BNO055), serial devices (Arduino, Dynamixel U2D2, Feetech CH340), Pollen Robotics Reachy robots (mDNS), and more — then suggests the matching RCAN profile.
+
+**Full documentation:** [docs/hardware/auto-detect.md](hardware/auto-detect.md)
+
+---
+
+## Supported Platforms
+
+### Feetech STS3215 (SO-ARM101 / LeRobot)
+
+6-DOF serial bus servo arm used in the Hugging Face SO-ARM101 LeRobot kit.
+
+```yaml
+drivers:
+- id: arm
+  protocol: feetech
+  port: auto
+  baudrate: 1000000
+  servo_ids: [1, 2, 3, 4, 5, 6]
+```
+
+Install: `pip install opencastor[lerobot]` · Guide: [docs/hardware/lerobot-kits.md](hardware/lerobot-kits.md)
+
+### Pollen Robotics Reachy 2 / Reachy Mini
+
+Full-size and desktop humanoid robots. `host: auto` uses mDNS to discover `reachy.local` / `reachy-mini.local`.
+
+```yaml
+drivers:
+- id: reachy
+  protocol: reachy
+  host: auto
+```
+
+Install: `pip install opencastor[reachy]` · Guide: [docs/hardware/reachy.md](hardware/reachy.md)
+
+---
+
+## 🔍 Peripheral Auto-Detection (Legacy)
 
 See the **[Peripheral Guide](peripherals.md)** for full documentation on every supported
 hardware category, wiring tips, driver installation, and how to add support for new
