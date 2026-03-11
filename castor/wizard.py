@@ -2192,6 +2192,130 @@ def _print_manual_registration_url(
     )
 
 
+def _acb_onboarding_flow(detected_ports: list) -> dict:
+    """Interactive ACB hardware onboarding wizard step.
+
+    Guides the user through configuring detected ACB joints and returns a
+    partial RCAN ``drivers`` config dict.
+
+    Args:
+        detected_ports: List of detected ACB serial port strings.
+
+    Returns:
+        Partial RCAN config dict with ``drivers`` key, or empty dict if skipped.
+    """
+    print(f"\n{Colors.GREEN}--- HLabs ACB v2.0 HARDWARE SETUP ---{Colors.ENDC}")
+
+    if not detected_ports:
+        print(f"  {Colors.WARNING}No ACB devices detected via USB.{Colors.ENDC}")
+        setup = input_default("Set up ACB in CAN bus mode instead?", "N").strip().lower()
+        if setup not in ("y", "yes"):
+            return {}
+        transport = "can"
+        ports_or_nodes: list = []
+    else:
+        print(f"  {Colors.GREEN}Detected ACB device(s):{Colors.ENDC}")
+        for p in detected_ports:
+            print(f"    {p}")
+        transport = "usb"
+        ports_or_nodes = list(detected_ports)
+
+    n_joints_str = input_default("How many ACB joints to configure?", "1").strip()
+    try:
+        n_joints = int(n_joints_str)
+    except ValueError:
+        n_joints = 1
+
+    _PID_DEFAULTS = {
+        "vel_p": 0.25,
+        "vel_i": 1.0,
+        "vel_d": 0.0,
+        "pos_p": 20.0,
+        "pos_i": 1.0,
+        "pos_d": 0.0,
+        "curr_p": 0.5,
+        "curr_i": 0.1,
+        "curr_d": 0.001,
+    }
+    _CONTROL_MODES = ["velocity", "position", "torque", "voltage"]
+
+    driver_entries = []
+    for idx in range(n_joints):
+        print(f"\n  {Colors.BOLD}Joint {idx + 1} of {n_joints}{Colors.ENDC}")
+        default_id = (
+            ports_or_nodes[idx].split("/")[-1] if idx < len(ports_or_nodes) else f"motor_{idx}"
+        )
+        joint_id = input_default("  Joint ID", default_id).strip() or default_id
+        pole_pairs = int(input_default("  Pole pairs", "7").strip() or "7")
+
+        print(f"  Control modes: {', '.join(_CONTROL_MODES)}")
+        ctrl_mode = input_default("  Control mode", "velocity").strip().lower()
+        if ctrl_mode not in _CONTROL_MODES:
+            ctrl_mode = "velocity"
+
+        use_pid_defaults = input_default("  Use HLabs 7PP PID defaults?", "Y").strip().lower()
+        if use_pid_defaults in ("y", "yes", ""):
+            pid = dict(_PID_DEFAULTS)
+        else:
+            pid = {}
+            for key, default_val in _PID_DEFAULTS.items():
+                val_str = input_default(f"    {key}", str(default_val)).strip()
+                try:
+                    pid[key] = float(val_str)
+                except ValueError:
+                    pid[key] = default_val
+
+        entry: dict = {
+            "id": joint_id,
+            "protocol": "acb",
+            "pole_pairs": pole_pairs,
+            "control_mode": ctrl_mode,
+            "pid": pid,
+        }
+
+        if transport == "usb":
+            port = ports_or_nodes[idx] if idx < len(ports_or_nodes) else "auto"
+            entry["port"] = port
+        else:
+            entry["transport"] = "can"
+            entry["can_interface"] = input_default("  CAN interface", "socketcan").strip()
+            entry["can_channel"] = input_default("  CAN channel", "can0").strip()
+            entry["can_node_id"] = int(
+                input_default("  CAN node ID", str(idx + 1)).strip() or str(idx + 1)
+            )
+
+        driver_entries.append(entry)
+
+    # Suggest profile based on joint count
+    profile_map = {1: "hlabs/acb-single", 3: "hlabs/acb-arm-3dof", 6: "hlabs/acb-biped-6dof"}
+    suggested_profile = profile_map.get(n_joints)
+    if suggested_profile:
+        print(f"\n  {Colors.GREEN}Suggested profile:{Colors.ENDC} {suggested_profile}")
+
+    # Optional boot calibration
+    do_calibrate = (
+        input_default("  Run calibration now (requires connected hardware)?", "N").strip().lower()
+    )
+    if do_calibrate in ("y", "yes") and driver_entries:
+        print("  Starting calibration...")
+        try:
+            from castor.drivers.acb_driver import AcbDriver
+
+            for entry in driver_entries:
+                drv = AcbDriver(entry)
+                result = drv.calibrate()
+                status = "OK" if result.success else f"FAILED: {result.error}"
+                print(f"    {entry['id']}: {status}")
+                drv.close()
+        except Exception as exc:
+            print(f"  Calibration error: {exc}")
+
+    config: dict = {"drivers": driver_entries}
+    if suggested_profile:
+        config["profile"] = suggested_profile
+    return config
+
+
 def choose_hardware():
     """Select hardware kit, with optional auto-detection."""
     print(f"\n{Colors.GREEN}--- HARDWARE KIT ---{Colors.ENDC}")
@@ -2790,6 +2914,31 @@ def main():
         # Merge embedding interpreter config
         if embedding_config:
             rcan_data.update(embedding_config)
+
+        # Step 12c: HLabs ACB onboarding (if ACB detected)
+        try:
+            from castor.hardware_detect import detect_acb_usb
+
+            acb_ports = detect_acb_usb()
+            if acb_ports:
+                print(
+                    f"\n  {Colors.GREEN}HLabs ACB device(s) detected!{Colors.ENDC}"
+                    f"  ({', '.join(acb_ports)})"
+                )
+            offer_acb = (
+                input_default("Set up HLabs ACB hardware?", "Y" if acb_ports else "N")
+                .strip()
+                .lower()
+            )
+            if offer_acb in ("y", "yes"):
+                acb_config = _acb_onboarding_flow(acb_ports)
+                if acb_config.get("drivers"):
+                    rcan_data.setdefault("drivers", [])
+                    rcan_data["drivers"].extend(acb_config["drivers"])
+                if acb_config.get("profile"):
+                    rcan_data["profile"] = acb_config["profile"]
+        except Exception:
+            pass  # Never block wizard progress
     else:
         # -- Advanced Path (legacy) --
         agent_config = choose_provider()
