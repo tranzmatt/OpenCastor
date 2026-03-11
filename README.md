@@ -291,7 +291,12 @@ castor token --role operator        # issue JWT
 
 Full reference: [`docs/claude/cli-reference.md`](docs/claude/cli-reference.md)
 
-## What's New in v2026.3.10.1
+## What's New in v2026.3.11.0
+
+### 🔌 v2026.3.11.0 — Plug-and-Play Hardware Detection
+12+ hardware types auto-detected on `castor scan`: RealSense, OAK-D, ODrive, VESC, Hailo-8, Coral TPU, Arduino, CircuitPython, Dynamixel, RPLidar, Reachy, and more. New drivers for Feetech STS3215 servos (SO-ARM101) and Pollen Robotics Reachy. LeRobot RCAN profiles included. `port: auto` wiring across all major drivers.
+
+### Previous: v2026.3.10.1
 
 - **EmbeddingInterpreter** — local-first multimodal semantic perception with CLIP/SigLIP2 (Tier 0, free default, no API key), ImageBind/CLAP (Tier 1, experimental), or Gemini Embedding 2 (Tier 2, 3072-dim MRL). Builds a persistent episode vector store at `~/.opencastor/episodes/` and injects RAG context into TieredBrain pre/post hooks so robots recognize familiar patterns across sessions. Prometheus metrics (`opencastor_embedding_*`), Streamlit Embedding tab, and benchmark suite included.
 - **HLabs ACB v2.0 hardware support** — first-class driver for the HLaboratories Actuator Control Board v2.0 (STM32G474, 3-phase BLDC, 12V–30V, 40A). USB-C serial + CAN Bus (1Mbit/s, 11-bit ARB ID) dual transport; `port: auto` VID/PID auto-detection; motor calibration flow (pole pairs → zero electrical angle → PID); real-time encoder telemetry at 50Hz; firmware flash via DFU mode (`castor flash`); three RCAN profiles (`hlabs/acb-single`, `hlabs/acb-arm-3dof`, `hlabs/acb-biped-6dof`). Install with `pip install opencastor[hlabs]`.
