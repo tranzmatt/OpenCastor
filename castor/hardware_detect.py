@@ -21,6 +21,13 @@ import time as _time
 # Suppress libcamera / picamera2 noise before any camera-related imports (#558)
 os.environ.setdefault("LIBCAMERA_LOG_LEVELS", "*:FATAL")
 
+try:
+    import smbus2 as _smbus2_mod  # noqa: F401
+
+    HAS_SMBUS = True
+except ImportError:
+    HAS_SMBUS = False
+
 # Module-level cache for lsusb output — avoids running lsusb multiple times
 # per detect_hardware() call. Reset by invalidate_usb_descriptors_cache().
 _USB_DESCRIPTORS_CACHE: list | None = None
@@ -88,7 +95,8 @@ KNOWN_FEETECH_DEVICES: dict = {
 
 #: Dynamixel U2D2 and OpenCR/OpenCM boards.
 KNOWN_DYNAMIXEL_DEVICES: dict = {
-    "0403:6014": "Dynamixel U2D2 (FT232H)",
+    "0403:6014": "Dynamixel U2D2 (FT232R)",  # Standard U2D2
+    "0403:6015": "Dynamixel U2D2-H (FT232H)",  # High-speed U2D2-H
     "16d0:0c17": "Robotis OpenCM 9.04",
     "0483:5740": "Robotis OpenCR 1.0",
 }
@@ -103,10 +111,15 @@ KNOWN_ODRIVE_DEVICES: dict = {
 #: LiDAR USB adapters (RPLidar, YDLIDAR, Hokuyo, Sick).
 KNOWN_LIDAR_DEVICES: dict = {
     "10c4:ea60": "RPLidar/YDLIDAR (CP2102) — probe baud to disambiguate",
-    "0483:5740": "YDLIDAR T15 (STM32)",
+    "0483:5740": "YDLIDAR T15 / RPLidar S3 (STM32 VCP)",  # shared VID/PID; see detect_rplidar_usb()
     "15d1:0000": "Hokuyo URG",
     "19a2:5343": "Sick TIM571",
 }
+
+#: VID/PID pairs associated with RPLidar / YDLIDAR USB adapters.
+_LIDAR_CP2102_VID_PID = (0x10C4, 0xEA60)  # Slamtec / YDLIDAR CP2102
+_LIDAR_STM32_VID_PID = (0x0483, 0x5740)  # STM32 VCP (newer RPLidar / YDLIDAR T15)
+_LIDAR_VID_PIDS: frozenset = frozenset({_LIDAR_CP2102_VID_PID, _LIDAR_STM32_VID_PID})
 
 #: I2C address → device name/type mapping for enriched scan output.
 I2C_DEVICE_MAP: dict = {
@@ -191,6 +204,85 @@ def scan_i2c() -> list:
                             pass
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
+
+    return devices
+
+
+def detect_i2c_devices() -> list:
+    """Scan I2C buses for attached devices using smbus2 (preferred) or sysfs parsing.
+
+    Uses :data:`I2C_DEVICE_MAP` to enrich found addresses with human-readable names.
+
+    .. note::
+        When using smbus2, only addresses in :data:`I2C_DEVICE_MAP` are probed.
+        For a full 0x03–0x77 sweep, use :func:`scan_i2c` (requires ``i2cdetect``).
+
+    Returns:
+        List of dicts: ``{"bus": int, "address": str, "device_name": str}``.
+        Returns ``[]`` on non-Linux platforms or when no I2C buses are found.
+    """
+    if sys.platform != "linux":
+        return []
+
+    devices: list = []
+
+    # Collect available bus numbers from /dev/i2c-*
+    i2c_buses: list = []
+    dev_dir = "/dev"
+    if os.path.isdir(dev_dir):
+        for entry in os.listdir(dev_dir):
+            if entry.startswith("i2c-"):
+                try:
+                    i2c_buses.append(int(entry.split("-")[1]))
+                except (ValueError, IndexError):
+                    pass
+
+    if HAS_SMBUS:
+        import smbus2  # noqa: PLC0415
+
+        for bus_num in sorted(i2c_buses):
+            for addr_hex, info in I2C_DEVICE_MAP.items():
+                addr_int = int(addr_hex, 16)
+                try:
+                    with smbus2.SMBus(bus_num) as bus:
+                        bus.read_byte(addr_int)
+                    devices.append(
+                        {
+                            "bus": bus_num,
+                            "address": addr_hex,
+                            "device_name": info.get("name", "unknown"),
+                        }
+                    )
+                    logger.debug(
+                        "I2C device found: bus=%d addr=%s (%s)",
+                        bus_num,
+                        addr_hex,
+                        info.get("name"),
+                    )
+                except OSError:
+                    pass  # No ACK — device not present
+    else:
+        # Fallback: parse /sys/bus/i2c/devices/ directory names (format: "BUS-ADDR")
+        sys_i2c = "/sys/bus/i2c/devices"
+        if os.path.isdir(sys_i2c):
+            for entry in os.listdir(sys_i2c):
+                parts = entry.split("-")
+                if len(parts) != 2:
+                    continue
+                try:
+                    bus_num = int(parts[0])
+                    addr_int = int(parts[1], 16)
+                    addr_hex = f"0x{addr_int:02x}"
+                    info = I2C_DEVICE_MAP.get(addr_hex, {})
+                    devices.append(
+                        {
+                            "bus": bus_num,
+                            "address": addr_hex,
+                            "device_name": info.get("name", "unknown"),
+                        }
+                    )
+                except (ValueError, IndexError):
+                    pass
 
     return devices
 
@@ -548,6 +640,49 @@ def detect_lidar_usb() -> list:
     return _match_vid_pid_table(KNOWN_LIDAR_DEVICES)
 
 
+def detect_rplidar_usb() -> dict:
+    """Detect RPLidar and YDLIDAR USB adapters, distinguishing model by product string.
+
+    Covers:
+    - CP2102 (VID 0x10C4 / PID 0xEA60) — used by both Slamtec RPLidar and YDLIDAR.
+    - STM32 VCP (VID 0x0483 / PID 0x5740) — used by newer RPLidar and YDLIDAR T15.
+
+    Disambiguation heuristic: product/description string containing ``"YDLIDAR"`` →
+    ydlidar; ``"RPLIDAR"`` or ``"SLAMTEC"`` → rplidar; anything else → unknown_lidar.
+
+    Returns:
+        Dict: ``{"detected": bool, "model": "rplidar"|"ydlidar"|"unknown_lidar"}``.
+        ``detected`` is ``False`` and ``model`` is ``None`` when nothing matches.
+    """
+    for port_info in _list_usb_ports_with_vidpid():
+        vid = getattr(port_info, "vid", None)
+        pid = getattr(port_info, "pid", None)
+        if (vid, pid) not in _LIDAR_VID_PIDS:
+            continue
+        combined = (
+            (getattr(port_info, "description", "") or "")
+            + (getattr(port_info, "product", "") or "")
+            + (getattr(port_info, "manufacturer", "") or "")
+        ).upper()
+        if "YDLIDAR" in combined:
+            model = "ydlidar"
+        elif "RPLIDAR" in combined or "SLAMTEC" in combined:
+            model = "rplidar"
+        else:
+            model = "unknown_lidar"
+        logger.info("LiDAR detected: %s on %s", model, port_info.device)
+        return {"detected": True, "model": model}
+
+    # lsusb fallback — no product string available, classify as unknown_lidar
+    lines = scan_usb_descriptors()
+    for ln in lines:
+        if "10c4:ea60" in ln or "0483:5740" in ln:
+            logger.info("LiDAR detected via lsusb (model unknown): %s", ln)
+            return {"detected": True, "model": "unknown_lidar"}
+
+    return {"detected": False, "model": None}
+
+
 def detect_hailo() -> list:
     """Detect Hailo-8 NPU via ``/dev/hailo0``, ``lspci``, or the ``hailo`` Python package.
 
@@ -655,6 +790,87 @@ def detect_imx500_camera() -> list:
     return found
 
 
+def detect_rpi_ai_camera() -> dict:
+    """Detect Raspberry Pi AI Camera (Sony IMX500) via libcamera and sysfs.
+
+    Detection strategy (in priority order):
+
+    1. Run ``libcamera-hello --list-cameras`` (timeout 3 s) — parse stdout for "imx500".
+    2. Read ``/proc/device-tree/model`` — check for "imx500" mention.
+    3. Scan ``/sys/class/video4linux/`` device name files for "imx500".
+
+    NPU firmware is considered active when ``/lib/firmware/imx500/`` exists.
+
+    Returns:
+        Dict: ``{"detected": bool, "model": "imx500", "npu": bool}``.
+    """
+    detected = False
+    npu = os.path.isdir("/lib/firmware/imx500")
+
+    # 1. libcamera-hello
+    try:
+        proc = subprocess.run(
+            ["libcamera-hello", "--list-cameras"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if proc.returncode == 0 and "imx500" in proc.stdout.lower():
+            detected = True
+            logger.info("RPi AI Camera (IMX500) detected via libcamera-hello")
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+
+    # 2. device-tree model
+    if not detected:
+        try:
+            content = _read_device_tree_model().lower()
+            if "imx500" in content:
+                detected = True
+                logger.info("RPi AI Camera (IMX500) detected via device-tree model")
+        except (FileNotFoundError, PermissionError):
+            pass
+
+    # 3. /sys/class/video4linux/
+    if not detected:
+        v4l_dir = "/sys/class/video4linux"
+        if os.path.isdir(v4l_dir):
+            for entry in os.listdir(v4l_dir):
+                name = _get_v4l2_device_name(entry) or ""
+                if "imx500" in name.lower():
+                    detected = True
+                    logger.info(
+                        "RPi AI Camera (IMX500) detected via /sys/class/video4linux/%s", entry
+                    )
+                    break
+
+    return {"detected": detected, "model": "imx500", "npu": npu}
+
+
+def detect_lerobot_hardware() -> dict:
+    """Detect LeRobot-compatible hardware (Feetech SO-ARM101 / ALOHA).
+
+    Heuristic:
+    - Feetech servo board must be detected (via :func:`detect_feetech_usb`).
+    - At least one ``/dev/ttyUSB*`` or ``/dev/ttyACM*`` port must exist.
+    - Two or more serial ports → ALOHA profile (dual arm); one → SO-ARM101.
+
+    Returns:
+        Dict: ``{"compatible": bool, "profile": "so_arm101"|"aloha"|None}``.
+    """
+    feetech_ports = detect_feetech_usb()
+    if not feetech_ports:
+        return {"compatible": False, "profile": None}
+
+    serial_ports = scan_usb_serial()
+    if not serial_ports:
+        return {"compatible": False, "profile": None}
+
+    profile = "aloha" if len(serial_ports) >= 2 else "so_arm101"
+    logger.info("LeRobot hardware detected: profile=%s, ports=%s", profile, serial_ports)
+    return {"compatible": True, "profile": profile}
+
+
 def detect_reachy_network(timeout: float = 2.0) -> list:
     """Detect Pollen Robotics Reachy 2 / Reachy Mini via mDNS or hostname resolution.
 
@@ -734,6 +950,7 @@ def _run_all_detectors() -> dict:
     """Execute all hardware scans and return a combined result dict (uncached)."""
     return {
         "i2c_devices": scan_i2c(),
+        "i2c": detect_i2c_devices(),
         "usb_serial": scan_usb_serial(),
         "usb_descriptors": scan_usb_descriptors(),
         "cameras": scan_cameras(),
@@ -747,10 +964,13 @@ def _run_all_detectors() -> dict:
         "circuitpython": detect_circuitpython_usb(),
         "dynamixel": detect_dynamixel_usb(),
         "lidar": detect_lidar_usb(),
+        "rplidar": detect_rplidar_usb(),
         "hailo": detect_hailo(),
         "coral": detect_coral(),
         "imx500": detect_imx500_camera(),
+        "rpi_ai_camera": detect_rpi_ai_camera(),
         "reachy": detect_reachy_network(),
+        "lerobot": detect_lerobot_hardware(),
     }
 
 
@@ -913,10 +1133,13 @@ def suggest_preset(hw: dict) -> tuple:
             "Feetech servo board detected (SO-ARM101 candidate)",
         )
 
-    # ── Dynamixel U2D2 / Koch arm ─────────────────────────────────────────
+    # ── Dynamixel U2D2 ───────────────────────────────────────────────────
     if hw.get("dynamixel"):
+        vp = hw["dynamixel"][0].get("vid_pid", "")
         port = hw["dynamixel"][0].get("port", "unknown")
-        return "lerobot/koch-arm", "high", f"Dynamixel U2D2 on {port}"
+        if vp in ("0403:6014", "0403:6015"):
+            return "dynamixel_arm", "high", f"Dynamixel U2D2 on {port}"
+        return "lerobot/koch-arm", "high", f"Dynamixel controller on {port}"
 
     # ── Luxonis OAK-D ─────────────────────────────────────────────────────
     if hw.get("oakd"):
@@ -941,6 +1164,12 @@ def suggest_preset(hw: dict) -> tuple:
     # ── Coral TPU ─────────────────────────────────────────────────────────
     if hw.get("coral"):
         return "coral/tpu-inference", "high", "Coral Edge TPU detected"
+
+    # ── LiDAR ─────────────────────────────────────────────────────────────
+    rplidar_result = hw.get("rplidar")
+    if isinstance(rplidar_result, dict) and rplidar_result.get("detected"):
+        model = rplidar_result.get("model", "unknown_lidar")
+        return "lidar_navigation", "high", f"LiDAR detected: {model}"
 
     # ── Arduino ───────────────────────────────────────────────────────────
     if hw.get("arduino"):
@@ -1078,4 +1307,50 @@ def suggest_extras(hw: dict) -> list[str]:
                     __import__(import_name)
                 except ImportError:
                     suggestions.append(pkg)
+
+    # ── rplidar / ydlidar: package name depends on detected model ──────────
+    rplidar_result = hw.get("rplidar")
+    if isinstance(rplidar_result, dict) and rplidar_result.get("detected"):
+        model = rplidar_result.get("model", "unknown_lidar")
+        if model == "ydlidar":
+            pkg = "ydlidar"
+        elif model == "rplidar":
+            pkg = "rplidar"
+        else:
+            pkg = None  # unknown_lidar — cannot determine package safely
+        if pkg:
+            try:
+                __import__(pkg)
+            except ImportError:
+                if pkg not in suggestions:
+                    suggestions.append(pkg)
+
+    # ── i2c_devices: smbus2 ────────────────────────────────────────────────
+    if hw.get("i2c"):
+        if not HAS_SMBUS and "smbus2" not in suggestions:
+            suggestions.append("smbus2")
+
+    # ── rpi_ai_camera: picamera2 ───────────────────────────────────────────
+    rpi_cam = hw.get("rpi_ai_camera")
+    if isinstance(rpi_cam, dict) and rpi_cam.get("detected"):
+        try:
+            __import__("picamera2")
+        except ImportError:
+            if "picamera2" not in suggestions:
+                suggestions.append("picamera2")
+
+    # ── lerobot ────────────────────────────────────────────────────────────
+    lerobot_result = hw.get("lerobot")
+    if isinstance(lerobot_result, dict) and lerobot_result.get("compatible"):
+        for pkg, import_name in [
+            ("gym-pusht", "gym_pusht"),
+            ("gym-aloha", "gym_aloha"),
+            ("feetech-servo-sdk", "feetech_servo_sdk"),
+        ]:
+            try:
+                __import__(import_name)
+            except ImportError:
+                if pkg not in suggestions:
+                    suggestions.append(pkg)
+
     return list(dict.fromkeys(suggestions))  # deduplicate, preserve order
