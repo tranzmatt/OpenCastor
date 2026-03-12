@@ -6,7 +6,7 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
-## [2026.3.14.0] — 2026-03-11
+## [2026.3.12.0] — 2026-03-12
 
 ### Added
 - **#537** Dynamixel U2D2-H explicit VID/PID (`0x0403:0x6015`) + `suggest_preset()` returns `dynamixel_arm` for U2D2 VID/PIDs
@@ -17,7 +17,26 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
-## [2026.3.12.0] — 2026-03-11
+## [2026.3.11.2] — 2026-03-11
+
+### Security
+- `Depends(verify_token)` added to all 12 `/setup/api/*` wizard routes (#561)
+- Wizard JS `getAuthHeaders()` helper; `GET /setup` injects `window.__OC_TOKEN` server-side (#561)
+- SHA-256 checksum verification before DFU firmware flash (#562)
+- `GET /api/metrics` now requires auth (#563)
+- CORS default changed from `*` to `localhost:8501,127.0.0.1:8501` (#564)
+- `?token=` query param now logs deprecation warning (#565)
+- `hmac.compare_digest()` for constant-time token comparison (#566)
+- GitHub Actions pinned to commit SHA throughout (#567)
+- `StrictHostKeyChecking=no` → `accept-new` in deploy command (#568)
+- HMAC-SHA256 verification for Teams/Matrix webhooks (#569)
+- `requirements.lock` pinned lockfile added (#570)
+- `/health` endpoint stripped to `{status, uptime_s, version}` only; sensitive state moved to `/api/health/detail` (auth required) (#571)
+- `/api/behavior/status` → `{running}` only; detail at `/api/behavior/status/detail` (auth) (#572)
+
+---
+
+## [2026.3.11.1] — 2026-03-11
 
 ### Added
 - `castor scan` CLI subcommand — detects connected hardware, prints full scan results with optional `--json`, `--refresh`, `--preset-only` flags (#547)
