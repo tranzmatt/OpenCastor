@@ -10,7 +10,7 @@
   <a href="https://github.com/craigm26/OpenCastor/actions"><img src="https://img.shields.io/github/actions/workflow/status/craigm26/OpenCastor/ci.yml?label=CI" alt="CI"></a>
   <a href="https://github.com/craigm26/OpenCastor/blob/main/LICENSE"><img src="https://img.shields.io/github/license/craigm26/OpenCastor?color=green" alt="License"></a>
   <a href="https://pypi.org/project/opencastor/"><img src="https://img.shields.io/pypi/pyversions/opencastor" alt="Python"></a>
-  <a href="https://discord.gg/jMjA8B26Bq"><img src="https://img.shields.io/discord/1234567890?label=Discord&color=5865F2" alt="Discord"></a>
+  <a href="https://discord.gg/jMjA8B26Bq"><img src="https://img.shields.io/discord/1473117064020627567?label=Discord&color=5865F2&logo=discord" alt="Discord"></a>
   <a href="./sbom/"><img src="https://img.shields.io/badge/SBOM-CycloneDX-blue" alt="SBOM"></a>
 </p>
 
@@ -217,16 +217,43 @@ provider_fallback:
 
 ## Supported Hardware
 
+Run `castor scan` — OpenCastor auto-detects connected hardware by USB VID/PID, I2C address, V4L2, libcamera, and `/dev` entries. No manual config needed for supported kits.
+
+### LeRobot / Hugging Face Arms
+
+| Kit | Notes | Install |
+|---|---|---|
+| **LeRobot SO-ARM101** | 6-DOF serial bus servo arm. Auto-detected via CH340 USB adapter (`castor scan`). RCAN profiles for follower, leader, and bimanual. | `pip install opencastor[lerobot]` |
+| **Koch arm** | Similar Feetech servo architecture, same detection path | `pip install opencastor[lerobot]` |
+| **ALOHA / bimanual** | Dual SO-ARM101 leader+follower. `castor scan` detects both ports and suggests bimanual preset. | `pip install opencastor[lerobot]` |
+
+**Quickstart for SO-ARM101:**
+```bash
+pip install opencastor[lerobot]
+castor scan                          # auto-detects arm on /dev/ttyUSB0 or /dev/ttyACM0
+castor wizard --preset so_arm101     # guided config: follower / leader / bimanual
+castor gateway --config so_arm101.rcan.yaml
+```
+
+The SO-ARM101 uses Feetech STS3215 servos over a Waveshare Serial Bus Servo Driver Board. `castor scan` identifies it by USB VID `0x1A86` / PID `0x7523` (CH340 chip) and counts how many boards are connected to suggest the right preset (single arm vs bimanual pair).
+
+### Other Supported Hardware
+
 | Kit | Price | Preset |
 |---|---|---|
 | Waveshare AlphaBot / JetBot | ~$45 | `waveshare_alpha.rcan.yaml` |
 | Adeept RaspTank / DarkPaw | ~$55 | `adeept_generic.rcan.yaml` |
 | SunFounder PiCar-X | ~$60 | `sunfounder_picar.rcan.yaml` |
 | Robotis Dynamixel (X-Series) | Varies | `dynamixel_arm.rcan.yaml` |
+| Pollen Robotics Reachy 2 | — | `reachy2.rcan.yaml` |
+| HLabs ACB v2.0 (BLDC) | — | `hlabs/acb-single.rcan.yaml` |
 | LEGO Mindstorms EV3 / SPIKE Prime | $30–150 used | `lego_mindstorms_ev3.rcan.yaml` |
 | Arduino + L298N (DIY) | ~$8–15 | `arduino_l298n.rcan.yaml` |
 | ESP32 + Motor Driver (DIY) | ~$6–12 | `esp32_generic.rcan.yaml` |
-| OAK-4 Pro + Depth + IMU | ~$150 | `oak4_pro.rcan.yaml` |
+| OAK-D / OAK-4 Pro | ~$150 | `oak4_pro.rcan.yaml` |
+| RPLidar / YDLIDAR | Varies | `castor wizard` |
+| Intel RealSense D435/D455/L515 | Varies | `castor wizard` |
+| Google Coral USB / Hailo-8 | Varies | `castor wizard` |
 | DIY (any) | Any | `castor wizard` |
 
 18 presets total in `config/presets/`. OpenCastor explicitly supports second-hand hardware — donated school kits, eBay finds, makerspace bins. If you found it at Goodwill, there's probably a preset for it.
@@ -293,16 +320,23 @@ Full reference: [`docs/claude/cli-reference.md`](docs/claude/cli-reference.md)
 
 ## What's New in v2026.3.12.0
 
-### 🔧 v2026.3.12.0 — Install DX
+### 🔌 v2026.3.12.0 — Smarter Hardware Detection
+
+Five new hardware detectors and an expanded I2C lookup table:
+
+- **Dynamixel U2D2** — explicit VID `0x0403`/PID `0x6014` detection; `suggest_preset("dynamixel_arm")`
+- **RPLidar vs YDLIDAR** — differentiated by USB product string; STM32 path added
+- **Raspberry Pi AI Camera** — libcamera + sysfs detection, IMX500 NPU firmware state check
+- **LeRobot SO-ARM101 profiles** — Feetech board count → suggests follower / leader / bimanual preset automatically
+- **I2C sensor table** — expanded to VL53L1X, SSD1306, ADS1115, BME280, LSM6DSO, HMC5883L, QMC5883L
+
+### 🔧 v2026.3.11.1 — Install DX
 
 - **`castor scan`** — hardware scan CLI with `--json` / `--refresh` / `--preset-only`
 - **`castor doctor` hardware checks** — warns if depthai, reachy2-sdk, etc. are missing for detected hardware
 - **`castor upgrade`** — git pull + pip install + service restart in one command; `castor stop` for clean shutdown
 - **Gateway hardening** — PID file, port-in-use detection, `KillMode=control-group` in systemd services
-- **`/api/hardware/scan`** wired to full `detect_hardware()` output with caching and `?refresh=true`
 - **Venv-agnostic systemd** — service templates now use `python -m castor.cli` and `python -m streamlit`
-- **`feetech-servo-sdk`** — fixed PyPI package name for LeRobot servo support
-- **OAK-D SR detection fix** — PID `f63b` now correctly identified as "Luxonis OAK-D SR"
 - **[Upgrade guide](docs/install/upgrade.md)** — Pi OS PEP 668, `--system-site-packages`, migration docs
 
 > Previous: [v2026.3.11.0](CHANGELOG.md#20263110--2026-03-11) — Hardware Auto-Detection, LeRobot & Reachy support
