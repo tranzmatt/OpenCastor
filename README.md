@@ -36,21 +36,19 @@ castor gateway         # start the API gateway + messaging
 The wizard detects your hardware and selects a stack profile automatically:
 
 <!-- SETUP_CATALOG:BEGIN -->
-| Profile | Best for | Requires |
+| Profile | Description | Requires |
 |---|---|---|
-| `apple_native` | **Mac with Apple Silicon (M1–M4)** — runs models on-device via Apple's Foundation Models framework. No API key needed. | macOS 26+ (Tahoe), Apple Silicon |
-| `mlx_local_vision` | Mac with Apple Silicon — open-source models via MLX (Llama, Mistral, Qwen). Faster and more model choice than `apple_native`. | macOS, Apple Silicon, `pip install opencastor[mlx]` |
-| `ollama_universal_local` | Any machine — runs local models via Ollama. Works on Mac, Linux, and Windows. Slower than MLX on Apple Silicon. | [Ollama](https://ollama.com) installed |
+| `apple_native` | Mac with Apple Silicon (M1–M4) — runs models on-device via Apple Foundation Models. No API key needed. | macOS, Apple Silicon |
+| `mlx_local_vision` | Mac with Apple Silicon — open-source models via MLX (Llama, Mistral, Qwen). More model choice than apple_native. | macOS, Apple Silicon |
+| `ollama_universal_local` | Any machine — runs local models via Ollama. Works on Mac, Linux, and Windows. | [Ollama](https://ollama.com) installed |
 
 **On Apple Silicon, `apple_native` is the default.** The wizard will ask which Apple model profile fits your use case:
 
-| Apple Model Profile | Use case | Guardrails |
+| Apple Profile | Use case | Guardrails |
 |---|---|---|
-| `apple-balanced` ⭐ | General chat and robot commands — best starting point | Default (safe) |
-| `apple-creative` | Creative tasks, less restrictive output | Permissive |
-| `apple-tagging` | Classifying or labeling objects/scenes | Default (safe) |
-
-When in doubt, pick `apple-balanced`. You can change profiles anytime by re-running `castor wizard`.
+| `apple-balanced` ⭐ | General chat and robot commands — best starting point | Default |
+| `apple-creative` | Creative tasks, less restrictive output | Permissive Content Transformations |
+| `apple-tagging` | Classifying or labeling objects/scenes | Default |
 <!-- SETUP_CATALOG:END -->
 
 ## Docker Quickstart

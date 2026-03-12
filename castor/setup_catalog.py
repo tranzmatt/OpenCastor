@@ -322,7 +322,7 @@ _MODELS: Dict[str, List[Dict[str, Any]]] = {
         {
             "id": "apple-balanced",
             "label": "Apple Balanced",
-            "desc": "General model with default guardrails",
+            "desc": "General chat and robot commands — best starting point",
             "tags": ["on-device", "recommended"],
             "recommended": True,
             "apple_use_case": "GENERAL",
@@ -331,7 +331,7 @@ _MODELS: Dict[str, List[Dict[str, Any]]] = {
         {
             "id": "apple-creative",
             "label": "Apple Creative",
-            "desc": "General model with permissive transformations",
+            "desc": "Creative tasks, less restrictive output",
             "tags": ["on-device", "creative"],
             "apple_use_case": "GENERAL",
             "apple_guardrails": "PERMISSIVE_CONTENT_TRANSFORMATIONS",
@@ -339,7 +339,7 @@ _MODELS: Dict[str, List[Dict[str, Any]]] = {
         {
             "id": "apple-tagging",
             "label": "Apple Tagging",
-            "desc": "Content tagging use-case with default guardrails",
+            "desc": "Classifying or labeling objects/scenes",
             "tags": ["on-device", "classification"],
             "apple_use_case": "CONTENT_TAGGING",
             "apple_guardrails": "DEFAULT",
@@ -451,7 +451,7 @@ _STACK_PROFILES: List[StackProfile] = [
     StackProfile(
         id="apple_native",
         label="Apple Native (Recommended on eligible Mac)",
-        desc="On-device Apple Foundation Models with profile presets",
+        desc="Mac with Apple Silicon (M1–M4) — runs models on-device via Apple Foundation Models. No API key needed.",
         provider="apple",
         model_profile_id="apple-balanced",
         local=True,
@@ -461,7 +461,7 @@ _STACK_PROFILES: List[StackProfile] = [
     StackProfile(
         id="mlx_local_vision",
         label="MLX Local Vision",
-        desc="Apple Silicon local inference with MLX vision model",
+        desc="Mac with Apple Silicon — open-source models via MLX (Llama, Mistral, Qwen). More model choice than apple_native.",
         provider="mlx",
         model_profile_id="mlx-community/Qwen2.5-VL-7B-Instruct-4bit",
         local=True,
@@ -471,7 +471,7 @@ _STACK_PROFILES: List[StackProfile] = [
     StackProfile(
         id="ollama_universal_local",
         label="Ollama Universal Local",
-        desc="Cross-platform local stack with Ollama",
+        desc="Any machine — runs local models via Ollama. Works on Mac, Linux, and Windows.",
         provider="ollama",
         model_profile_id="llava:13b",
         local=True,

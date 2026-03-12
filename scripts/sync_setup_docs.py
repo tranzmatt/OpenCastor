@@ -41,14 +41,27 @@ def _build_readme_block() -> str:
     apples = get_model_profiles("apple")
 
     lines = []
+    lines.append("| Profile | Description | Requires |")
+    lines.append("|---|---|---|")
     for stack in stacks:
-        lines.append(f"- `{stack.id}` — {stack.label}")
+        requires_parts = []
+        if "macos" in stack.compatibility and "arm64" in stack.compatibility:
+            requires_parts.append("macOS, Apple Silicon")
+        if not requires_parts:
+            requires_parts.append("[Ollama](https://ollama.com) installed" if "ollama" in stack.id else "—")
+        requires = ", ".join(requires_parts)
+        lines.append(f"| `{stack.id}` | {stack.desc} | {requires} |")
 
     lines.append("")
-    lines.append("| Apple Profile | Meaning |")
-    lines.append("|---|---|")
+    lines.append("**On Apple Silicon, `apple_native` is the default.** The wizard will ask which Apple model profile fits your use case:")
+    lines.append("")
+    lines.append("| Apple Profile | Use case | Guardrails |")
+    lines.append("|---|---|---|")
     for profile in apples:
-        lines.append(f"| `{profile.id}` | {profile.label} |")
+        use_case = (profile.apple_use_case or "GENERAL").replace("_", " ").title()
+        guardrails = (profile.apple_guardrails or "DEFAULT").replace("_", " ").title()
+        recommended = " ⭐" if profile.recommended else ""
+        lines.append(f"| `{profile.id}`{recommended} | {profile.desc} | {guardrails} |")
     return "\n".join(lines)
 
 
