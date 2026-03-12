@@ -12,7 +12,9 @@ within that section.
 """
 
 from castor.rcan.capabilities import Capability, CapabilityRegistry
+from castor.rcan.invoke import InvokeRequest, InvokeResult, SkillRegistry
 from castor.rcan.message import MessageType, Priority, RCANMessage
+from castor.rcan import telemetry_fields
 from castor.rcan.rbac import CapabilityBroker, CapabilityLease, RCANPrincipal, RCANRole, Scope
 from castor.rcan.router import MessageRouter
 from castor.rcan.ruri import RURI
@@ -45,6 +47,12 @@ __all__ = [
     "CapabilityRegistry",
     # Routing
     "MessageRouter",
+    # §19 INVOKE
+    "InvokeRequest",
+    "InvokeResult",
+    "SkillRegistry",
+    # §20 Telemetry fields
+    "telemetry_fields",
     # SDK Bridge (rcan-py interoperability)
     "ruri_to_robot_uri",
     "robot_uri_to_ruri",

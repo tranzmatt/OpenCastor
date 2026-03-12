@@ -14,6 +14,13 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 - **#539** `detect_rplidar_usb()` distinguishes RPLidar from YDLIDAR by product string; model-specific `suggest_extras`; `suggest_preset()` → `lidar_navigation`
 - **#540** `detect_rpi_ai_camera()` via `libcamera-hello` + device-tree + v4l sysfs; NPU firmware check at `/lib/firmware/imx500/`; `suggest_extras()` → `picamera2`
 - **#541** `detect_lerobot_hardware()` for SO-ARM101/ALOHA profiles; `[lerobot]` extra gains `gym-pusht` and `gym-aloha`
+- §19 INVOKE/INVOKE_RESULT message types (`castor.rcan.invoke`)
+  - `InvokeRequest`, `InvokeResult` dataclasses
+  - `SkillRegistry` for registering and dispatching named skills/behaviors
+- §20 standard telemetry field name constants (`castor.rcan.telemetry_fields`)
+  - 40+ standard field names for joints, pose, power, compute, sensors, safety
+### Changed
+- `SPEC_VERSION` bumped from `"1.2"` to `"1.3"`
 
 ---
 
