@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/opencastor-logo.png" alt="OpenCastor" width="200"/>
+  <img src="brnad/icon-192.png" alt="OpenCastor" width="200"/>
 </p>
 
 <h1 align="center">OpenCastor</h1>
