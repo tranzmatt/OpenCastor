@@ -6,6 +6,13 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.12.8] — 2026-03-12
+
+### Fixed
+- `fleet_telemetry.py`: health probe exceptions now logged at `WARNING` level (with robot name) instead of silently swallowed via `DEBUG`. Fixes invisible fleet connectivity failures in production. (#602)
+
+---
+
 ## [2026.3.12.7] — 2026-03-12
 
 ### Fixed
