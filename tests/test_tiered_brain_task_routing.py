@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -37,7 +37,7 @@ class TestSensorPollSkipsPlanner:
         planner = _make_provider()
         brain, fast = _brain(planner=planner)
 
-        result = brain.think(b"", "check battery level", task_category="sensor_poll")
+        brain.think(b"", "check battery level", task_category="sensor_poll")
 
         planner.think.assert_not_called()
         fast.think.assert_called_once()
@@ -48,7 +48,7 @@ class TestSensorPollSkipsPlanner:
         brain, fast = _brain(planner=planner, config={"tiered_brain": {"planner_interval": 1}})
 
         # Tick 1 would normally trigger planner (interval=1)
-        result = brain.think(b"", "poll range sensor", task_category="sensor_poll")
+        brain.think(b"", "poll range sensor", task_category="sensor_poll")
 
         planner.think.assert_not_called()
 
@@ -56,16 +56,23 @@ class TestSensorPollSkipsPlanner:
 class TestReasoningForcesPlanner:
     """High-complexity task categories should force planner execution."""
 
-    @pytest.mark.parametrize("category", [
-        "reasoning", "code", "safety", "vision", "search",
-    ])
+    @pytest.mark.parametrize(
+        "category",
+        [
+            "reasoning",
+            "code",
+            "safety",
+            "vision",
+            "search",
+        ],
+    )
     def test_prefers_planner_when_available(self, category):
         planner = _make_provider(text="planner response")
         brain, fast = _brain(planner=planner)
         # Ensure we're NOT on a periodic interval tick
         brain.tick_count = 999  # won't hit any interval
 
-        result = brain.think(b"", "complex task", task_category=category)
+        brain.think(b"", "complex task", task_category=category)
 
         planner.think.assert_called_once()
 
@@ -83,9 +90,19 @@ class TestReasoningForcesPlanner:
 class TestFallbackWhenPlannerNone:
     """When no planner is configured, all categories fall back to fast provider."""
 
-    @pytest.mark.parametrize("category", [
-        "sensor_poll", "navigation", "reasoning", "code", "safety", "vision", "search", None,
-    ])
+    @pytest.mark.parametrize(
+        "category",
+        [
+            "sensor_poll",
+            "navigation",
+            "reasoning",
+            "code",
+            "safety",
+            "vision",
+            "search",
+            None,
+        ],
+    )
     def test_falls_back_to_fast_without_planner(self, category):
         brain, fast = _brain(planner=None)
 
@@ -141,7 +158,7 @@ class TestNavigationDefaultBehaviour:
         brain, fast = _brain(planner=planner, config={"tiered_brain": {"planner_interval": 5}})
 
         # Run 5 ticks, only tick 5 should trigger planner
-        for i in range(4):
+        for _ in range(4):
             brain.think(b"", "navigate", task_category="navigation")
         assert planner.think.call_count == 0
 

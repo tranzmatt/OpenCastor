@@ -28,14 +28,17 @@ from .providers.task_router import TaskCategory, TaskRouter
 logger = logging.getLogger("OpenCastor.TieredBrain")
 
 # Task categories that should ALWAYS skip the planner (cheap/fast tier only)
-_FAST_ONLY_CATEGORIES: frozenset[TaskCategory] = frozenset(
-    {TaskCategory.SENSOR_POLL}
-)
+_FAST_ONLY_CATEGORIES: frozenset[TaskCategory] = frozenset({TaskCategory.SENSOR_POLL})
 
 # Task categories that should PREFER the planner when available
 _PREFER_PLANNER_CATEGORIES: frozenset[TaskCategory] = frozenset(
-    {TaskCategory.REASONING, TaskCategory.CODE, TaskCategory.SAFETY,
-     TaskCategory.VISION, TaskCategory.SEARCH}
+    {
+        TaskCategory.REASONING,
+        TaskCategory.CODE,
+        TaskCategory.SAFETY,
+        TaskCategory.VISION,
+        TaskCategory.SEARCH,
+    }
 )
 
 
@@ -187,7 +190,9 @@ class TieredBrain:
         # Task-aware routing (issue #612): optional TaskRouter for category-based dispatch.
         # If a task_routing block exists in RCAN config, honour it; else use defaults.
         routing_table = config.get("task_routing", {})
-        self.task_router: TaskRouter = task_router or TaskRouter(routing_table=routing_table or None)
+        self.task_router: TaskRouter = task_router or TaskRouter(
+            routing_table=routing_table or None
+        )
 
         # Planner runs every N ticks (0 = never auto-run)
         self.planner_interval = config.get("tiered_brain", {}).get("planner_interval", 10)
@@ -317,13 +322,14 @@ class TieredBrain:
         # Task-category overrides: SENSOR_POLL skips planner; high-complexity categories force it.
         if _resolved_category in _FAST_ONLY_CATEGORIES:
             # Cheap tasks: never escalate to planner regardless of interval or uncertainty
-            logger.debug("TieredBrain: task_category=%s → fast-only, skipping planner",
-                         _resolved_category.value if _resolved_category else None)
+            logger.debug(
+                "TieredBrain: task_category=%s → fast-only, skipping planner",
+                _resolved_category.value if _resolved_category else None,
+            )
         elif _resolved_category in _PREFER_PLANNER_CATEGORIES and self.planner:
             # High-complexity tasks: force planner when available
             should_plan = True
-            logger.info("TieredBrain: task_category=%s → forcing planner",
-                        _resolved_category.value)
+            logger.info("TieredBrain: task_category=%s → forcing planner", _resolved_category.value)
         else:
             # Default interval-based logic (covers NAVIGATION, None, unknown)
             if self.planner and self.planner_interval > 0:
