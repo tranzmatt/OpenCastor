@@ -149,12 +149,77 @@
     <div class="container">
       <div class="changelog-timeline">
 
+        <!-- v2026.3.13.8 -->
+        <div class="changelog-release current reveal" id="v2026.3.13.8">
+          <div class="release-header">
+            <span class="release-version">v2026.3.13.8</span>
+            <span class="release-date">March 13, 2026</span>
+            <span class="release-badge-current">Current</span>
+          </div>
+          <div class="release-items">
+            <div class="release-item">
+              <div class="release-item-icon">🧠</div>
+              <div class="release-item-body">
+                <h4>Task-Aware Model Routing</h4>
+                <p><code>castor/providers/task_router.py</code>: selects provider by task category (SENSOR_POLL, NAVIGATION, REASONING, CODE, SEARCH, VISION, SAFETY). SAFETY tier never downgrades. (#612)</p>
+              </div>
+            </div>
+            <div class="release-item">
+              <div class="release-item-icon">🧪</div>
+              <div class="release-item-body">
+                <h4>OpenRouter Provider Test Coverage</h4>
+                <p><code>tests/test_openrouter_provider.py</code>: <code>test_model_name_defaults_when_not_configured</code> pins <code>_DEFAULT_MODEL</code> to <code>anthropic/claude-3.5-sonnet</code>; regressions caught by CI. (#637)</p>
+              </div>
+            </div>
+            <div class="release-item">
+              <div class="release-item-icon">🔧</div>
+              <div class="release-item-body">
+                <h4>Ruff Import Cleanup</h4>
+                <p>Unused imports removed and blank lines normalized across multiple test files.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- v2026.3.13.7 -->
+        <div class="changelog-release reveal" id="v2026.3.13.7">
+          <div class="release-header">
+            <span class="release-version">v2026.3.13.7</span>
+            <span class="release-date">March 13, 2026</span>
+          </div>
+          <div class="release-items">
+            <div class="release-item">
+              <div class="release-item-icon">🔧</div>
+              <div class="release-item-body">
+                <h4>OpenRouter Default Model Updated</h4>
+                <p><code>castor/providers/openrouter_provider.py</code>: <code>_DEFAULT_MODEL</code> updated from <code>anthropic/claude-3.5-haiku</code> to <code>anthropic/claude-3.5-sonnet</code> to align with the current ecosystem-standard model. (#635)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- v2026.3.13.6 -->
+        <div class="changelog-release reveal" id="v2026.3.13.6">
+          <div class="release-header">
+            <span class="release-version">v2026.3.13.6</span>
+            <span class="release-date">March 13, 2026</span>
+          </div>
+          <div class="release-items">
+            <div class="release-item">
+              <div class="release-item-icon">🔒</div>
+              <div class="release-item-body">
+                <h4>RCAN Dependency Constraint Tightened</h4>
+                <p><code>pyproject.toml</code>: <code>rcan</code> dependency constraint tightened from <code>&gt;=0.1.0</code> to <code>&gt;=0.3.0,&lt;1.0</code>. Aligns with minimum SDK version required for RCAN v1.3 §17/§19 features (<code>INVOKE_CANCEL</code>, Ed25519 signing). Applies to core deps and <code>[rcan]</code> extras group. (#634)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- v2026.3.13.5 -->
-        <div class="changelog-release current reveal" id="v2026.3.13.5">
+        <div class="changelog-release reveal" id="v2026.3.13.5">
           <div class="release-header">
             <span class="release-version">v2026.3.13.5</span>
             <span class="release-date">March 13, 2026</span>
-            <span class="release-badge-current">Current</span>
           </div>
           <div class="release-items">
             <div class="release-item">
