@@ -58,7 +58,7 @@ class InvokeResult:
     """INVOKE_RESULT message payload (§19.3)."""
 
     invoke_id: str
-    status: str  # "success" | "error" | "timeout" | "not_found"
+    status: str  # "success" | "failure" | "timeout" | "not_found"
     result: dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
     duration_ms: Optional[float] = None
@@ -165,7 +165,7 @@ class SkillRegistry:
             logger.exception("Skill '%s' raised exception", request.skill)
             return InvokeResult(
                 invoke_id=request.invoke_id,
-                status="error",
+                status="failure",
                 error=str(exc),
                 duration_ms=(time.monotonic() - start) * 1000,
             )

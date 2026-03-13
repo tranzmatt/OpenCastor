@@ -59,7 +59,7 @@ def test_skill_error_handling():
 
     req = InvokeRequest(skill="test.failing", params={})
     result = registry.invoke(req)
-    assert result.status == "error"
+    assert result.status == "failure"
     assert "Something went wrong" in result.error
 
 

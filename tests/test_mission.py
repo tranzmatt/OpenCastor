@@ -25,7 +25,11 @@ def _make_config():
             "wheel_circumference_m": 0.21,
             "turn_time_per_deg_s": 0.011,
             "min_drive_s": 0.0,  # no minimum so tests run instantly
-        }
+        },
+        "rcan_protocol": {
+            "port": 8000,
+            "capabilities": [],
+        },
     }
 
 
