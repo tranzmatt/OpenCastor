@@ -26,10 +26,12 @@ class RegistryMessage:
 
     Attributes:
         msg_id:     Unique message identifier (UUID).
-        rrn:        Robot Registration Number (e.g. ``rrn://example.org/rover-1``).
+        rrn:        Robot Registration Number (e.g. ``RRN-000000000001``).
         ruri:       Robot URI — the reachable endpoint for this robot.
         public_key: PEM-encoded public key for identity verification.
         timestamp:  Unix timestamp of registration request.
+        metadata:   Optional metadata dict (model, serial, manufacturer, firmware,
+                    components list, parent_rrn, etc.).
     """
 
     msg_id: str
@@ -37,18 +39,22 @@ class RegistryMessage:
     ruri: str
     public_key: str
     timestamp: float = field(default_factory=time.time)
+    metadata: dict = field(default_factory=dict)
 
     def to_message(self) -> dict[str, Any]:
         """Serialize to RCAN message format using REGISTRY_REGISTER type."""
+        payload: dict[str, Any] = {
+            "rrn": self.rrn,
+            "ruri": self.ruri,
+            "public_key": self.public_key,
+            "timestamp": self.timestamp,
+        }
+        if self.metadata:
+            payload["metadata"] = self.metadata
         return {
             "type": MessageType.REGISTRY_REGISTER,
             "msg_id": self.msg_id,
-            "payload": {
-                "rrn": self.rrn,
-                "ruri": self.ruri,
-                "public_key": self.public_key,
-                "timestamp": self.timestamp,
-            },
+            "payload": payload,
         }
 
     @classmethod
@@ -73,6 +79,7 @@ class RegistryMessage:
             ruri=payload["ruri"],
             public_key=payload["public_key"],
             timestamp=payload.get("timestamp", time.time()),
+            metadata=payload.get("metadata", {}),
         )
 
 
