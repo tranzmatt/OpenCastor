@@ -6,6 +6,17 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.12.6] — 2026-03-12
+
+### Changed
+- Migrated deprecated `@app.on_event("startup"/"shutdown")` to FastAPI lifespan context manager (`contextlib.asynccontextmanager`). Eliminates deprecation warnings on FastAPI 0.100+. (#596)
+- Updated all test fixtures to stub `app.router.lifespan_context` with a no-op alongside existing `on_startup`/`on_shutdown` clearing, ensuring real hardware/config init is skipped during tests.
+
+### Fixed
+- `InvokeResult.to_message()` docstring incorrectly referenced non-existent §19.4; corrected to §19.3. (#597)
+
+---
+
 ## [2026.3.12.5] — 2026-03-12
 
 ### Fixed
