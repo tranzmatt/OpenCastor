@@ -6,6 +6,16 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.13.3] — 2026-03-13
+
+### Fixed
+- `castor/migrate.py`: implement migration chain `1.0.0-alpha → 1.1 → 1.2 → 1.3`; configs can now be fully migrated to CURRENT_VERSION without hitting an empty path. (#619)
+- `castor/setup_service.py`: default new config template now generates `rcan_version: "1.3"` instead of stale `"1.0.0-alpha"`. (#620)
+- `castor/conformance.py`: fix-hint messages updated to reference `rcan_version: "1.3"`. (#620)
+- `docs/hardware/lerobot-kits.md`, `docs/hardware/reachy.md`: example YAML configs updated to `rcan_version: "1.3"`. (#621)
+
+---
+
 ## [2026.3.13.2] — 2026-03-13
 
 ### Added
