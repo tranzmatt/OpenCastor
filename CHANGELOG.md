@@ -6,6 +6,17 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.13.8] — 2026-03-13
+
+### Added
+- `castor/providers/task_router.py`: task-aware model routing — selects provider by task category (SENSOR_POLL, NAVIGATION, REASONING, CODE, SEARCH, VISION, SAFETY). SAFETY tier never downgrades. (#612)
+- `tests/test_openrouter_provider.py`: `test_model_name_defaults_when_not_configured` — pins `_DEFAULT_MODEL` to `anthropic/claude-3.5-sonnet`; future changes caught by CI. (#637)
+
+### Fixed
+- Ruff import cleanup across multiple test files (unused imports removed, blank lines normalized).
+
+---
+
 ## [2026.3.13.7] — 2026-03-13
 
 ### Changed
