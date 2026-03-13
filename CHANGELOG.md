@@ -6,6 +6,14 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.13.11] — 2026-03-13
+
+### Fixed
+- `castor/rcan/registry.py`: correct docstring terminology from 'Robot Resource Name' to canonical 'Robot Registration Number'; fix RRN example from RURI-style to `RRN-000000000001` format (#645)
+- `.github/workflows/auto-label.yml`: replace broken SHA pin with `actions/labeler@v5` tag to restore PR auto-labelling
+
+---
+
 ## [2026.3.13.10] — 2026-03-13
 
 ### Fixed
