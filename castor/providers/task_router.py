@@ -21,13 +21,13 @@ class TaskCategory(str, Enum):
 # Default category → preferred provider ordered list
 # First available provider in the list wins
 _DEFAULT_ROUTING: dict[TaskCategory, list[str]] = {
-    TaskCategory.SENSOR_POLL: ["ollama", "mlx", "llamacpp", "gemini", "anthropic"],
-    TaskCategory.NAVIGATION: ["anthropic", "gemini", "openai", "ollama"],
-    TaskCategory.REASONING: ["anthropic", "openai", "gemini", "ollama"],
-    TaskCategory.CODE: ["deepseek", "openai", "anthropic", "ollama"],
-    TaskCategory.SEARCH: ["gemini", "anthropic", "openai"],
-    TaskCategory.VISION: ["gemini", "anthropic", "openai"],
-    TaskCategory.SAFETY: ["anthropic", "openai", "gemini"],
+    TaskCategory.SENSOR_POLL: ["ollama", "mlx", "llamacpp", "gemini", "anthropic", "openrouter"],
+    TaskCategory.NAVIGATION: ["anthropic", "gemini", "openai", "openrouter", "ollama"],
+    TaskCategory.REASONING: ["anthropic", "openai", "gemini", "openrouter", "ollama"],
+    TaskCategory.CODE: ["deepseek", "openai", "anthropic", "openrouter", "ollama"],
+    TaskCategory.SEARCH: ["gemini", "anthropic", "openai", "openrouter"],
+    TaskCategory.VISION: ["gemini", "anthropic", "openai", "openrouter"],
+    TaskCategory.SAFETY: ["anthropic", "openai", "gemini", "openrouter"],
 }
 
 
