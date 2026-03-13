@@ -6,6 +6,13 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.13.13] — 2026-03-13
+
+### Fixed
+- `InvokeCancelRequest`: add `cancel_timeout_ms: Optional[int]` field per RCAN §19.4 spec — receiver wait time for graceful abort before force-terminating (default 5000 ms); field was defined in the spec but absent from the dataclass and `to_message()` serializer (#651)
+
+---
+
 ## [2026.3.13.12] — 2026-03-13
 
 ### Changed
