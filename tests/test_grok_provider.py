@@ -1,11 +1,27 @@
 """Tests for GrokProvider (xAI)."""
 
 import os
+import sys
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from castor.providers.grok_provider import GrokProvider
+# ---------------------------------------------------------------------------
+# Minimal openai stub — injected only when the real package is absent so that
+# GrokProvider's lazy ``from openai import OpenAI`` succeeds in unit tests
+# without requiring the optional dependency to be installed.
+# ---------------------------------------------------------------------------
+if "openai" not in sys.modules:
+    _openai_stub = types.ModuleType("openai")
+    _openai_stub.OpenAI = MagicMock(name="OpenAI")
+    _openai_stub.AsyncOpenAI = MagicMock(name="AsyncOpenAI")
+    _openai_stub.APIError = type("APIError", (Exception,), {})
+    _openai_stub.AuthenticationError = type("AuthenticationError", (Exception,), {})
+    _openai_stub.RateLimitError = type("RateLimitError", (Exception,), {})
+    sys.modules["openai"] = _openai_stub
+
+from castor.providers.grok_provider import GrokProvider  # noqa: E402
 
 _CFG = {
     "provider": "grok",
