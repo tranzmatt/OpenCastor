@@ -6,6 +6,14 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.12.7] — 2026-03-12
+
+### Fixed
+- `InvokeResult.status` now returns `"failure"` (instead of `"error"`) on skill exceptions, aligning with §19 spec INVOKE_RESULT status values. (#599)
+- `tests/test_mission.py` `_make_config()` now includes `rcan_protocol` key, preventing brittle `KeyError` under config schema changes. (#598)
+
+---
+
 ## [2026.3.12.6] — 2026-03-12
 
 ### Changed
