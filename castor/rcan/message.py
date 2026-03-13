@@ -6,16 +6,18 @@ Messages are plain JSON (no protobuf) -- readable with ``curl``, zero deps.
 
 Message types follow the RCAN spec::
 
-    DISCOVER     -- mDNS / peer discovery
-    STATUS       -- Telemetry / state reporting
-    COMMAND      -- Motor, config, or action command
-    STREAM       -- Continuous sensor data
-    EVENT        -- Asynchronous notifications
-    HANDOFF      -- Transfer control between principals
-    ACK          -- Acknowledgement of a prior message
-    ERROR        -- Error response
-    AUTHORIZE    -- Out-of-band authorization for HiTL gate (v1.2)
-    PENDING_AUTH -- Notification that HiTL gate is awaiting authorization (v1.2)
+    DISCOVER      -- mDNS / peer discovery
+    STATUS        -- Telemetry / state reporting
+    COMMAND       -- Motor, config, or action command
+    STREAM        -- Continuous sensor data
+    EVENT         -- Asynchronous notifications
+    HANDOFF       -- Transfer control between principals
+    ACK           -- Acknowledgement of a prior message
+    ERROR         -- Error response
+    AUTHORIZE     -- Out-of-band authorization for HiTL gate (v1.2)
+    PENDING_AUTH  -- Notification that HiTL gate is awaiting authorization (v1.2)
+    INVOKE        -- Trigger a named skill/behavior on the robot runtime (v1.3 §19)
+    INVOKE_RESULT -- Result of an INVOKE invocation (v1.3 §19)
 
 Each message carries a priority (LOW, NORMAL, HIGH, SAFETY) that determines
 queue ordering.  SAFETY priority messages skip the queue entirely
@@ -44,6 +46,8 @@ class MessageType(IntEnum):
     ERROR = 8
     AUTHORIZE = 9  # Out-of-band authorization for HiTL gate (RCAN v1.2)
     PENDING_AUTH = 10  # Notification that HiTL gate is awaiting authorization (RCAN v1.2)
+    INVOKE = 11  # Trigger a named skill/behavior on the robot runtime (RCAN v1.3 §19)
+    INVOKE_RESULT = 12  # Result of an INVOKE invocation (RCAN v1.3 §19)
 
 
 class Priority(IntEnum):

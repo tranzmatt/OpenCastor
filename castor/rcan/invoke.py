@@ -15,6 +15,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
 
+from castor.rcan.message import MessageType
+
 logger = logging.getLogger("OpenCastor.RCAN.Invoke")
 
 
@@ -36,7 +38,7 @@ class InvokeRequest:
         backward-compatibility with existing call-sites.
         """
         return {
-            "type": "INVOKE",
+            "type": MessageType.INVOKE,
             "source_ruri": source_ruri,
             "target_ruri": target_ruri,
             "msg_id": self.invoke_id,  # §19.3 — wire field is msg_id
@@ -67,7 +69,7 @@ class InvokeResult:
         RCAN specification, echoing the ``msg_id`` from the originating INVOKE.
         """
         return {
-            "type": "INVOKE_RESULT",
+            "type": MessageType.INVOKE_RESULT,
             "source_ruri": source_ruri,
             "target_ruri": target_ruri,
             "reply_to": self.invoke_id,  # §19.4 — correlates to INVOKE msg_id

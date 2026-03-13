@@ -1,12 +1,22 @@
 """Tests for RCAN §19 INVOKE/INVOKE_RESULT message types."""
+
 import pytest
 from castor.rcan.invoke import InvokeRequest, InvokeResult, SkillRegistry
+from castor.rcan.message import MessageType
+
+
+def test_message_type_enum_invoke_values():
+    """MessageType enum must define INVOKE=11 and INVOKE_RESULT=12 (RCAN v1.3 §19)."""
+    assert MessageType.INVOKE == 11
+    assert MessageType.INVOKE_RESULT == 12
+    assert MessageType["INVOKE"] is MessageType.INVOKE
+    assert MessageType["INVOKE_RESULT"] is MessageType.INVOKE_RESULT
 
 
 def test_invoke_request_to_message():
     req = InvokeRequest(skill="nav.go_to", params={"x": 1.0, "y": 2.0}, invoke_id="test-123")
     msg = req.to_message("rcan://localhost/test/bot/1", "rcan://localhost/test/bot/1")
-    assert msg["type"] == "INVOKE"
+    assert msg["type"] == MessageType.INVOKE
     assert msg["payload"]["skill"] == "nav.go_to"
     assert msg["msg_id"] == "test-123"  # §19.3 — wire field is msg_id
 
@@ -14,7 +24,7 @@ def test_invoke_request_to_message():
 def test_invoke_result_success():
     result = InvokeResult(invoke_id="test-123", status="success", result={"reached": True})
     msg = result.to_message("rcan://localhost/test/bot/1", "rcan://localhost/test/controller/1")
-    assert msg["type"] == "INVOKE_RESULT"
+    assert msg["type"] == MessageType.INVOKE_RESULT
     assert msg["payload"]["status"] == "success"
 
 
