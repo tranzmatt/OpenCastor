@@ -149,12 +149,67 @@
     <div class="container">
       <div class="changelog-timeline">
 
+        <!-- v2026.3.13.5 -->
+        <div class="changelog-release current reveal" id="v2026.3.13.5">
+          <div class="release-header">
+            <span class="release-version">v2026.3.13.5</span>
+            <span class="release-date">March 13, 2026</span>
+            <span class="release-badge-current">Current</span>
+          </div>
+          <div class="release-items">
+            <div class="release-item">
+              <div class="release-item-icon">🔧</div>
+              <div class="release-item-body">
+                <h4>RCAN §21 MessageType Additions</h4>
+                <p><code>castor/rcan/message.py</code>: add <code>REGISTRY_REGISTER_RESULT</code> (wire value 16) and <code>REGISTRY_RESOLVE_RESULT</code> (wire value 17) to <code>MessageType</code> enum per RCAN spec §21. (#631)</p>
+              </div>
+            </div>
+            <div class="release-item">
+              <div class="release-item-icon">🔒</div>
+              <div class="release-item-body">
+                <h4>SDK Compatibility Version Bump</h4>
+                <p><code>castor/rcan/sdk_compat.py</code>: minimum rcan-py version check bumped from <code>&gt;=0.2.0</code> to <code>&gt;=0.3.0</code>. <code>tests/test_compliance.py</code>: fixture updated from <code>"0.1.0"</code> to <code>"0.3.0"</code>. (#630 #632)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- v2026.3.13.4 -->
+        <div class="changelog-release reveal" id="v2026.3.13.4">
+          <div class="release-header">
+            <span class="release-version">v2026.3.13.4</span>
+            <span class="release-date">March 13, 2026</span>
+          </div>
+          <div class="release-items">
+            <div class="release-item">
+              <div class="release-item-icon">🚀</div>
+              <div class="release-item-body">
+                <h4>Deploy Workflow Self-Trigger Fix</h4>
+                <p><code>.github/workflows/deploy-pages.yml</code>: workflow file added to path filter so wrangler-action SHA bumps self-trigger a deploy. (#625)</p>
+              </div>
+            </div>
+            <div class="release-item">
+              <div class="release-item-icon">🗺️</div>
+              <div class="release-item-body">
+                <h4>Sitemap &amp; robots.txt</h4>
+                <p><code>site/sitemap.xml</code> and <code>site/robots.txt</code> added; sitemap covers all 8 top-level pages with change-frequency and priority hints for search crawler discovery. (#627)</p>
+              </div>
+            </div>
+            <div class="release-item">
+              <div class="release-item-icon">🔗</div>
+              <div class="release-item-body">
+                <h4>OG &amp; Twitter Meta Tags</h4>
+                <p>Open Graph and Twitter Card meta tags added to <code>about.html</code>, <code>docs.html</code>, <code>changelog.html</code>, <code>hardware.html</code>, <code>beginners.html</code>, and <code>tutorials.html</code>. Unblocks social link previews. (#626)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- v2026.3.13.3 -->
-        <div class="changelog-release current reveal" id="v2026.3.13.3">
+        <div class="changelog-release reveal" id="v2026.3.13.3">
           <div class="release-header">
             <span class="release-version">v2026.3.13.3</span>
             <span class="release-date">March 13, 2026</span>
-            <span class="release-badge-current">Current</span>
           </div>
           <div class="release-items">
             <div class="release-item">
