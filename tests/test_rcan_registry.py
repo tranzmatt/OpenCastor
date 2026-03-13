@@ -4,12 +4,12 @@ import pytest
 
 from castor.rcan.message import MessageType
 from castor.rcan.registry import (
-    RRNCategory,
     RegistryMessage,
     RegistryRegisterResult,
     RegistryResolveRequest,
     RegistryResolveResponse,
     RegistryResolveResult,
+    RRNCategory,
     _parse_rrn,
     _validate_rrn,
 )
@@ -157,6 +157,7 @@ class TestRegistryResolveResponse:
 
 # ── §21.4 REGISTRY_REGISTER_RESULT ───────────────────────────────────────────
 
+
 class TestRegistryRegisterResultMessageType:
     def test_register_result_enum_value(self):
         assert MessageType.REGISTRY_REGISTER_RESULT == 16
@@ -225,6 +226,7 @@ class TestRegistryRegisterResult:
 
 
 # ── §21.5 REGISTRY_RESOLVE_RESULT ────────────────────────────────────────────
+
 
 class TestRegistryResolveResult:
     def test_found_to_message_type(self):
@@ -319,6 +321,7 @@ class TestRegistryResolveResult:
 
 
 # ── RRN Format Validation ─────────────────────────────────────────────────────
+
 
 class TestRRNValidation:
     # ── Basic format checks ───────────────────────────────────────────────
@@ -416,6 +419,7 @@ class TestRRNValidation:
 
 # ── _parse_rrn ────────────────────────────────────────────────────────────────
 
+
 class TestParseRRN:
     def test_four_segment_full(self):
         result = _parse_rrn("rrn://opencastor.com/robot/v2/unit-001")
@@ -454,6 +458,7 @@ class TestParseRRN:
 
 # ── RRNCategory enum ──────────────────────────────────────────────────────────
 
+
 class TestRRNCategory:
     def test_all_categories_have_string_values(self):
         assert RRNCategory.ROBOT == "robot"
@@ -467,6 +472,7 @@ class TestRRNCategory:
 
 
 # ── RegistryMessage.metadata ──────────────────────────────────────────────────
+
 
 class TestRegistryMessageMetadata:
     def test_metadata_round_trip(self):
@@ -525,6 +531,7 @@ class TestRegistryMessageMetadata:
 
 
 # ── RegistryResolveResponse.from_message ─────────────────────────────────────
+
 
 class TestRegistryResolveResponseFromMessage:
     def test_from_message_round_trip(self):
