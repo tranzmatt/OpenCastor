@@ -2,7 +2,7 @@
 RCAN §21 Robot Registry Framework (RRF) protocol stubs.
 
 Implements REGISTRY_REGISTER and REGISTRY_RESOLVE message types for
-registering robots with the RRF and resolving Robot Resource Names (RRNs)
+registering robots with the RRF and resolving Robot Registration Numbers (RRNs)
 to Robot URIs (RURIs) and associated metadata.
 
 Spec: https://rcan.dev/spec/section-21/
@@ -26,7 +26,7 @@ class RegistryMessage:
 
     Attributes:
         msg_id:     Unique message identifier (UUID).
-        rrn:        Robot Resource Name (e.g. ``rrn://example.org/robots/rover-1``).
+        rrn:        Robot Registration Number (e.g. ``rrn://example.org/rover-1``).
         ruri:       Robot URI — the reachable endpoint for this robot.
         public_key: PEM-encoded public key for identity verification.
         timestamp:  Unix timestamp of registration request.
@@ -83,7 +83,7 @@ class RegistryResolveRequest:
     Sent to the RRF to look up an RRN and retrieve RURI + metadata.
 
     Attributes:
-        rrn:    Robot Resource Name to resolve.
+        rrn:    Robot Registration Number to resolve.
         msg_id: Unique message identifier (UUID).
     """
 
@@ -106,7 +106,7 @@ class RegistryResolveResponse:
     Returned by the RRF with resolved RURI and verification status.
 
     Attributes:
-        rrn:      The Robot Resource Name that was resolved.
+        rrn:      The Robot Registration Number that was resolved.
         ruri:     Resolved Robot URI (reachable endpoint).
         verified: Whether the robot's identity has been cryptographically verified.
         tier:     Service tier (e.g. ``'free'``, ``'pro'``, ``'enterprise'``).
