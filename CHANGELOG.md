@@ -6,6 +6,16 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.13.2] — 2026-03-13
+
+### Added
+- `castor/rcan/invoke.py`: `InvokeCancelRequest` dataclass for INVOKE_CANCEL wire messages (§19.4). `InvokeResult.status` now includes `"cancelled"` variant. `SkillRegistry` gains `cancel(msg_id)` with `threading.Event` tracking for best-effort in-flight cancellation. (#609)
+- `castor/rcan/router.py`: `MessageRouter.route_invoke_cancel()` dispatches INVOKE_CANCEL before capability routing; `InvokeCancelRequest` exported from `castor.rcan`. (#610)
+- `tests/test_rcan_router.py`: `TestInvokeFamily` — 9 tests covering INVOKE routing, INVOKE_CANCEL (found / not-found / missing-msg-id), no-registry error, INVOKE_RESULT type, and routed counter increment. (#611)
+- `castor/config_validation.py`: `"memory"` added to optional top-level config keys (v1.3+ `memory.compaction`).
+
+---
+
 ## [2026.3.13.1] — 2026-03-13
 
 ### Added
