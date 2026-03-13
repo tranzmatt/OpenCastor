@@ -344,7 +344,7 @@ state.offline_fallback.get_active_provider().think(image, instruction)
 
 ### Overview
 
-[RCAN Spec](https://rcan.dev/spec/) — current version 1.1.0.
+[RCAN Spec](https://rcan.dev/spec/) — current version 1.3.
 
 | Component | Description |
 |-----------|-------------|

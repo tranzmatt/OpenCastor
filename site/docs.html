@@ -194,6 +194,7 @@
               <a href="#safety">Safety Modules</a>
               <a href="#cli">CLI Reference</a>
               <a href="#api">API Reference</a>
+              <a href="#skill-invocation">Skill Invocation</a>
               <a href="#docker">Docker</a>
               <a href="#troubleshooting">Troubleshooting</a>
               <a href="/hub">Community Recipes</a>
@@ -1120,6 +1121,67 @@
             -H <span class="s">"Content-Type: application/json"</span> \
             -d <span class="s">'{"action": "nav.goto", "params": {"x": 1.0, "y": 2.5}}'</span></div>
         </div>
+      </div>
+    </section>
+
+    <!-- §19 Skill Invocation -->
+    <section class="section" id="skill-invocation">
+      <div class="container">
+        <div class="section-header center reveal">
+          <p class="section-label">§19 · RCAN v1.3</p>
+          <h2 class="section-title">Skill Invocation</h2>
+          <p class="section-desc">OpenCastor supports RCAN §19 Skill Invocation — structured remote calls
+            from an orchestrator to a robot's registered skills via <code>INVOKE</code>,
+            <code>INVOKE_RESULT</code>, and <code>INVOKE_CANCEL</code> message types.</p>
+        </div>
+
+        <div style="max-width:720px;margin:0 auto;overflow-x:auto" class="reveal">
+          <table class="endpoint-table">
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="method">GET</td>
+                <td>/api/skills</td>
+                <td>List registered skills and their schemas</td>
+              </tr>
+              <tr>
+                <td class="method-post method">POST</td>
+                <td>/api/skills/invoke</td>
+                <td>Invoke a skill (emits RCAN INVOKE; returns INVOKE_RESULT)</td>
+              </tr>
+              <tr>
+                <td class="method-post method">POST</td>
+                <td>/api/skills/invoke/{invocation_id}/cancel</td>
+                <td>Cancel an in-progress skill invocation (INVOKE_CANCEL)</td>
+              </tr>
+              <tr>
+                <td class="method">GET</td>
+                <td>/api/skills/invoke/{invocation_id}</td>
+                <td>Poll invocation status and result</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="code-block reveal" style="max-width:720px;margin:24px auto 0">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div><span class="code-filename">Example — Invoke a skill</span>
+          </div>
+          <div class="code-body"><span class="k">curl</span> -X POST http://localhost:8000/api/skills/invoke \
+            -H <span class="s">"Content-Type: application/json"</span> \
+            -d <span class="s">'{"skill": "navigate_to", "params": {"x": 1.0, "y": 2.5}, "timeout_ms": 5000}'</span></div>
+        </div>
+
+        <p class="reveal" style="max-width:720px;margin:16px auto 0;color:var(--text-secondary);font-size:0.9rem">
+          See <a href="https://rcan.dev/spec/section-19/" style="color:var(--accent)">RCAN §19 Skill Invocation spec</a> for
+          full message-type definitions and flow diagrams.
+        </p>
       </div>
     </section>
 
