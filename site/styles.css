@@ -43,6 +43,46 @@
   --dur: 0.25s;
 }
 
+/* ── Light mode ─────────────────────────────── */
+[data-theme="light"] {
+  --bg: #f8f8fc;
+  --bg-alt: #f0f0f8;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f5f5fd;
+  --surface: #eaeaf8;
+  --text: #0f0f1a;
+  --text-secondary: #4a4a6a;
+  --text-muted: #8a8aaa;
+  --accent: #4f52e0;
+  --accent-hover: #3f42c8;
+  --accent-glow: rgba(79, 82, 224, 0.12);
+  --border: #dcdcee;
+  --border-hover: #c8c8e0;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f8f8fc;
+    --bg-alt: #f0f0f8;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f5f5fd;
+    --surface: #eaeaf8;
+    --text: #0f0f1a;
+    --text-secondary: #4a4a6a;
+    --text-muted: #8a8aaa;
+    --accent: #4f52e0;
+    --accent-hover: #3f42c8;
+    --accent-glow: rgba(79, 82, 224, 0.12);
+    --border: #dcdcee;
+    --border-hover: #c8c8e0;
+  }
+}
+
+/* Theme transition */
+*, *::before, *::after {
+  transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease), color 0.15s var(--ease);
+}
+
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
 body { font-family: var(--font-body); background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
@@ -613,3 +653,28 @@ code, pre { font-family: var(--font-mono); }
   .community-stats-grid { grid-template-columns: 1fr 1fr; gap: 24px; }
   .community-social-links { flex-direction: column; align-items: center; }
 }
+
+/* ── Theme Toggle Button ──────────────────── */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: block; }
+[data-theme="light"] .theme-toggle .icon-sun { display: block; }
+[data-theme="light"] .theme-toggle .icon-moon { display: none; }
