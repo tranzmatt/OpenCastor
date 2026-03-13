@@ -8,6 +8,19 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ## [2026.3.13.12] — 2026-03-13
 
+### Changed
+- `CLAUDE.md`: complete rewrite for RCAN v1.4 — updated version refs, RCAN protocol table (MessageType 16/17), RRN format docs, TieredBrain task routing, JS SDK examples, test gotchas
+- `rcan_version` in all config examples updated to `1.4`
+- README updates for v1.4 spec alignment
+
+### Ecosystem
+- rcan-py: v0.3.1 → v0.4.0 (SPEC_VERSION 1.4)
+- rcan-spec: v1.3 → v1.4 (§1–§16 dedicated section pages)
+
+---
+
+## [2026.3.13.12] — 2026-03-13
+
 ### Added
 - `sdk/js/src/index.ts`: typed `invoke()`, `invokeCancel()`, `registryRegister()`, and `registryResolve()` methods with full interface definitions — implements RCAN §19 INVOKE/INVOKE_CANCEL and §21 REGISTRY_REGISTER/REGISTRY_RESOLVE; includes `timeoutMs` + `replyTo` overrides (#650)
 

@@ -1,271 +1,246 @@
-# CLAUDE.md - OpenCastor Development Guide
+# CLAUDE.md — OpenCastor Development Guide
 
-## Project Overview
+> **Agent context file.** Read this before making any changes. Keep it up to date.
 
-OpenCastor is a universal runtime for embodied AI. It connects LLM "brains" (Gemini, GPT-4.1, Claude, Ollama, HuggingFace, llama.cpp, MLX, OpenRouter, Groq, VLA, ONNX, Kimi, MiniMax, Qwen) to robot "bodies" (Raspberry Pi, Jetson, Arduino, ESP32, LEGO) through a plug-and-play architecture, and exposes them to messaging platforms (WhatsApp, Telegram, Discord, Slack, Home Assistant) for remote control. New peripherals: RPLidar 2D LiDAR, IMU (MPU6050/BNO055), OAK-4 Pro depth+IMU. Reactive obstacle avoidance, LLM response cache, JS/TS SDK, fine-tune export, personality profiles, voice loop, workspace isolation. Configuration is driven by YAML files compliant with the [RCAN Standard](https://rcan.dev/spec/).
+## What Is OpenCastor?
 
-**Version**: 2026.3.8.3 | **License**: Apache 2.0 | **Python**: 3.10+
+OpenCastor is the open-source **reference implementation of the RCAN protocol** (v1.4). It connects LLM "brains" to robot "bodies" through a plug-and-play architecture and exposes them to messaging platforms for remote control.
 
-> **Reference docs**: [`docs/claude/structure.md`](docs/claude/structure.md) · [`docs/claude/api-reference.md`](docs/claude/api-reference.md) · [`docs/claude/env-vars.md`](docs/claude/env-vars.md) · [`docs/claude/cli-reference.md`](docs/claude/cli-reference.md) · [`docs/claude/subsystems.md`](docs/claude/subsystems.md)
+- **Version**: 2026.3.13.11 (date-based: `YYYY.MM.DD.patch`)
+- **RCAN**: v1.4 — see [rcan.dev/spec](https://rcan.dev/spec/)
+- **License**: Apache 2.0 | **Python**: 3.10+ | **Tests**: 105+ passing
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/craigm26/OpenCastor.git
 cd OpenCastor
-pip install -e ".[channels]"   # Install with all messaging channels
-cp .env.example .env           # Copy env template
-castor wizard                  # Interactive setup (API keys, hardware, channels)
-castor gateway                 # Start the API gateway
+pip install -e ".[channels]"
+cp .env.example .env
+castor wizard        # interactive setup
+castor gateway       # start API gateway
 ```
 
-Or with Docker:
-```bash
-cp .env.example .env && nano .env
-docker compose up
-```
-
-## Architecture
+## Repository Layout
 
 ```
-[ WhatsApp / Telegram / Discord / Slack / Home Assistant ]  <-- Messaging Channels
-                    |
-            [ API Gateway ]                    <-- FastAPI (castor/api.py)
-            [ Web Wizard: /setup ]             <-- Browser setup wizard
-                    |
-        ┌──────────────────────┐
-        │   Safety Layer       │               <-- Anti-subversion, BoundsChecker
-        └──────────────────────┘
-                    |
-    [ Gemini / GPT-4.1 / Claude / Ollama ]    <-- Brain (Provider Layer)
-                    |
-     ┌─────────────────────────────────┐
-     │  Offline Fallback / Tiered Brain │      <-- Connectivity-aware routing
-     └─────────────────────────────────┘
-                    |
-              [ RCAN Config ]                  <-- Spinal Cord (Validation)
-                    |
-    ┌───────────────────────────────────────┐
-    │  VFS  │  Agents  │  Learner  │ Fleet  │  <-- Runtime Subsystems
-    └───────────────────────────────────────┘
-                    |
-    [ Dynamixel / PCA9685 / ROS2 / mock ]     <-- Drivers (Nervous System)
-                    |
-              [ Your Robot ]                   <-- The Body
+OpenCastor/
+├── castor/                 # Core runtime
+│   ├── api.py              # FastAPI gateway (main entry point)
+│   ├── tiered_brain.py     # TieredBrain: fast/planner routing by task_category
+│   ├── providers/          # LLM adapters (Gemini, Claude, GPT, Ollama, ...)
+│   │   ├── task_router.py  # TaskRouter — routes tasks by category to providers
+│   │   └── base.py         # BaseProvider ABC + Thought dataclass
+│   ├── drivers/            # Hardware drivers (PCA9685, Dynamixel, ROS2, ...)
+│   ├── channels/           # Messaging channels (WhatsApp, Telegram, Discord, ...)
+│   ├── rcan/               # RCAN protocol implementation
+│   │   ├── registry.py     # RRN validation, REGISTRY_REGISTER/RESOLVE (§21)
+│   │   ├── invoke.py       # InvokeRequest/Result, SkillRegistry (§19)
+│   │   ├── parallel_invoke.py  # invoke_all(), invoke_race()
+│   │   ├── message.py      # MessageType enum, RCANMessage
+│   │   └── sdk_compat.py   # Compatibility layer for rcan-py SDK
+│   ├── fleet/              # Fleet management, group policies
+│   ├── privacy_mode.py     # Privacy mode — blocks cloud egress
+│   └── sdk/                # Python SDK wrapper
+├── sdk/js/                 # TypeScript/JS SDK (@opencastor/sdk)
+│   └── src/index.ts        # CastorClient — typed wrappers for all API endpoints
+├── site/                   # OpenCastor website (static HTML/CSS)
+│   ├── *.html              # 8 pages (index, docs, hardware, about, hub, ...)
+│   └── styles.css          # Global stylesheet (dark/light theme, pill toggles)
+├── tests/                  # Test suite (pytest)
+├── config/presets/         # RCAN config presets for common hardware
+├── bob.rcan.yaml           # Bob robot config (gitignored — device-specific)
+└── CHANGELOG.md            # Version history
 ```
 
-## Core Abstractions
+## Key Abstractions
 
-| Class | File | Purpose |
+| Class | File | What it does |
 |---|---|---|
-| `Thought` | `castor/providers/base.py` | AI reasoning step: `raw_text` + `action` dict (`type`: move/stop/wait/grip/nav_waypoint) |
-| `BaseProvider` | `castor/providers/base.py` | LLM adapter ABC: `think()`, `think_stream()`, `health_check()`; `_caps`/`_robot_name` set by api.py |
-| `DriverBase` | `castor/drivers/base.py` | Hardware driver ABC: `move()`, `stop()`, `close()`, `health_check()` |
-| `BaseChannel` | `castor/channels/base.py` | Messaging integration ABC: `start()`, `stop()`, `send_message()` |
-| `CastorFS` | `castor/fs/__init__.py` | Unix-style VFS with capability permissions, memory tiers, e-stop |
-| `EpisodeMemory` | `castor/memory.py` | SQLite episode store; max 10k, FIFO; `CASTOR_MEMORY_DB` |
-| `MetricsRegistry` | `castor/metrics.py` | Stdlib-only Prometheus; `get_registry()` singleton |
-| `ToolRegistry` | `castor/tools.py` | LLM-callable tools; `call(name, /, **kwargs)` positional-only |
-| `SisyphusLoop` | `castor/learner/sisyphus.py` | PM→Dev→QA→Apply continuous improvement loop |
-| `BehaviorRunner` | `castor/behaviors.py` | YAML step sequences: waypoint/wait/think/speak/stop |
-| `WaypointNav` | `castor/nav.py` | Dead-reckoning nav via `wheel_circumference_m` + `turn_time_per_deg_s` |
-| `UsageTracker` | `castor/usage.py` | SQLite token/cost at `~/.castor/usage.db`; `CASTOR_USAGE_DB` |
-| `ProviderFallbackManager` | `castor/provider_fallback.py` | Quota-error auto-switch; `ProviderQuotaError` |
-| `CameraManager` | `castor/camera.py` | Multi-camera: tile/primary/most_recent composite modes |
-| `CompositeDriver` | `castor/drivers/composite.py` | Routes action keys to sub-drivers via RCAN `routing:` config |
-| Factory: `get_provider()` | `castor/providers/__init__.py` | LLM provider factory |
-| Factory: `create_channel()` | `castor/channels/__init__.py` | Messaging channel factory |
+| `TieredBrain` | `castor/tiered_brain.py` | Routes prompts: fast model or planner based on `task_category` |
+| `TaskRouter` | `castor/providers/task_router.py` | Selects provider by `TaskCategory` (SENSOR_POLL → local-only, SAFETY → planner) |
+| `BaseProvider` | `castor/providers/base.py` | LLM adapter ABC: `think()`, `think_stream()`, `health_check()` |
+| `DriverBase` | `castor/drivers/base.py` | Hardware ABC: `move()`, `stop()`, `close()`, `health_check()` |
+| `RegistryMessage` | `castor/rcan/registry.py` | RCAN §21 wire message. `RRNCategory` enum, `_validate_rrn()`, `metadata` block |
+| `InvokeRequest` | `castor/rcan/invoke.py` | §19 INVOKE — skill name + params + timeout |
+| `SkillRegistry` | `castor/rcan/invoke.py` | Maps skill names to handler callables |
+| `FleetManager` | `castor/fleet/group_policy.py` | Group policies, config deep-merge |
+| `CastorClient` | `sdk/js/src/index.ts` | TypeScript SDK — `invoke()`, `invokeAll()`, `invokeRace()`, `registryRegister()`, `registryResolve()` |
 
-## Authentication (`castor/auth.py`)
+## RCAN Protocol (v1.4)
 
-Credentials resolved in priority order:
-1. **Environment variable** (e.g. `GOOGLE_API_KEY`)
-2. **`.env` file** (loaded via python-dotenv)
-3. **RCAN config fallback** (e.g. `config["api_key"]`)
+OpenCastor implements **RCAN v1.4** full stack:
 
-Auth layers on API (in order): (1) Multi-user JWT (`JWT_SECRET` + `OPENCASTOR_USERS`) → (2) RCAN JWT (`OPENCASTOR_JWT_SECRET`) → (3) static bearer (`OPENCASTOR_API_TOKEN`) → (4) open. Roles: `admin(3) > operator(2) > viewer(1)`.
+### MessageTypes
+```python
+DISCOVER = 1       # Robot announces presence
+STATUS = 2         # Health/state query
+COMMAND = 3        # Action instruction
+STREAM = 4         # Continuous data stream
+EVENT = 5          # Triggered state change
+HANDOFF = 6        # Session transfer
+ACK = 7            # Acknowledgment
+ERROR = 8          # Error response
+AUTHORIZE = 9      # HiTL approval (§8)
+PENDING_AUTH = 10  # HiTL gate awaiting (§8)
+INVOKE = 11        # Skill invocation (§19)
+INVOKE_RESULT = 12 # Skill result (§19)
+REGISTRY_REGISTER = 13    # Register with RRF (§21)
+REGISTRY_RESOLVE = 14     # Resolve RRN→RURI (§21)
+INVOKE_CANCEL = 15        # Cancel in-flight INVOKE (§19)
+REGISTRY_REGISTER_RESULT = 16  # Registration result (§21)
+REGISTRY_RESOLVE_RESULT = 17   # Resolution result (§21)
+```
 
-Key functions: `resolve_provider_key()`, `resolve_channel_credentials()`, `list_available_providers()`, `check_provider_ready()`.
+### Robot Registration Numbers (RRN)
+Two formats, both accepted by `_validate_rrn()`:
+```
+RRN-000000000001                           # numeric (12 digits, RRF-assigned)
+rrn://org/category/model/id               # URI 4-segment (recommended)
+rrn://org/category/id                     # URI 3-segment
+rrn://org/id                              # URI legacy 2-segment (category=robot)
+```
+Valid categories: `robot` | `component` | `sensor` | `assembly`
 
-→ See [docs/claude/api-reference.md](docs/claude/api-reference.md) for all API endpoints.
-→ See [docs/claude/env-vars.md](docs/claude/env-vars.md) for all environment variables.
+### Task Categories (TieredBrain routing)
+```python
+SENSOR_POLL  → fast model only (never escalates to planner — token budget guard)
+NAVIGATION   → standard routing
+REASONING    → planner preferred
+CODE         → planner preferred
+SAFETY       → planner ALWAYS (never downgraded)
+VISION       → planner preferred
+SEARCH       → planner preferred
+```
 
-## Providers & Drivers
-
-**Providers** (`castor/providers/`): Google Gemini, OpenAI GPT-4.1, Anthropic Claude, Ollama, HuggingFace, llama.cpp, MLX, Vertex AI, OpenRouter, Groq, VLA, ONNX, Kimi, MiniMax, Qwen, SentenceTransformers. All implement `think(image_bytes, instruction) -> Thought`. After brain init, `api.py` sets `brain._caps` (from `rcan_protocol.capabilities`) and `brain._robot_name` (from `metadata.robot_name`) so `build_messaging_prompt()` includes the correct action vocabulary (e.g. `nav_waypoint` when `nav` capability is active).
-
-**Drivers** (`castor/drivers/`): PCA9685 (I2C PWM/Amazon kits), Dynamixel (Protocol 2.0), CompositeDriver (multi-driver routing), ROS2Driver (Twist publisher, mock mode).
-
-**Channels** (`castor/channels/`): WhatsApp (neonize QR; `group_jids`/`group_name_filter` for per-robot group routing), WhatsApp (Twilio), Telegram, Discord, Slack, MQTT, Home Assistant.
-
-## Configuration (RCAN)
-
-- Config files use `.rcan.yaml` extension; follow [RCAN Spec](https://rcan.dev/spec/) v1.1.0
-- Required keys: `rcan_version`, `metadata.robot_name`, `agent.model`, non-empty `drivers` list
-- Validated by `castor/config_validation.py` on gateway startup
-- 16 presets in `config/presets/`; generate new configs with `castor wizard`
+## RCAN Config Format (v1.4)
 
 ```yaml
-# Minimal RCAN config example
-rcan_version: "1.1.0"
+rcan_version: "1.4"  # Must match current spec
 metadata:
   robot_name: my-robot
+  rrn: RRN-000000000001               # RRF-assigned numeric RRN
+  rrn_uri: rrn://org/robot/model/id   # URI-format RRN (structured)
+  rcan_uri: rcan://robot.local:8000/my-robot
+  version: 2026.3.13.11
 agent:
   provider: google
   model: gemini-1.5-flash
-drivers:
-- id: wheels
-  protocol: pca9685
-```
-
-Provider quota fallback:
-```yaml
-provider_fallback:
+task_routing:                          # Optional (PR #647)
   enabled: true
-  provider: ollama
-  model: llama3.2:3b
-  quota_cooldown_s: 3600
-```
-
-Multi-camera support:
-```yaml
-cameras:
-- id: front
-  type: usb
-  index: 0
-  role: primary
-- id: rear
-  type: usb
-  index: 1
-  role: secondary
-```
-
-ROS2 driver:
-```yaml
+  categories:
+    sensor_poll: {planner: false}
+    safety:      {planner: true}
 drivers:
-- id: ros2_driver
-  protocol: ros2
-  cmd_vel_topic: /cmd_vel
-  odom_topic: /odom
-  max_linear_vel: 1.0
+  - id: wheels
+    protocol: pca9685
 ```
 
-## CLI Commands
-
-```bash
-castor run      --config robot.rcan.yaml             # Perception-action loop
-castor gateway  --config robot.rcan.yaml             # API gateway + channels
-castor wizard   [--simple|--web]                     # Interactive setup
-castor deploy   pi@192.168.1.10 --config robot.rcan.yaml  # SSH-push + restart
-castor fleet    [--watch]                            # Discover + monitor robots
-castor swarm    status/command/stop/sync             # Multi-node swarm ops
-castor hub      list/search/install/publish          # Hardware preset registry
-castor dashboard / castor demo / castor status       # UI + diagnostics
-```
-
-→ See [docs/claude/cli-reference.md](docs/claude/cli-reference.md) for all 50+ commands.
-
-## Swarm Node Registry (`config/swarm.yaml`)
-
-```yaml
-nodes:
-  - name: alex
-    host: alex.local
-    ip: 192.168.68.91
-    port: 8000
-    token: <OPENCASTOR_API_TOKEN>
-    rcan: ~/OpenCastor/alex.rcan.yaml
-    tags: [rpi5, camera, i2c, rover]
-```
-
-`castor swarm status` queries all nodes concurrently. `castor swarm command --instruction "go forward"` broadcasts to all nodes.
-
-## Docker
-
-```bash
-docker compose up                                    # Gateway only
-docker compose --profile hardware up                 # + hardware runtime
-docker compose --profile dashboard up                # + Streamlit
-docker compose --profile hardware --profile dashboard up  # Everything
-```
-
-## CI/CD
-
-| Workflow | Trigger | Purpose |
-|---|---|---|
-| `ci.yml` | Push, PR | Tests + ruff lint + type check |
-| `validate_rcan.yml` | Push/PR on `*.rcan.yaml` | JSON schema validation |
-| `install-test.yml` | Scheduled | Multi-platform install test |
-| `release.yml` | Tag push | PyPI release automation |
-| `deploy-pages.yml` | Push to main | Cloudflare Pages deploy |
-
-## Code Style
-
-- **PEP 8**, 100-char line length (enforced by Ruff)
-- **snake_case** functions/variables; **Type hints** on public signatures
-- **Docstrings** on classes and non-trivial methods
-- **Lazy imports** for optional SDKs (`HAS_<NAME>` boolean pattern)
-- **Structured logging**: `logging.getLogger("OpenCastor.<Module>")`
-- Lint: `ruff check castor/` / `ruff format castor/`
-
-## Testing
+## Running Tests
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/
+pytest tests/                          # All tests
+pytest tests/test_rcan_registry.py     # Registry + RRN tests (105 tests)
+pytest tests/test_tiered_brain_task_routing.py  # Task routing (31 tests)
+pytest tests/test_task_router.py       # TaskRouter (30 tests)
+ruff check castor/                     # Lint
+ruff format castor/                    # Format
 ```
 
-**Current**: 3387 tests, 8 skipped, 0 failures (125+ test files)
+**Key test gotchas:**
+- `_reset_state_and_env` autouse fixture resets `AppState` before every test
+- `MagicMock` answers `True` to any `hasattr()` — use `del mock._shared_state` to force False
+- Error responses use `{"error": "...", "code": "HTTP_NNN"}` not `{"detail": "..."}`
+- `tick_count = 998` not `999` in routing tests (999 is divisible by default interval 10)
 
-Key fixture: `_reset_state_and_env` (autouse in `test_api_endpoints.py`) resets all `AppState` fields before every test including `thought_history = deque(maxlen=50)`, `learner = None`, `offline_fallback = None`, and clears `_command_history`/`_webhook_history`.
+## JS SDK (`sdk/js/`)
 
-Test gotchas:
-- `monkeypatch.setattr("castor.api.time.time", ...)` causes RecursionError — use `_command_history.clear()` instead
-- `MagicMock` answers True to `hasattr(mock, anything)` — use `del mock._shared_state` to force False
-- Structured error responses: `{"error": "...", "code": "HTTP_NNN"}` not `{"detail": "..."}`
+```typescript
+import { CastorClient } from '@opencastor/sdk';
+const client = new CastorClient({ baseUrl: 'http://robot.local:8000' });
 
-## Adding New Components
+// §19 INVOKE
+await client.invoke({ skill: 'navigate_to', params: { x: 1, y: 2 }, timeoutMs: 5000 });
+await client.invokeAll([{ skill: 'wave' }, { skill: 'speak', params: { text: 'hi' } }]);
+const winner = await client.invokeRace([{ skill: 'plan_a' }, { skill: 'plan_b' }]);
 
-### New AI Provider
-1. Create `castor/providers/<name>_provider.py`, subclass `BaseProvider`
-2. Implement `__init__` (resolve key), `think()`, `think_stream()`, `health_check()`
-3. Call `self._check_instruction_safety(instruction)` at top of `think()` and `think_stream()`
+// §21 Registry
+await client.registryRegister({ rrn: 'RRN-000000000001', ruri: 'rcan://robot.local:8000/bob' });
+const resolved = await client.registryResolve('RRN-000000000001');
+```
+
+Tests: `cd sdk/js && npm test` (13 tests, Jest + ts-jest)
+
+## Website (`site/`)
+
+8 static HTML pages. Theme: dark/light pill toggle (`☀·🌙`), stored in `localStorage('oc-theme')`.
+
+**Key CSS patterns:**
+- `.theme-pill` / `.theme-pill-opt[data-opt="light"|"dark"]` — pill toggle
+- `.nav-end` — flex container for pill + hamburger (z-index: 1001 to stay above mobile nav)
+- `.nav-theme-row` — shown only in mobile drawer (`display:none` on desktop)
+
+**If adding a new page:** copy the nav structure from `index.html`, keep `.nav-end` group intact.
+
+## CI/CD
+
+| Workflow | Trigger | Action |
+|---|---|---|
+| `ci.yml` | Push / PR | pytest + ruff + mypy |
+| `validate_rcan.yml` | `*.rcan.yaml` changes | JSON schema validation |
+| `release.yml` | Tag push | PyPI publish |
+| `deploy-pages.yml` | Main push | Cloudflare Pages (site/) |
+
+Versioning: `YYYY.MM.DD.patch` — bump patch for each commit, date when date changes.
+
+## Code Style
+
+- **Python**: PEP 8, 100-char lines, snake_case, type hints on public signatures
+- **Imports**: Ruff enforces — run `ruff format castor/ && ruff check castor/` before commit
+- **Lazy imports**: `HAS_<NAME>` boolean pattern for optional hardware SDKs
+- **Logging**: `logging.getLogger("OpenCastor.<Module>")`
+- **TypeScript**: strict mode, no `any` on public surfaces
+
+## Extending OpenCastor
+
+### New Provider
+1. `castor/providers/<name>_provider.py` → subclass `BaseProvider`
+2. Implement `think()`, `think_stream()`, `health_check()`
+3. Call `self._check_instruction_safety(instruction)` at start of `think()`
 4. Register in `castor/providers/__init__.py` (`get_provider()`)
-5. Add env var to `castor/auth.py` `PROVIDER_AUTH_MAP` and `.env.example`
+5. Add to `castor/auth.py` `PROVIDER_AUTH_MAP` + `.env.example`
 
-### New Hardware Driver
-1. Create `castor/drivers/<name>.py`, subclass `DriverBase`
-2. Implement `move()`, `stop()`, `close()` with mock fallback (`HAS_<NAME>` pattern)
-3. Implement `health_check()` → `{ok, mode: "hardware"|"mock", error}`
-4. Register in `get_driver()` in `castor/main.py`
+### New Driver
+1. `castor/drivers/<name>.py` → subclass `DriverBase`
+2. Implement `move()`, `stop()`, `close()` with `HAS_<NAME>` mock fallback
+3. Register in `castor/main.py` `get_driver()`
 
-### New Messaging Channel
-1. Create `castor/channels/<name>.py`, subclass `BaseChannel`
-2. Implement `start()`, `stop()`, `send_message()`; wrap handlers in `try/except`
-3. Register in `castor/channels/__init__.py`
-4. Add env vars to `castor/auth.py` `CHANNEL_AUTH_MAP` and `.env.example`
-5. Add webhook endpoint to `castor/api.py` with `_check_webhook_rate()` applied
+### New RCAN Skill (§19)
+1. Define handler: `async def my_skill(params: dict) -> dict`
+2. Register: `skill_registry.register("my_skill", my_skill)`
+3. Test via `POST /rcan` with `{"msg_type": 11, "skill": "my_skill", "params": {...}}`
 
-### New Hardware Preset
-1. Create `config/presets/<name>.rcan.yaml`; follow RCAN schema; CI validates on push
+## Safety
 
-See `CONTRIBUTING.md` for detailed examples and templates.
+- `_check_instruction_safety()` called at top of every `think()`/`think_stream()`
+- `BoundsChecker` validates motor commands; `GuardianAgent` has veto
+- `SENSOR_POLL` task category NEVER escalates to planner (TieredBrain hard override)
+- `SAFETY` task category ALWAYS uses planner (never downgraded)
+- `.env` in `.gitignore`; `bob.rcan.yaml`, `alex.rcan.yaml` gitignored (device-specific)
 
-## Safety Considerations
+## Bob (the reference robot)
 
-- **Prompt injection**: `_check_instruction_safety()` at top of every `think()`/`think_stream()`
-- **Rate limiting**: 5 req/sec/IP (`/api/command`), 10 req/min/sender (webhooks)
-- **Bounds clamping**: Dynamixel 0–4095 ticks; PCA9685 duty cycle limits
-- **E-stop**: `POST /api/stop`, `fs.estop()`, or via any messaging channel
-- **`BoundsChecker`** validates motor commands; **`GuardianAgent`** has veto authority
-- **`safety_stop: true`** in RCAN config enables emergency stop on startup
-- `.env` in `.gitignore` — secrets never committed; JWT auth optional
+- **Hardware**: Raspberry Pi 5 16GB + Hailo-8 NPU + PCA9685 ESC/steering + CSI camera
+- **RRN**: `RRN-000000000001` / `rrn://craigm26/robot/opencastor-rpi5-hailo/bob-001`
+- **Config**: `~/opencastor/bob.rcan.yaml` (gitignored)
+- **Host**: `robot.local` / `192.168.68.61`
+- **RURI**: `rcan://robot.local:8000/bob`
 
-## RPi5 Hardware Notes
+## Useful Links
 
-- GPIO I2C: add `dtparam=i2c_arm=on` to `/boot/firmware/config.txt` → reboot → `/dev/i2c-1`
-- PCA9685: won't respond until powered (external power rail)
-- OAK-D: `pip install depthai==3.3.0` + `sudo udevadm control --reload-rules`
-- USB speaker: `~/.asoundrc` → `defaults.pcm.card 2`; set `SDL_AUDIODRIVER=alsa` + `AUDIODEV=plughw:2,0`
-- **Neonize pin**: `neonize==0.3.13.post0` — 0.3.10.post6 gets `err-client-outdated 405` from WhatsApp. 0.3.11+ needs protobuf 6.x (soft conflict with google-ai libs, safe when Google is not primary provider)
-- Dashboard: use `OPENCASTOR_API_TOKEN=... python -m streamlit run castor/dashboard.py --server.fileWatcherType none`
+- Spec: https://rcan.dev/spec/
+- §19 Invoke: https://rcan.dev/spec/section-19/
+- §21 Registry: https://rcan.dev/spec/section-21/
+- Robot Registry Foundation: https://robotregistryfoundation.org/
+- rcan-py SDK: https://github.com/continuonai/rcan-py
