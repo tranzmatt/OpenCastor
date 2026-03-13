@@ -6,6 +6,13 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.13.7] — 2026-03-13
+
+### Changed
+- `castor/providers/openrouter_provider.py`: update `_DEFAULT_MODEL` from `anthropic/claude-3.5-haiku` to `anthropic/claude-3.5-sonnet` to align with the current ecosystem-standard model. (#635)
+
+---
+
 ## [2026.3.13.6] — 2026-03-13
 
 ### Fixed
