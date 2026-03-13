@@ -251,7 +251,7 @@ class ProviderPool(BaseProvider):
                     ok = bool(result.get("ok", True))
                 except Exception as exc:
                     ok = False
-                    logger.debug("ProviderPool: health probe pool[%d] raised: %s", i, exc)
+                    logger.warning("ProviderPool: health probe pool[%d] raised: %s", i, exc)
 
                 with self._lock:
                     if not ok and i not in self._degraded:

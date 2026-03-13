@@ -895,7 +895,7 @@ class ConformanceChecker:
                 category="rcan_v12",
                 status="fail",
                 detail="rcan_version is missing — required for RCAN v1.2 compliance",
-                fix='Set rcan_version: "1.2.0" at the top of your config',
+                fix='Set rcan_version: "1.3.0" at the top of your config',
             )
         # Accept "1.2.x" or later; warn on older versions.
         try:
@@ -906,7 +906,7 @@ class ConformanceChecker:
                 category="rcan_v12",
                 status="warn",
                 detail=f"rcan_version='{version}' is not a numeric semver string",
-                fix='Set rcan_version: "1.2.0" for RCAN v1.2 compliance',
+                fix='Set rcan_version: "1.3.0" for RCAN v1.3 compliance',
             )
         major, minor = parts[0], parts[1] if len(parts) > 1 else 0
         if (major, minor) < (1, 2):
@@ -916,15 +916,15 @@ class ConformanceChecker:
                 status="warn",
                 detail=(
                     f"rcan_version='{version}' is below 1.2.0 — "
-                    "confidence_gates and hitl_gates are RCAN v1.2 features"
+                    "confidence_gates and hitl_gates are RCAN v1.2+ features"
                 ),
-                fix='Update rcan_version: "1.2.0" to enable v1.2 features',
+                fix='Update rcan_version: "1.3.0" to enable v1.3 features',
             )
         return ConformanceResult(
             check_id=cid,
             category="rcan_v12",
             status="pass",
-            detail=f"rcan_version='{version}' is compatible with RCAN v1.2",
+            detail=f"rcan_version='{version}' is compatible with RCAN v1.3",
         )
 
     def _v12_confidence_gates(self) -> list[ConformanceResult]:
