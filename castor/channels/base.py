@@ -11,8 +11,8 @@ import re
 import time
 from abc import ABC, abstractmethod
 from collections import defaultdict, deque
-from typing import Optional
 from collections.abc import Callable
+from typing import Optional
 
 from castor.command_interpreter import get_command_interpreter
 

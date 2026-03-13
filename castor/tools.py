@@ -35,8 +35,8 @@ import base64
 import json
 import logging
 import time
-from typing import Any, Optional
 from collections.abc import Callable
+from typing import Any, Optional
 
 logger = logging.getLogger("OpenCastor.Tools")
 

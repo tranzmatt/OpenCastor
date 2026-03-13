@@ -29,8 +29,8 @@ REST API:
 import io
 import json
 import logging
-from typing import Any, Literal, Optional
 from collections.abc import Iterator
+from typing import Any, Literal, Optional
 
 logger = logging.getLogger("OpenCastor.Finetune")
 

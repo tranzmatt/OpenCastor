@@ -34,9 +34,9 @@ installed entry points.  ``castor plugin list`` shows the result.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Optional
-from collections.abc import Callable
 
 try:
     from importlib.metadata import entry_points

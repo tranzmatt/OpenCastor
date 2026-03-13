@@ -29,8 +29,8 @@ API:
 import logging
 import os
 import threading
-from typing import Optional
 from collections.abc import Callable
+from typing import Optional
 
 logger = logging.getLogger("OpenCastor.Avoidance")
 

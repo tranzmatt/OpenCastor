@@ -9,10 +9,10 @@ import logging
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any, Optional
-from collections.abc import Callable
 
 logger = logging.getLogger("OpenCastor.SharedState")
 

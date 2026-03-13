@@ -30,8 +30,8 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Optional
 from collections.abc import Callable
+from typing import Any, Optional
 
 logger = logging.getLogger("OpenCastor.Hotword")
 

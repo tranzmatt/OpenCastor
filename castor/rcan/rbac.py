@@ -25,10 +25,10 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag, auto
 from typing import Optional
-from collections.abc import Callable
 
 from castor.fs.permissions import Cap
 

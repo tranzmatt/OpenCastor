@@ -15,9 +15,9 @@ import os
 import shutil
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from typing import Optional
-from collections.abc import Callable
 
 logger = logging.getLogger("OpenCastor.Safety.Monitor")
 

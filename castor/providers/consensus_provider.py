@@ -46,8 +46,8 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 import time
-from typing import Any
 from collections.abc import Iterator
+from typing import Any
 
 from castor.providers.base import BaseProvider, Thought
 

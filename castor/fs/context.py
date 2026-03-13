@@ -25,8 +25,8 @@ Compound Pipelines
 import logging
 import threading
 import time
-from typing import Any, Optional, Union
 from collections.abc import Callable
+from typing import Any, Optional, Union
 
 from castor.fs.namespace import Namespace
 

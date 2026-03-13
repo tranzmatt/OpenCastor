@@ -9,11 +9,11 @@ import logging
 import os
 import statistics
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger("OpenCastor.Benchmarker")
 

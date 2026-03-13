@@ -4,8 +4,8 @@ Discovers and manages messaging channel integrations.
 """
 
 import logging
-from typing import Optional
 from collections.abc import Callable
+from typing import Optional
 
 from castor.auth import check_channel_ready, resolve_channel_credentials
 

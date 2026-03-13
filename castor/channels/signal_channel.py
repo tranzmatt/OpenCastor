@@ -33,8 +33,8 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Optional
 from collections.abc import Callable
+from typing import Any, Optional
 
 from castor.channels.base import BaseChannel
 

@@ -28,8 +28,8 @@ import base64
 import json
 import logging
 import os
-from typing import Any, Optional
 from collections.abc import Generator
+from typing import Any, Optional
 
 from .base import BaseProvider, Thought
 

@@ -18,8 +18,8 @@ SAFETY priority messages skip the queue (Safety Invariant 6).
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
 from collections.abc import Callable
+from typing import Any, Optional
 
 from castor.rcan.capabilities import CapabilityRegistry
 from castor.rcan.message import RCANMessage

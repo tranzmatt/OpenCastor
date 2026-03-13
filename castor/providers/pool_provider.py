@@ -47,8 +47,8 @@ import logging
 import random
 import threading
 import time
-from typing import Any, Optional
 from collections.abc import Iterator
+from typing import Any, Optional
 
 from castor.providers.base import BaseProvider, Thought
 

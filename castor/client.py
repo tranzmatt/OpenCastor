@@ -32,8 +32,8 @@ import json
 import os
 import urllib.error
 import urllib.request
-from typing import Any, Optional
 from collections.abc import Iterator
+from typing import Any, Optional
 
 _DEFAULT_URL = os.getenv("OPENCASTOR_API_URL", "http://localhost:8000")
 _DEFAULT_TOKEN = os.getenv("OPENCASTOR_API_TOKEN", "")

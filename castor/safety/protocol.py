@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
-from collections.abc import Callable
 
 logger = logging.getLogger("OpenCastor.Safety.Protocol")
 

@@ -23,8 +23,8 @@ import json
 import logging
 import os
 import time
-from typing import Any, Optional
 from collections.abc import Callable, Iterator
+from typing import Any, Optional
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 

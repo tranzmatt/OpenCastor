@@ -29,11 +29,11 @@ class GrokProvider(BaseProvider):
 
     def __init__(self, config: dict) -> None:
         super().__init__(config)
-        from openai import OpenAI
-
         api_key = os.getenv("XAI_API_KEY") or config.get("api_key") or config.get("xai_api_key")
         if not api_key:
             raise ValueError("XAI_API_KEY not found in environment or config")
+
+        from openai import OpenAI
 
         base_url = config.get("base_url", _BASE_URL)
         self.client = OpenAI(api_key=api_key, base_url=base_url)

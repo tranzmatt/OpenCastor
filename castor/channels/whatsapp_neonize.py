@@ -28,8 +28,8 @@ import logging
 import os
 import re
 import threading
-from typing import Optional
 from collections.abc import Callable
+from typing import Optional
 
 from castor.channels.base import BaseChannel
 

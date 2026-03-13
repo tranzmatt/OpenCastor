@@ -18,8 +18,8 @@ RCAN config block::
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
 from collections.abc import Callable
+from typing import Any, Optional
 
 from castor.connectivity import ConnectivityMonitor, is_online
 

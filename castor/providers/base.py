@@ -2,9 +2,9 @@ import json
 import logging
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, Optional
-from collections.abc import Iterator
 
 logger = logging.getLogger("OpenCastor.BaseProvider")
 

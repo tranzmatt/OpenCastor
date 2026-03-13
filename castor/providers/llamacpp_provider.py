@@ -22,8 +22,8 @@ import logging
 import os
 import urllib.error
 import urllib.request
-from typing import Any, Optional
 from collections.abc import Generator
+from typing import Any, Optional
 
 from .base import BaseProvider, Thought
 

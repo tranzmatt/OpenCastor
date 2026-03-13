@@ -23,8 +23,8 @@ import logging
 import socket
 import threading
 import time
-from typing import Optional
 from collections.abc import Callable
+from typing import Optional
 
 logger = logging.getLogger("OpenCastor.RCAN.mDNS")
 

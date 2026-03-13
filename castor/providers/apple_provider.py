@@ -7,8 +7,8 @@ import logging
 import queue
 import threading
 import time
-from typing import Any
 from collections.abc import Iterator
+from typing import Any
 
 from .apple_preflight import run_apple_preflight
 from .base import BaseProvider, Thought
