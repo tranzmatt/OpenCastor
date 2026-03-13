@@ -66,14 +66,14 @@ class InvokeResult:
     def to_message(self, source_ruri: str, target_ruri: str) -> dict[str, Any]:
         """Serialize to RCAN message format.
 
-        Uses ``reply_to`` as the wire-format correlation field per §19.4 of the
+        Uses ``reply_to`` as the wire-format correlation field per §19.3 of the
         RCAN specification, echoing the ``msg_id`` from the originating INVOKE.
         """
         return {
             "type": MessageType.INVOKE_RESULT,
             "source_ruri": source_ruri,
             "target_ruri": target_ruri,
-            "reply_to": self.invoke_id,  # §19.4 — correlates to INVOKE msg_id
+            "reply_to": self.invoke_id,  # §19.3 — correlates to INVOKE msg_id
             "payload": {
                 "status": self.status,
                 "result": self.result,

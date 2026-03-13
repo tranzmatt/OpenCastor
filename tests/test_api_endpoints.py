@@ -118,14 +118,29 @@ def client():
 
     We replace the real startup/shutdown lifecycle events to avoid loading
     configs, hardware, channels, or other real infrastructure.
+
+    Handles both legacy @app.on_event handlers and the modern FastAPI
+    lifespan context manager pattern.
     """
+    import contextlib
+
     from castor.api import app
 
-    # Save original event handlers and replace with no-ops
+    # Save and clear legacy on_event handlers
     original_startup = app.router.on_startup[:]
     original_shutdown = app.router.on_shutdown[:]
     app.router.on_startup.clear()
     app.router.on_shutdown.clear()
+
+    # Save and replace lifespan context manager with a no-op so that
+    # real hardware/config initialisation is skipped during tests.
+    original_lifespan = app.router.lifespan_context
+
+    @contextlib.asynccontextmanager
+    async def _noop_lifespan(app):
+        yield
+
+    app.router.lifespan_context = _noop_lifespan
 
     try:
         with TestClient(app, raise_server_exceptions=False) as c:
@@ -134,6 +149,7 @@ def client():
         # Restore original handlers
         app.router.on_startup[:] = original_startup
         app.router.on_shutdown[:] = original_shutdown
+        app.router.lifespan_context = original_lifespan
 
 
 @pytest.fixture()

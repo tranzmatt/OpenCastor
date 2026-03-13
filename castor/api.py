@@ -75,13 +75,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger("OpenCastor.Gateway")
 
+
 # ---------------------------------------------------------------------------
 # App & state
 # ---------------------------------------------------------------------------
+@contextlib.asynccontextmanager
+async def lifespan(app: "FastAPI"):  # noqa: F821
+    """FastAPI lifespan context manager (replaces deprecated @app.on_event)."""
+    await on_startup()
+    yield
+    await on_shutdown()
+
+
 app = FastAPI(
     title="OpenCastor Gateway",
     description="REST API for controlling your robot and receiving messages from channels.",
     version=__import__("importlib.metadata", fromlist=["version"]).version("opencastor"),
+    lifespan=lifespan,
 )
 
 # CORS: configurable via OPENCASTOR_CORS_ORIGINS env var (comma-separated).
@@ -4239,7 +4249,6 @@ async def _stop_channels():
 # ---------------------------------------------------------------------------
 # Lifecycle events
 # ---------------------------------------------------------------------------
-@app.on_event("startup")
 async def on_startup():
     # Always initialize thought history ring buffer (no config needed)
     state.thought_history = collections.deque(maxlen=50)
@@ -7361,7 +7370,6 @@ async def flash_driver(driver_id: str, body: _FlashRequest, request: Request):
         return {"status": "error", "message": str(exc)}
 
 
-@app.on_event("shutdown")
 async def on_shutdown():
     # Close WebRTC peers
     try:
