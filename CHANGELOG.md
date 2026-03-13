@@ -6,6 +6,18 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.3.13.4] — 2026-03-13
+
+### Fixed
+- `.github/workflows/deploy-pages.yml`: add workflow file itself to path filter so wrangler-action SHA bumps self-trigger a deploy and verify the fix. (#625)
+
+### Added
+- `site/sitemap.xml`: new sitemap covering all 8 top-level pages with change-frequency and priority hints for search crawler discovery. (#627)
+- `site/robots.txt`: new robots.txt with `Sitemap:` reference pointing to `/sitemap.xml`. (#627)
+- `site/`: OG (`og:title`, `og:description`, `og:type`, `og:url`, `og:image`) and Twitter (`twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`) meta tags added to `about.html`, `docs.html`, `changelog.html`, `hardware.html`, `beginners.html`, and `tutorials.html`. Unblocks social link previews on all pages. (#626)
+
+---
+
 ## [2026.3.13.3] — 2026-03-13
 
 ### Fixed
