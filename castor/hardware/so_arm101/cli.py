@@ -124,6 +124,8 @@ def cmd_calibrate(args) -> None:
     from castor.hardware.so_arm101.lerobot_bridge import (
         lerobot_available,
         run_calibrate,
+    )
+    from castor.hardware.so_arm101.lerobot_bridge import (
         status as lr_status,
     )
 
@@ -150,7 +152,7 @@ def cmd_calibrate(args) -> None:
     if ok:
         print(f"\n✅ Calibration complete for {args.arm} arm.\n")
     else:
-        print(f"\n⚠  Calibration exited with an error. Check cables and retry.\n")
+        print("\n⚠  Calibration exited with an error. Check cables and retry.\n")
 
 
 def cmd_status(args) -> None:
@@ -167,7 +169,7 @@ def cmd_status(args) -> None:
         print(f"  {icon}  {tool}: {path or 'not found'}")
 
     ports = detect_feetech_ports()
-    print(f"\n[SO-ARM101] Detected controller boards:")
+    print("\n[SO-ARM101] Detected controller boards:")
     if ports:
         for p in ports:
             print(f"  ✓  {p['port']}  — {p['description']}")

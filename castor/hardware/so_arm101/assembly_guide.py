@@ -8,11 +8,10 @@ Web wizard: embedded as steps when SO-ARM101 selected in hardware picker.
 from __future__ import annotations
 
 import textwrap
-from typing import Callable, Optional
+from typing import Callable
 
 from castor.hardware.so_arm101.constants import (
     FOLLOWER_ASSEMBLY_STEPS,
-    AssemblyStep,
 )
 
 
@@ -71,7 +70,7 @@ def run_assembly_guide(
 
         if step.motor_id is not None:
             print_fn(f"\n  ⚙  Motor ID for this joint: {step.motor_id}")
-            print_fn(f"  📌 Reference: https://huggingface.co/docs/lerobot/so101")
+            print_fn("  📌 Reference: https://huggingface.co/docs/lerobot/so101")
 
         print_fn("")
         resp = input_fn(f"  [Step {i + 1}/{len(steps)}] Done? Press Enter to continue, or 'q' to quit: ").strip().lower()

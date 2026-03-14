@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
 
 from castor.hardware.so_arm101.constants import (
     DEFAULT_BAUD,
@@ -92,6 +91,8 @@ def setup_motors(
     if prefer_lerobot and not dry_run:
         from castor.hardware.so_arm101.lerobot_bridge import (
             lerobot_available,
+        )
+        from castor.hardware.so_arm101.lerobot_bridge import (
             run_setup_motors as _lr_setup,
         )
         if lerobot_available():
@@ -199,8 +200,8 @@ def setup_motors(
 
         if not ok:
             print_fn(
-                f"  ✗ Could not communicate with motor at ID=1 on any probe baud. "
-                f"Check cable and power."
+                "  ✗ Could not communicate with motor at ID=1 on any probe baud. "
+                "Check cable and power."
             )
         results[joint] = ok
 

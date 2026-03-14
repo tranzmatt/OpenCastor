@@ -23,10 +23,8 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 from typing import Optional
-
 
 # ── Locate LeRobot venv ───────────────────────────────────────────────────────
 
@@ -96,7 +94,7 @@ def run_find_port(print_fn=print, input_fn=input) -> Optional[str]:
     print_fn("  Follow the prompts: disconnect USB when asked, reconnect when done.\n")
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             [str(tool)],
             text=True,
             capture_output=False,  # let output go to terminal
