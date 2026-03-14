@@ -251,6 +251,9 @@ class PCA9685RCDriver(DriverBase):
         caller -- arming, move(), stop(), or future code -- can send an
         out-of-range signal to the hardware.
         """
+        if self.pca is None:
+            logger.warning("PCA9685 not initialized; skipping _set_pulse")
+            return
         pulse_us = max(PULSE_MIN_US, min(PULSE_MAX_US, pulse_us))
         duty = _us_to_duty(self.freq, pulse_us)
         self.pca.channels[channel].duty_cycle = duty
@@ -310,7 +313,7 @@ class PCA9685Driver(DriverBase):
         left_speed = max(-1.0, min(1.0, linear - angular))
         right_speed = max(-1.0, min(1.0, linear + angular))
 
-        if self.motor_left is None:
+        if self.motor_left is None or self.motor_right is None:
             logger.info(f"[MOCK] L={left_speed:.2f} R={right_speed:.2f}")
             return
 

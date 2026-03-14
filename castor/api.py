@@ -1856,6 +1856,71 @@ async def depth_obstacles():
 # ---------------------------------------------------------------------------
 
 
+async def _build_telemetry_payload() -> dict:
+    """Assemble one telemetry frame dict for ws_telemetry.
+
+    Extracted from _push_loop to reduce cyclomatic complexity of ws_telemetry.
+    Uses the module-level ``state`` object.
+    """
+    from castor.depth import get_obstacle_zones
+    from castor.main import get_shared_camera
+
+    robot_name = (state.config or {}).get("metadata", {}).get("robot_name", "robot")
+
+    # Loop count + latency from ProcFS if available
+    loop_count = 0
+    avg_latency_ms = 0.0
+    if state.fs is not None:
+        try:
+            snap = state.fs.proc.snapshot()
+            loop_count = snap.get("loop", {}).get("iteration") or 0
+            avg_latency_ms = snap.get("loop", {}).get("latency_ms") or 0.0
+        except Exception:
+            pass
+
+    # Camera status
+    camera_status = "offline"
+    if state.fs is not None:
+        try:
+            hw = state.fs.proc.snapshot().get("hw", {})
+            camera_status = hw.get("camera", "offline") or "offline"
+        except Exception:
+            pass
+    elif hasattr(state, "camera") and state.camera is not None:
+        camera_status = "online" if state.camera.is_available() else "offline"
+
+    # Driver type
+    driver_type = "none"
+    if state.driver is not None:
+        dt = type(state.driver).__name__.lower()
+        driver_type = "mock" if "mock" in dt or "sim" in dt else "hardware"
+
+    # Depth obstacles
+    camera = get_shared_camera()
+    depth = getattr(camera, "last_depth", None) if camera is not None else None
+    depth_data = await asyncio.to_thread(get_obstacle_zones, depth)
+
+    # Provider name + fallback flag
+    provider_name = (state.config or {}).get("agent", {}).get("provider", "none")
+    using_fallback = False
+    if state.provider_fallback is not None:
+        using_fallback = getattr(state.provider_fallback, "is_using_fallback", False)
+    elif state.offline_fallback is not None:
+        using_fallback = getattr(state.offline_fallback, "is_using_fallback", False)
+
+    return {
+        "ts": time.time(),
+        "robot": robot_name,
+        "loop_count": loop_count,
+        "avg_latency_ms": avg_latency_ms,
+        "camera": camera_status,
+        "driver": driver_type,
+        "depth": depth_data,
+        "provider": provider_name,
+        "using_fallback": using_fallback,
+    }
+
+
 @app.websocket("/ws/telemetry")
 async def ws_telemetry(websocket: WebSocket, token: str = ""):
     """WebSocket endpoint that pushes telemetry JSON every 200 ms.
@@ -1891,66 +1956,9 @@ async def ws_telemetry(websocket: WebSocket, token: str = ""):
     logger.debug("WebSocket telemetry client connected")
 
     async def _push_loop():
-        from castor.depth import get_obstacle_zones
-        from castor.main import get_shared_camera
-
         while True:
             try:
-                # Collect telemetry
-                robot_name = (state.config or {}).get("metadata", {}).get("robot_name", "robot")
-
-                # Loop count + latency from ProcFS if available
-                loop_count = 0
-                avg_latency_ms = 0.0
-                if state.fs is not None:
-                    try:
-                        snap = state.fs.proc.snapshot()
-                        loop_count = snap.get("loop", {}).get("iteration") or 0
-                        avg_latency_ms = snap.get("loop", {}).get("latency_ms") or 0.0
-                    except Exception:
-                        pass
-
-                # Camera status
-                camera_status = "offline"
-                if state.fs is not None:
-                    try:
-                        hw = state.fs.proc.snapshot().get("hw", {})
-                        camera_status = hw.get("camera", "offline") or "offline"
-                    except Exception:
-                        pass
-                elif hasattr(state, "camera") and state.camera is not None:
-                    camera_status = "online" if state.camera.is_available() else "offline"
-
-                # Driver type
-                driver_type = "none"
-                if state.driver is not None:
-                    dt = type(state.driver).__name__.lower()
-                    driver_type = "mock" if "mock" in dt or "sim" in dt else "hardware"
-
-                # Depth obstacles
-                camera = get_shared_camera()
-                depth = getattr(camera, "last_depth", None) if camera is not None else None
-                depth_data = await asyncio.to_thread(get_obstacle_zones, depth)
-
-                # Provider name + fallback flag
-                provider_name = (state.config or {}).get("agent", {}).get("provider", "none")
-                using_fallback = False
-                if state.provider_fallback is not None:
-                    using_fallback = getattr(state.provider_fallback, "is_using_fallback", False)
-                elif state.offline_fallback is not None:
-                    using_fallback = getattr(state.offline_fallback, "is_using_fallback", False)
-
-                frame = {
-                    "ts": time.time(),
-                    "robot": robot_name,
-                    "loop_count": loop_count,
-                    "avg_latency_ms": avg_latency_ms,
-                    "camera": camera_status,
-                    "driver": driver_type,
-                    "depth": depth_data,
-                    "provider": provider_name,
-                    "using_fallback": using_fallback,
-                }
+                frame = await _build_telemetry_payload()
                 await websocket.send_json(frame)
             except WebSocketDisconnect:
                 logger.debug("WebSocket telemetry client disconnected (push loop)")

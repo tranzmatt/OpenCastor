@@ -157,7 +157,9 @@ class WorkspaceBounds:
             elif -d < self.warning_margin:
                 results.append(
                     BoundsResult(
-                        "warning", f"near workspace sphere boundary ({-d:.4f}m margin)", -d
+                        BoundsStatus.WARNING,
+                        f"near workspace sphere boundary ({-d:.4f}m margin)",
+                        -d
                     )
                 )
             else:
@@ -240,7 +242,7 @@ class JointBounds:
     ) -> BoundsResult:
         if joint_id not in self.joints:
             return BoundsResult(
-                "warning", f"no limits defined for joint '{joint_id}'", float("inf")
+                BoundsStatus.WARNING, f"no limits defined for joint '{joint_id}'", float("inf")
             )
 
         lim = self.joints[joint_id]
@@ -253,7 +255,7 @@ class JointBounds:
                 margin = lim.position_min - position
                 results.append(
                     BoundsResult(
-                        "violation",
+                        BoundsStatus.VIOLATION,
                         f"joint {joint_id} position {position:.4f} below min {lim.position_min:.4f}",
                         -margin,
                     )
@@ -262,7 +264,7 @@ class JointBounds:
                 margin = position - lim.position_max
                 results.append(
                     BoundsResult(
-                        "violation",
+                        BoundsStatus.VIOLATION,
                         f"joint {joint_id} position {position:.4f} above max {lim.position_max:.4f}",
                         -margin,
                     )
@@ -272,7 +274,7 @@ class JointBounds:
                 if margin < warning_zone:
                     results.append(
                         BoundsResult(
-                            "warning",
+                            BoundsStatus.WARNING,
                             f"joint {joint_id} position near limit ({margin:.4f} rad margin)",
                             margin,
                         )
@@ -288,7 +290,7 @@ class JointBounds:
             if abs_vel > lim.velocity_max:
                 results.append(
                     BoundsResult(
-                        "violation",
+                        BoundsStatus.VIOLATION,
                         f"joint {joint_id} velocity {abs_vel:.4f} exceeds max {lim.velocity_max:.4f}",
                         -abs(margin),
                     )
@@ -296,7 +298,7 @@ class JointBounds:
             elif margin < lim.velocity_max * 0.1:
                 results.append(
                     BoundsResult(
-                        "warning",
+                        BoundsStatus.WARNING,
                         f"joint {joint_id} velocity near limit ({margin:.4f} rad/s margin)",
                         margin,
                     )
@@ -312,7 +314,7 @@ class JointBounds:
             if abs_t > lim.torque_max:
                 results.append(
                     BoundsResult(
-                        "violation",
+                        BoundsStatus.VIOLATION,
                         f"joint {joint_id} torque {abs_t:.4f} exceeds max {lim.torque_max:.4f}",
                         -abs(margin),
                     )
@@ -320,7 +322,7 @@ class JointBounds:
             elif margin < lim.torque_max * 0.1:
                 results.append(
                     BoundsResult(
-                        "warning",
+                        BoundsStatus.WARNING,
                         f"joint {joint_id} torque near limit ({margin:.4f} Nm margin)",
                         margin,
                     )
@@ -372,13 +374,13 @@ class ForceBounds:
         margin = limit - abs(force_n)
         if abs(force_n) > limit:
             return BoundsResult(
-                "violation",
+                BoundsStatus.VIOLATION,
                 f"EE force {abs(force_n):.2f}N exceeds limit {limit:.2f}N",
                 -abs(margin),
             )
         if abs(force_n) > limit * self.warning_fraction:
             return BoundsResult(
-                "warning",
+                BoundsStatus.WARNING,
                 f"EE force {abs(force_n):.2f}N near limit {limit:.2f}N ({margin:.2f}N margin)",
                 margin,
             )
@@ -388,7 +390,7 @@ class ForceBounds:
         margin = self.max_contact_force - abs(force_n)
         if abs(force_n) > self.max_contact_force:
             return BoundsResult(
-                "violation",
+                BoundsStatus.VIOLATION,
                 f"contact force {abs(force_n):.2f}N exceeds limit {self.max_contact_force:.2f}N",
                 -abs(margin),
             )
@@ -398,7 +400,7 @@ class ForceBounds:
         margin = self.max_gripper_force - abs(force_n)
         if abs(force_n) > self.max_gripper_force:
             return BoundsResult(
-                "violation",
+                BoundsStatus.VIOLATION,
                 f"gripper force {abs(force_n):.2f}N exceeds limit {self.max_gripper_force:.2f}N",
                 -abs(margin),
             )

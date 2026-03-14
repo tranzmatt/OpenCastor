@@ -39,7 +39,7 @@ from typing import Any, Optional
 # Rule catalogue
 # ---------------------------------------------------------------------------
 
-_P66_RULES = [
+_P66_RULES: list[dict[str, Any]] = [
     # ── Motion ──────────────────────────────────────────────────────────────
     {
         "rule_id": "MOTION_001",

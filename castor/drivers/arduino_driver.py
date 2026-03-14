@@ -151,14 +151,13 @@ class ArduinoSerialDriver(DriverBase):
     # DriverBase interface
     # ------------------------------------------------------------------
 
-    def move(self, **kwargs: Any) -> None:
-        """Send a drive command.
+    def _move(self, linear: float = 0.0, angular: float = 0.0) -> None:
+        """Send a drive command (SafetyLayer routing path).
 
-        Accepts ``linear``/``angular`` (preferred) or legacy ``linear_x``/
-        ``angular_z`` keys, all normalised to the range ``[-1.0, 1.0]``.
+        Args:
+            linear: Forward/backward speed, normalised to ``[-1.0, 1.0]``.
+            angular: Turning rate, normalised to ``[-1.0, 1.0]``.
         """
-        linear = float(kwargs.get("linear", kwargs.get("linear_x", 0.0)))
-        angular = float(kwargs.get("angular", kwargs.get("angular_z", 0.0)))
         left, right = self._mix_tank(linear, angular)
         self._send({"cmd": "drive", "left": left, "right": right})
 
