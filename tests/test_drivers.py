@@ -74,18 +74,25 @@ class TestDriverBase:
         with pytest.raises(TypeError):
             IncompleteDriver()
 
-    def test_partial_implementation_missing_move_fails(self):
-        """Subclass missing 'move' should fail to instantiate."""
+    def test_partial_implementation_missing_move_uses_base_concrete(self):
+        """move() is now concrete in DriverBase; subclasses may omit it and implement _move() instead."""
 
-        class IncompleteDriver(DriverBase):
+        class NewStyleDriver(DriverBase):
+            def __init__(self):
+                self._moved = False
+
+            def _move(self, linear=0.0, angular=0.0):
+                self._moved = True
+
             def stop(self):
                 pass
 
             def close(self):
                 pass
 
-        with pytest.raises(TypeError):
-            IncompleteDriver()
+        driver = NewStyleDriver()
+        driver.move(0.5, 0.0)
+        assert driver._moved
 
     def test_move_accepts_keyword_args(self):
         class TestDriver(DriverBase):
@@ -642,3 +649,159 @@ class TestModuleLevelFlags:
         from castor.drivers.dynamixel import HAS_DYNAMIXEL
 
         assert HAS_DYNAMIXEL is False
+
+
+# =====================================================================
+# SafetyLayer integration tests (Task D)
+# =====================================================================
+
+class TestDriverBaseSafetyLayer:
+    """Verify SafetyLayer routing in DriverBase.move()."""
+
+    def _make_new_style_driver(self):
+        """Concrete driver that implements _move() — opts into safety routing."""
+
+        class _Driver(DriverBase):
+            def __init__(self):
+                self._move_calls = []
+
+            def _move(self, linear=0.0, angular=0.0):
+                self._move_calls.append((linear, angular))
+
+            def stop(self):
+                pass
+
+            def close(self):
+                pass
+
+        return _Driver()
+
+    def test_driver_base_safety_layer_routes_move(self):
+        """move() calls safety_layer.write() before delegating to _move()."""
+        driver = self._make_new_style_driver()
+        mock_layer = MagicMock()
+        mock_layer.write.return_value = True  # allow
+        driver.set_safety_layer(mock_layer)
+
+        driver.move(0.5, 0.1)
+
+        mock_layer.write.assert_called_once_with(
+            "/dev/motor/cmd", {"linear": 0.5, "angular": 0.1}, principal="driver"
+        )
+        assert driver._move_calls == [(0.5, 0.1)]
+
+    def test_driver_base_estop_blocks_move(self):
+        """When safety_layer.write() returns False, _move() is NOT called."""
+        driver = self._make_new_style_driver()
+        mock_layer = MagicMock()
+        mock_layer.write.return_value = False  # block
+        driver.set_safety_layer(mock_layer)
+
+        driver.move(1.0, 0.0)
+
+        mock_layer.write.assert_called_once()
+        assert driver._move_calls == []  # _move should not have been called
+
+    def test_driver_base_no_safety_layer_still_works(self):
+        """Without a safety_layer, move() works normally (calls _move() directly)."""
+        driver = self._make_new_style_driver()
+        assert driver.safety_layer is None
+
+        driver.move(0.3, -0.2)
+
+        assert driver._move_calls == [(0.3, -0.2)]
+
+    def test_set_safety_layer_stores_layer(self):
+        """set_safety_layer() stores the provided object as self.safety_layer."""
+        driver = self._make_new_style_driver()
+        mock_layer = MagicMock()
+        driver.set_safety_layer(mock_layer)
+        assert driver.safety_layer is mock_layer
+
+    def test_safety_stop_calls_estop_then_stop(self):
+        """safety_stop() calls safety_layer.estop() then self.stop()."""
+        driver = self._make_new_style_driver()
+        stop_calls = []
+        driver.stop = lambda: stop_calls.append(True)
+
+        mock_layer = MagicMock()
+        driver.set_safety_layer(mock_layer)
+        driver.safety_stop()
+
+        mock_layer.estop.assert_called_once_with(principal="driver")
+        assert stop_calls == [True]
+
+    def test_safety_stop_without_safety_layer_still_calls_stop(self):
+        """safety_stop() without a layer still calls stop()."""
+        driver = self._make_new_style_driver()
+        stop_calls = []
+        driver.stop = lambda: stop_calls.append(True)
+
+        driver.safety_stop()
+        assert stop_calls == [True]
+
+    def test_legacy_driver_move_override_not_affected_by_safety(self):
+        """Legacy drivers that override move() directly are not affected by safety routing."""
+
+        class _LegacyDriver(DriverBase):
+            def __init__(self):
+                self._direct_calls = []
+
+            def move(self, linear=0.0, angular=0.0):
+                self._direct_calls.append((linear, angular))
+
+            def stop(self):
+                pass
+
+            def close(self):
+                pass
+
+        driver = _LegacyDriver()
+        mock_layer = MagicMock()
+        driver.set_safety_layer(mock_layer)
+
+        driver.move(0.9, 0.0)
+
+        # Legacy driver overrides move() entirely — safety_layer.write() is NOT called
+        mock_layer.write.assert_not_called()
+        assert driver._direct_calls == [(0.9, 0.0)]
+
+
+class TestWireDriversToSafety:
+    """Tests for castor.drivers.wire_drivers_to_safety() helper."""
+
+    def test_wires_all_compatible_drivers(self):
+        from castor.drivers import wire_drivers_to_safety
+
+        mock_layer = MagicMock()
+
+        class _D(DriverBase):
+            def _move(self, l=0.0, a=0.0):
+                pass
+
+            def stop(self):
+                pass
+
+            def close(self):
+                pass
+
+        d1, d2 = _D(), _D()
+        count = wire_drivers_to_safety([d1, d2], mock_layer)
+
+        assert count == 2
+        assert d1.safety_layer is mock_layer
+        assert d2.safety_layer is mock_layer
+
+    def test_returns_zero_when_safety_layer_is_none(self):
+        from castor.drivers import wire_drivers_to_safety
+
+        count = wire_drivers_to_safety([MagicMock()], None)
+        assert count == 0
+
+    def test_skips_non_driver_objects(self):
+        from castor.drivers import wire_drivers_to_safety
+
+        mock_layer = MagicMock()
+        non_driver = object()  # no set_safety_layer
+        count = wire_drivers_to_safety([non_driver], mock_layer)
+        assert count == 0

@@ -1,8 +1,36 @@
 import logging
+from typing import Any
 
 from .base import DriverBase as DriverBase
 
 logger = logging.getLogger("OpenCastor.Drivers")
+
+
+def wire_drivers_to_safety(drivers: list, safety_layer: Any) -> int:
+    """Attach *safety_layer* to every driver that supports ``set_safety_layer()``.
+
+    Call this once during runtime startup after all drivers have been
+    instantiated.  Only drivers that expose ``set_safety_layer`` (i.e.
+    subclasses of :class:`DriverBase`) are wired; others are silently skipped.
+
+    Args:
+        drivers:      List of instantiated driver objects.
+        safety_layer: A SafetyLayer instance (or ``None`` to skip wiring).
+
+    Returns:
+        Number of drivers successfully wired to the safety layer.
+    """
+    if safety_layer is None:
+        return 0
+    count = 0
+    for driver in drivers:
+        if hasattr(driver, "set_safety_layer") and callable(driver.set_safety_layer):
+            try:
+                driver.set_safety_layer(safety_layer)
+                count += 1
+            except Exception as exc:
+                logger.warning("wire_drivers_to_safety: failed for %r: %s", driver, exc)
+    return count
 
 _EXACT_PROTOCOLS = {
     "acb",

@@ -171,7 +171,8 @@ class FeetechDriver(DriverBase):
     # DriverBase interface
     # ------------------------------------------------------------------
 
-    def move(self, linear: float = 0.0, angular: float = 0.0) -> None:
+    def _move(self, linear: float = 0.0, angular: float = 0.0) -> None:
+        # moved from move() — routed through DriverBase.safety_layer
         """Map linear → wrist position, angular → shoulder pan position.
 
         Args:

@@ -107,9 +107,8 @@ class GPIODriver(DriverBase):
 
     # ── DriverBase interface ──────────────────────────────────────────
 
-    def move(self, action: dict):
-        linear = action.get("linear", 0.0)
-        angular = action.get("angular", 0.0)
+    def _move(self, linear: float = 0.0, angular: float = 0.0) -> None:
+        # moved from move() — routed through DriverBase.safety_layer
         self._clear_all()
         if linear > 0.1:
             self._set_pin("forward", True)

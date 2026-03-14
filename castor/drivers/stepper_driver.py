@@ -139,9 +139,8 @@ class StepperDriver(DriverBase):
         self._right = _make_motor("right_motor", {"step": 19, "dir": 25})
         logger.info("StepperDriver ready, mode=%s, max_rpm=%.0f", self._mode, self._max_rpm)
 
-    def move(self, action: dict):
-        linear = float(action.get("linear", 0.0))
-        angular = float(action.get("angular", 0.0))
+    def _move(self, linear: float = 0.0, angular: float = 0.0) -> None:
+        # moved from move() — routed through DriverBase.safety_layer
         l_rpm = max(-self._max_rpm, min(self._max_rpm, (linear - angular) * self._max_rpm))
         r_rpm = max(-self._max_rpm, min(self._max_rpm, (linear + angular) * self._max_rpm))
         if self._mode == "hardware":

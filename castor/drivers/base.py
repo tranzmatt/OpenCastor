@@ -1,4 +1,14 @@
+# TODO: The following drivers still define move() directly and have not yet been
+# migrated to _move() for automatic SafetyLayer routing. Each one still works;
+# they just bypass SafetyLayer until migrated:
+#   acb_driver.py, arduino_driver.py, composite.py, dynamixel.py,
+#   esp32_ble_driver.py, esp32_websocket.py, ev3dev_driver.py,
+#   imu_driver.py, ipc.py, lidar_driver.py, pca9685.py,
+#   picamera2_driver.py, reachy_driver.py, ros2_driver.py,
+#   simulation_driver.py, spike_driver.py, thermal_driver.py, worker.py
+
 from abc import ABC, abstractmethod
+from typing import Any, Optional
 
 __all__ = ["DriverBase"]
 
@@ -6,10 +16,110 @@ __all__ = ["DriverBase"]
 class DriverBase(ABC):
     """Abstract base class for all hardware drivers.
 
-    Subclasses must implement ``move()``, ``stop()``, and ``close()``.
+    Subclasses must implement ``_move()`` (preferred), ``stop()``, and ``close()``.
+    Alternatively, subclasses may override ``move()`` directly for legacy behaviour;
+    in that case ``_move()`` is never called and SafetyLayer routing is bypassed.
+
+    SafetyLayer integration
+    -----------------------
+    Attach a SafetyLayer via ``set_safety_layer(layer)`` (typically done at
+    runtime startup via ``wire_drivers_to_safety()``).  Once set, every call to
+    ``move()`` is validated by ``safety_layer.write("/dev/motor/cmd", …)`` before
+    the command reaches hardware.  Drivers that override ``move()`` directly do
+    not receive this automatic routing — migrate them to ``_move()`` to opt in.
+
     When the underlying hardware SDK is unavailable, drivers should degrade
     gracefully to a mock/logging mode rather than raising import errors.
     """
+
+    # Class-level default so subclasses that never call super().__init__()
+    # still have a well-defined safety_layer attribute.
+    safety_layer: Optional[Any] = None
+
+    # ------------------------------------------------------------------
+    # SafetyLayer wiring
+    # ------------------------------------------------------------------
+
+    def set_safety_layer(self, layer: Any) -> None:
+        """Attach a SafetyLayer instance to this driver.
+
+        Args:
+            layer: A SafetyLayer (or compatible) object that exposes
+                   ``write(path, data, principal)`` and ``estop(principal)``.
+        """
+        self.safety_layer = layer
+
+    # ------------------------------------------------------------------
+    # Move / safety routing
+    # ------------------------------------------------------------------
+
+    def move(self, linear: float = 0.0, angular: float = 0.0) -> None:
+        """Send a velocity command, routing through SafetyLayer when present.
+
+        Subclasses that implement ``_move()`` get automatic SafetyLayer
+        validation.  Subclasses that override ``move()`` directly bypass it
+        (legacy path — still fully functional, just no automatic safety checks).
+
+        Args:
+            linear: Forward/backward speed (range depends on driver, typically
+                    -1.0 to 1.0).
+            angular: Turning rate (range depends on driver, typically -1.0 to
+                     1.0).
+        """
+        sl = getattr(self, "safety_layer", None)
+        if sl is not None:
+            data = {"linear": linear, "angular": angular}
+            ok = sl.write("/dev/motor/cmd", data, principal="driver")
+            if not ok:
+                return  # safety layer blocked the command
+        self._move(linear, angular)
+
+    def _move(self, linear: float = 0.0, angular: float = 0.0) -> None:
+        """Execute a velocity command after safety validation.
+
+        Override this method instead of ``move()`` to opt into automatic
+        SafetyLayer routing.  The default implementation raises
+        ``NotImplementedError`` so that drivers which forgot to implement
+        either ``move()`` or ``_move()`` fail loudly at call time.
+
+        Args:
+            linear: Forward/backward speed.
+            angular: Turning rate.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement _move() for SafetyLayer routing, "
+            "or override move() directly for legacy behaviour."
+        )
+
+    def safety_stop(self) -> None:
+        """Trigger an emergency stop through SafetyLayer, then halt hardware.
+
+        Calls ``safety_layer.estop(principal="driver")`` if a SafetyLayer is
+        attached, then unconditionally calls ``self.stop()``.
+        """
+        sl = getattr(self, "safety_layer", None)
+        if sl is not None:
+            try:
+                sl.estop(principal="driver")
+            except Exception:
+                pass
+        self.stop()
+
+    # ------------------------------------------------------------------
+    # Abstract hardware interface
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def stop(self) -> None:
+        """Immediately halt all motors."""
+
+    @abstractmethod
+    def close(self) -> None:
+        """Release hardware resources (serial ports, I2C buses, etc.)."""
+
+    # ------------------------------------------------------------------
+    # Optional overrides
+    # ------------------------------------------------------------------
 
     def health_check(self) -> dict:
         """Check whether the hardware is accessible and responsive.
@@ -24,20 +134,3 @@ class DriverBase(ABC):
         connected to real hardware.  Override in concrete drivers to probe actual hardware.
         """
         return {"ok": True, "mode": "mock", "error": None}
-
-    @abstractmethod
-    def move(self, linear: float = 0.0, angular: float = 0.0) -> None:
-        """Send a velocity command to the robot.
-
-        Args:
-            linear: Forward/backward speed (range depends on driver, typically -1.0 to 1.0).
-            angular: Turning rate (range depends on driver, typically -1.0 to 1.0).
-        """
-
-    @abstractmethod
-    def stop(self) -> None:
-        """Immediately halt all motors."""
-
-    @abstractmethod
-    def close(self) -> None:
-        """Release hardware resources (serial ports, I2C buses, etc.)."""

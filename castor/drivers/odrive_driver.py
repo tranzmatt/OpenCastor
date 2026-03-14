@@ -183,17 +183,16 @@ class ODriveDriver(DriverBase):
 
     # ── DriverBase interface ────────────────────────────────────────────────────
 
-    def move(self, action: dict) -> None:
+    def _move(self, linear: float = 0.0, angular: float = 0.0) -> None:
+        # moved from move() — routed through DriverBase.safety_layer
         """Move the robot using velocity setpoints.
 
         Maps ``linear`` / ``angular`` to left/right velocity targets.
 
         Args:
-            action: Dict with ``linear`` (float) and ``angular`` (float) keys.
-                    Values in [-1, 1] range; scaled by ``max_velocity``.
+            linear: Forward/backward speed in [-1, 1]; scaled by ``max_velocity``.
+            angular: Turning rate in [-1, 1]; scaled by ``max_velocity``.
         """
-        linear = float(action.get("linear", 0.0))
-        angular = float(action.get("angular", 0.0))
         vel_l = (linear - angular) * self._max_vel
         vel_r = (linear + angular) * self._max_vel
 

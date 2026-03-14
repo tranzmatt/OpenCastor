@@ -127,6 +127,12 @@ class ConformanceChecker:
             self._safety_latency_budget(),
             *self._safety_hailo_opt_in(),
             self._safety_geofence(),
+            self._safety_local_safety_wins(),
+            self._safety_watchdog_configured(),
+            self._safety_confidence_gates_configured(),
+            self._safety_p66_conformance(),
+            self._safety_hardware_safety_declared(),
+            self._safety_estop_distance_configured(),
         ]
 
     def _safety_reactive_layer(self) -> ConformanceResult:
@@ -302,6 +308,158 @@ class ConformanceChecker:
             category="safety",
             status="pass",
             detail="Geofence configured",
+        )
+
+    def _safety_local_safety_wins(self) -> ConformanceResult:
+        cid = "safety.local_safety_wins"
+        safety_cfg = self._cfg.get("safety", {}) or {}
+        val = safety_cfg.get("local_safety_wins")
+        if val is not True:
+            return ConformanceResult(
+                check_id=cid,
+                category="safety",
+                status="fail",
+                detail=(
+                    "safety.local_safety_wins is not True — remote commands may override "
+                    "local safety constraints (RCAN §6 invariant violated)"
+                ),
+                fix="Set safety.local_safety_wins: true in rcan.yaml — RCAN §6 invariant.",
+            )
+        return ConformanceResult(
+            check_id=cid,
+            category="safety",
+            status="pass",
+            detail="safety.local_safety_wins=true (RCAN §6 invariant satisfied)",
+        )
+
+    def _safety_watchdog_configured(self) -> ConformanceResult:
+        cid = "safety.watchdog_configured"
+        watchdog = self._cfg.get("watchdog", {}) or {}
+        timeout = watchdog.get("timeout_s")
+        if timeout is None:
+            return ConformanceResult(
+                check_id=cid,
+                category="safety",
+                status="warn",
+                detail="watchdog.timeout_s is not configured",
+                fix="Add watchdog: timeout_s: 10 to rcan.yaml.",
+            )
+        try:
+            fval = float(timeout)
+        except (TypeError, ValueError):
+            return ConformanceResult(
+                check_id=cid,
+                category="safety",
+                status="warn",
+                detail=f"watchdog.timeout_s is not a number: {timeout!r}",
+                fix="Set watchdog.timeout_s to a numeric value ≤ 30 (e.g. 10).",
+            )
+        if fval > 30:
+            return ConformanceResult(
+                check_id=cid,
+                category="safety",
+                status="warn",
+                detail=f"watchdog.timeout_s={fval} exceeds recommended maximum of 30s",
+                fix="Reduce watchdog.timeout_s to ≤ 30 for timely fault detection.",
+            )
+        return ConformanceResult(
+            check_id=cid,
+            category="safety",
+            status="pass",
+            detail=f"watchdog.timeout_s={fval} (≤ 30s, good)",
+        )
+
+    def _safety_confidence_gates_configured(self) -> ConformanceResult:
+        cid = "safety.confidence_gates_configured"
+        brain = self._cfg.get("brain", {}) or {}
+        gates = brain.get("confidence_gates")
+        if gates is None:
+            return ConformanceResult(
+                check_id=cid,
+                category="safety",
+                status="warn",
+                detail="brain.confidence_gates is not configured",
+                fix="Add confidence_gates block to brain config for RCAN §16.2 compliance.",
+            )
+        return ConformanceResult(
+            check_id=cid,
+            category="safety",
+            status="pass",
+            detail="brain.confidence_gates is configured (RCAN §16.2)",
+        )
+
+    def _safety_p66_conformance(self) -> ConformanceResult:
+        cid = "safety.p66_conformance"
+        try:
+            from castor.safety.p66_manifest import build_manifest
+
+            manifest = build_manifest()
+            pct = manifest.get("summary", {}).get("conformance_pct", 0)
+        except Exception as exc:
+            return ConformanceResult(
+                check_id=cid,
+                category="safety",
+                status="warn",
+                detail=f"Could not evaluate P66 conformance manifest: {exc}",
+                fix="Ensure castor.safety.p66_manifest is importable and build_manifest() works.",
+            )
+        if pct >= 80:
+            status = "pass"
+        elif pct >= 60:
+            status = "warn"
+        else:
+            status = "fail"
+        return ConformanceResult(
+            check_id=cid,
+            category="safety",
+            status=status,
+            detail=f"Protocol 66 conformance: {pct}% (threshold pass≥80, warn≥60)",
+        )
+
+    def _safety_hardware_safety_declared(self) -> ConformanceResult:
+        cid = "safety.hardware_safety_declared"
+        hw_safety = self._cfg.get("hardware_safety")
+        if not hw_safety:
+            return ConformanceResult(
+                check_id=cid,
+                category="safety",
+                status="warn",
+                detail="hardware_safety block is not declared in config",
+                fix=(
+                    "Add hardware_safety block to declare physical safety capabilities "
+                    "(physical_estop, hardware_watchdog_mcu, etc.)."
+                ),
+            )
+        return ConformanceResult(
+            check_id=cid,
+            category="safety",
+            status="pass",
+            detail="hardware_safety block is declared",
+        )
+
+    def _safety_estop_distance_configured(self) -> ConformanceResult:
+        cid = "safety.estop_distance_configured"
+        safety_cfg = self._cfg.get("safety", {}) or {}
+        val = safety_cfg.get("emergency_stop_distance") or safety_cfg.get("estop_distance_mm")
+        if val is None:
+            return ConformanceResult(
+                check_id=cid,
+                category="safety",
+                status="warn",
+                detail=(
+                    "Neither safety.emergency_stop_distance nor safety.estop_distance_mm "
+                    "is configured"
+                ),
+                fix=(
+                    "Add safety.emergency_stop_distance (metres) or safety.estop_distance_mm "
+                    "to define the minimum clearance before emergency stop triggers."
+                ),
+            )
+        return ConformanceResult(
+            check_id=cid,
+            category="safety",
+            status="pass",
+            detail=f"E-stop distance configured: {val}",
         )
 
     # ------------------------------------------------------------------

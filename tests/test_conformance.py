@@ -957,7 +957,9 @@ class TestCmdValidate:
 
         cfg = make_valid_config()
         # Force some warns: remove geofence (warn), remove tiered_brain (warn)
-        # Keep everything else valid
+        # Keep everything else valid — must include safety.local_safety_wins: true
+        # so the new RCAN §6 check does not produce a fail.
+        cfg["safety"] = {"local_safety_wins": True}
         config_file = tmp_path / "warn.rcan.yaml"
         config_file.write_text(yaml.dump(cfg))
 
@@ -1047,3 +1049,137 @@ class TestCmdValidate:
 
         # Should exit with error, not crash
         assert exit_code != 0 or "not found" in f.getvalue().lower()
+
+
+# ===========================================================================
+# New P66 / safety completeness checks (Task C + D)
+# ===========================================================================
+
+
+class TestSafetyLocalSafetyWins:
+    def test_fail_when_missing(self):
+        cfg = make_valid_config()
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.local_safety_wins")
+        assert r.status == "fail"
+
+    def test_fail_when_false(self):
+        cfg = make_valid_config()
+        cfg["safety"] = {"local_safety_wins": False}
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.local_safety_wins")
+        assert r.status == "fail"
+
+    def test_pass_when_true(self):
+        cfg = make_valid_config()
+        cfg["safety"] = {"local_safety_wins": True}
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.local_safety_wins")
+        assert r.status == "pass"
+
+    def test_fix_mentions_rcan_section_6(self):
+        cfg = make_valid_config()
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.local_safety_wins")
+        assert r.fix is not None
+        assert "RCAN §6" in r.fix or "rcan.yaml" in r.fix
+
+
+class TestSafetyWatchdogConfigured:
+    def test_warn_when_missing(self):
+        cfg = make_valid_config()
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.watchdog_configured")
+        assert r.status == "warn"
+
+    def test_pass_when_timeout_le_30(self):
+        cfg = make_valid_config()
+        cfg["watchdog"] = {"timeout_s": 10}
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.watchdog_configured")
+        assert r.status == "pass"
+
+    def test_warn_when_timeout_gt_30(self):
+        cfg = make_valid_config()
+        cfg["watchdog"] = {"timeout_s": 60}
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.watchdog_configured")
+        assert r.status == "warn"
+
+    def test_pass_at_boundary_30(self):
+        cfg = make_valid_config()
+        cfg["watchdog"] = {"timeout_s": 30}
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.watchdog_configured")
+        assert r.status == "pass"
+
+
+class TestSafetyConfidenceGatesConfigured:
+    def test_warn_when_missing(self):
+        cfg = make_valid_config()
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.confidence_gates_configured")
+        assert r.status == "warn"
+
+    def test_pass_when_configured(self):
+        cfg = make_valid_config()
+        cfg["brain"] = {"confidence_gates": [{"scope": "motion", "min_confidence": 0.7}]}
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.confidence_gates_configured")
+        assert r.status == "pass"
+
+
+class TestSafetyP66Conformance:
+    def test_p66_conformance_check_runs(self):
+        """P66 conformance check runs and returns a valid status."""
+        cfg = make_valid_config()
+        cfg["safety"] = {"local_safety_wins": True}
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.p66_conformance")
+        assert r.status in ("pass", "warn", "fail")
+        assert "%" in r.detail
+
+    def test_p66_conformance_pct_in_detail(self):
+        """P66 conformance detail includes a percentage value."""
+        cfg = make_valid_config()
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.p66_conformance")
+        # Should contain a percentage figure in the detail string
+        assert "%" in r.detail
+
+
+class TestSafetyHardwareSafetyDeclared:
+    def test_warn_when_missing(self):
+        cfg = make_valid_config()
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.hardware_safety_declared")
+        assert r.status == "warn"
+
+    def test_pass_when_declared(self):
+        cfg = make_valid_config()
+        cfg["hardware_safety"] = {"physical_estop": True, "hardware_watchdog_mcu": False}
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.hardware_safety_declared")
+        assert r.status == "pass"
+
+
+class TestSafetyEstopDistanceConfigured:
+    def test_warn_when_missing(self):
+        cfg = make_valid_config()
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.estop_distance_configured")
+        assert r.status == "warn"
+
+    def test_pass_with_emergency_stop_distance(self):
+        cfg = make_valid_config()
+        cfg["safety"] = {"emergency_stop_distance": 0.3}
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.estop_distance_configured")
+        assert r.status == "pass"
+
+    def test_pass_with_estop_distance_mm(self):
+        cfg = make_valid_config()
+        cfg["safety"] = {"estop_distance_mm": 300}
+        results = checker_from(cfg).run_category("safety")
+        r = next(x for x in results if x.check_id == "safety.estop_distance_configured")
+        assert r.status == "pass"
