@@ -53,7 +53,14 @@ class DriverBase(ABC):
     # Move / safety routing
     # ------------------------------------------------------------------
 
-    def move(self, linear: float = 0.0, angular: float = 0.0) -> None:
+    def move(
+        self,
+        linear: float = 0.0,
+        angular: float = 0.0,
+        *,
+        linear_x: float | None = None,
+        angular_z: float | None = None,
+    ) -> None:
         """Send a velocity command, routing through SafetyLayer when present.
 
         Subclasses that implement ``_move()`` get automatic SafetyLayer
@@ -62,10 +69,17 @@ class DriverBase(ABC):
 
         Args:
             linear: Forward/backward speed (range depends on driver, typically
-                    -1.0 to 1.0).
+                    -1.0 to 1.0). Also accepted as ``linear_x`` (ROS convention).
             angular: Turning rate (range depends on driver, typically -1.0 to
-                     1.0).
+                     1.0). Also accepted as ``angular_z`` (ROS convention).
+            linear_x: Alias for ``linear`` (ROS2 / legacy callers).
+            angular_z: Alias for ``angular`` (ROS2 / legacy callers).
         """
+        # Accept ROS-convention aliases for backward compatibility
+        if linear_x is not None:
+            linear = linear_x
+        if angular_z is not None:
+            angular = angular_z
         sl = getattr(self, "safety_layer", None)
         if sl is not None:
             data = {"linear": linear, "angular": angular}
