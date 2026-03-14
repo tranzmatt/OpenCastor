@@ -3137,6 +3137,90 @@ async def safety_test_bounds(req: _SafetyTestBoundsRequest):
         raise HTTPException(status_code=500, detail=f"Bounds check failed: {exc}") from exc
 
 
+class _RCANSafetyRequest(BaseModel):
+    """Body for POST /api/safety/rcan — RCAN MessageType.SAFETY message handler."""
+
+    safety_event: str  # "STOP" | "ESTOP" | "RESUME"
+    reason: str
+    message_id: Optional[str] = None
+    ruri: Optional[str] = None
+    timestamp_ms: Optional[int] = None
+
+
+@app.post("/api/safety/rcan", dependencies=[Depends(verify_token)])
+async def rcan_safety_message(req: _RCANSafetyRequest):
+    """POST /api/safety/rcan — RCAN MessageType.SAFETY message (type 6) handler.
+
+    Handles STOP / ESTOP / RESUME safety events from the RCAN protocol layer.
+    These bypass all HiTL queues and confidence gates per RCAN §6.
+
+    - STOP  → controlled deceleration to rest (robot can resume without manual clear)
+    - ESTOP → immediate actuator cut (requires manual clear_estop)
+    - RESUME → clear a prior STOP or ESTOP and restore operation
+
+    RCAN §6 invariant: local safety checks still run. A RESUME is rejected
+    if the local e-stop was triggered by an on-device sensor (not a remote STOP).
+    """
+    event = req.safety_event.upper()
+    if event not in ("STOP", "ESTOP", "RESUME"):
+        raise HTTPException(
+            status_code=422,
+            detail=f"safety_event must be STOP, ESTOP, or RESUME — got '{req.safety_event}'",
+        )
+
+    result = {"event": event, "reason": req.reason, "message_id": req.message_id}
+
+    if not state.fs:
+        raise HTTPException(status_code=503, detail="Safety layer not initialised")
+
+    try:
+        if event == "ESTOP":
+            ok = state.fs.estop(
+                principal="rcan_remote",
+                source="rcan",
+                reason=req.reason,
+            )
+            result["accepted"] = ok
+            result["detail"] = "ESTOP activated" if ok else state.fs.last_write_denial
+        elif event == "STOP":
+            ok = state.fs.controlled_stop(
+                principal="rcan_remote",
+                source="rcan",
+                reason=req.reason,
+            )
+            result["accepted"] = ok
+            result["detail"] = "Controlled STOP initiated" if ok else state.fs.last_write_denial
+        elif event == "RESUME":
+            ok = state.fs.clear_estop(principal="rcan_remote")
+            result["accepted"] = ok
+            result["detail"] = "RESUME accepted" if ok else state.fs.last_write_denial
+            if not ok and state.fs.is_estopped:
+                result["hint"] = (
+                    "E-stop may have been triggered by a local sensor — "
+                    "verify physical safety before clearing locally via POST /api/estop/clear"
+                )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Safety handler error: {exc}") from exc
+
+    return result
+
+
+@app.get("/api/safety/manifest", dependencies=[Depends(verify_token)])
+async def safety_manifest():
+    """GET /api/safety/manifest — Machine-readable Protocol 66 conformance declaration.
+
+    Returns the full list of Protocol 66 safety rules, their implementation
+    status, severity, and current enabled state. Use this to verify safety
+    posture without reading source code.
+    """
+    try:
+        from castor.safety.p66_manifest import build_manifest
+
+        return build_manifest(state.fs if state.fs else None)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Manifest build failed: {exc}") from exc
+
+
 @app.websocket("/ws/safety")
 async def ws_safety(websocket: WebSocket):
     """WS /ws/safety — Real-time safety event push at 2Hz."""

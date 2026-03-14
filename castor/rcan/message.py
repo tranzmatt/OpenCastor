@@ -11,6 +11,7 @@ Message types follow the RCAN spec::
     COMMAND       -- Motor, config, or action command
     STREAM        -- Continuous sensor data
     EVENT         -- Asynchronous notifications
+    SAFETY        -- STOP / ESTOP / RESUME safety events (highest priority)
     HANDOFF       -- Transfer control between principals
     ACK           -- Acknowledgement of a prior message
     ERROR         -- Error response
@@ -46,7 +47,7 @@ class MessageType(IntEnum):
     COMMAND = 3
     STREAM = 4
     EVENT = 5
-    HANDOFF = 6
+    SAFETY = 6        # RCAN §6: STOP / ESTOP / RESUME — bypasses all queues
     ACK = 7
     ERROR = 8
     AUTHORIZE = 9  # Out-of-band authorization for HiTL gate (RCAN v1.2)
@@ -60,6 +61,7 @@ class MessageType(IntEnum):
         16  # §21 — result of REGISTRY_REGISTER (success/failure + assigned RRN)
     )
     REGISTRY_RESOLVE_RESULT = 17  # §21 — result of REGISTRY_RESOLVE (RURI + metadata or error)
+    HANDOFF = 19       # Transfer control between principals
 
 
 class Priority(IntEnum):

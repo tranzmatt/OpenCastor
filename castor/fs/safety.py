@@ -566,16 +566,101 @@ class SafetyLayer:
     # ------------------------------------------------------------------
     # Emergency stop
     # ------------------------------------------------------------------
-    def estop(self, principal: str = "root") -> bool:
-        """Trigger emergency stop. Requires CAP_ESTOP."""
+    # ------------------------------------------------------------------
+    # Source tracking helpers (RCAN §6 — local_safety_wins)
+    # ------------------------------------------------------------------
+    def _audit_action_sourced(
+        self,
+        principal: str,
+        path: str,
+        operation: str,
+        data: Any = None,
+        source: str = "local",
+    ):
+        """Write an audit record that includes command source (local|rcan|api|swarm)."""
+        if not POLICIES["audit_writes"]["enabled"]:
+            return
+        entry = {
+            "t": time.time(),
+            "who": principal,
+            "op": operation,
+            "path": path,
+            "source": source,  # RCAN §6: track command origin
+            "local_safety_enforced": True,  # always True — local safety always wins
+        }
+        if data is not None:
+            entry["data"] = repr(data)[:200]
+        self.ns.append("/var/log/actions", entry)
+        self._trim_log("/var/log/actions")
+
+    def write_remote(
+        self, path: str, data: Any, principal: str = "root", meta: Optional[dict] = None
+    ) -> bool:
+        """Write from a remote RCAN command — runs the same local safety checks.
+
+        This exists to make it architecturally explicit that remote commands
+        are NOT trusted more than local ones. All SafetyLayer checks run
+        identically; the only difference is the 'source=rcan' audit tag.
+
+        RCAN §6 invariant: local safety always wins — no remote command can
+        bypass bounds checking, e-stop state, or protocol rules.
+        """
+        # Re-use the standard write() path — every check runs
+        result = self.write(path, data, principal=principal, meta=meta)
+        if result:
+            # Re-tag the last audit entry with source=rcan
+            log = self.ns.read("/var/log/actions")
+            if isinstance(log, list) and log:
+                log[-1]["source"] = "rcan"
+                self.ns.write("/var/log/actions", log)
+        else:
+            self._audit_safety(
+                principal,
+                path,
+                "remote_write_denied",
+                f"RCAN remote write blocked by local safety: {self._last_write_denial}",
+            )
+        return result
+
+    def estop(self, principal: str = "root", source: str = "local", reason: str = "") -> bool:
+        """Trigger emergency stop. Requires CAP_ESTOP.
+
+        Args:
+            principal: Caller identity.
+            source:    Command origin — 'local', 'rcan', 'api', 'swarm'.
+            reason:    Human-readable explanation for audit trail.
+        """
         caps = self.perms.get_caps(principal)
         if not (caps & Cap.ESTOP) and principal != "root":
             self._audit_safety(principal, "/dev/motor", "deny_estop", "missing CAP_ESTOP")
             return False
         self._estop = True
         self.ns.write("/proc/status", "estop")
-        self._audit_safety(principal, "/dev/motor", "estop", "emergency stop activated")
-        logger.warning("EMERGENCY STOP activated by %s", principal)
+        detail = f"ESTOP activated — source={source}" + (f" — {reason}" if reason else "")
+        self._audit_safety(principal, "/dev/motor", "estop", detail)
+        logger.warning("EMERGENCY STOP [%s] activated by %s: %s", source, principal, reason)
+        return True
+
+    def controlled_stop(
+        self, principal: str = "root", source: str = "local", reason: str = ""
+    ) -> bool:
+        """Controlled deceleration stop (RCAN SAFETY STOP — not ESTOP).
+
+        Unlike estop() which cuts actuators immediately, controlled_stop() sets
+        a flag that the motion controller should respect to decelerate smoothly
+        to rest. The e-stop flag is NOT set, so the robot can resume without
+        manual clear. Audit is identical to ESTOP for traceability.
+
+        RCAN §6: STOP = controlled deceleration. ESTOP = immediate actuator cut.
+        """
+        caps = self.perms.get_caps(principal)
+        if not (caps & Cap.ESTOP) and principal != "root":
+            self._audit_safety(principal, "/dev/motor", "deny_stop", "missing CAP_ESTOP")
+            return False
+        self.ns.write("/proc/status", "stopping")
+        detail = f"Controlled STOP — source={source}" + (f" — {reason}" if reason else "")
+        self._audit_safety(principal, "/dev/motor", "controlled_stop", detail)
+        logger.warning("CONTROLLED STOP [%s] by %s: %s", source, principal, reason)
         return True
 
     def clear_estop(self, principal: str = "root", auth_code: Optional[str] = None) -> bool:

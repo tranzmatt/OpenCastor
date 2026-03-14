@@ -248,6 +248,249 @@ def _check_sensor_consent(
 
 
 # ---------------------------------------------------------------------------
+# Protocol 66 — Extended rules (Phase 2)
+# ---------------------------------------------------------------------------
+
+def _check_human_proximity_estop(
+    action: dict[str, Any], params: dict[str, Any]
+) -> Optional[RuleViolation]:
+    """HUMAN_001 — Immediate ESTOP if human within hard-stop distance."""
+    distance_m = action.get("human_distance_m")
+    if distance_m is None:
+        return None
+    limit = params.get("estop_distance_m", 0.3)
+    if distance_m < limit:
+        return RuleViolation(
+            rule_id="HUMAN_001",
+            category="human",
+            severity="critical",
+            message=(
+                f"Human within ESTOP distance: {distance_m:.2f}m < {limit:.2f}m — "
+                "immediate halt required"
+            ),
+        )
+    return None
+
+
+def _check_human_proximity_slowdown(
+    action: dict[str, Any], params: dict[str, Any]
+) -> Optional[RuleViolation]:
+    """HUMAN_002 — Reduce speed when human is in the slowdown zone."""
+    distance_m = action.get("human_distance_m")
+    linear_vel = action.get("linear_velocity", 0.0)
+    if distance_m is None:
+        return None
+    slowdown_dist = params.get("slowdown_distance_m", 1.5)
+    max_vel_in_zone = params.get("max_velocity_in_zone_ms", 0.25)
+    if distance_m < slowdown_dist and abs(linear_vel) > max_vel_in_zone:
+        return RuleViolation(
+            rule_id="HUMAN_002",
+            category="human",
+            severity="violation",
+            message=(
+                f"Speed {abs(linear_vel):.2f} m/s too high with human at {distance_m:.2f}m — "
+                f"max {max_vel_in_zone:.2f} m/s in {slowdown_dist:.1f}m zone"
+            ),
+        )
+    return None
+
+
+def _check_arm_joint_velocity(
+    action: dict[str, Any], params: dict[str, Any]
+) -> Optional[RuleViolation]:
+    """ARM_001 — Per-joint velocity limits for manipulators."""
+    joint_velocities = action.get("joint_velocities")
+    if not isinstance(joint_velocities, (list, dict)):
+        return None
+    max_vel = params.get("max_joint_velocity_rads", 3.14)  # π rad/s default
+    if isinstance(joint_velocities, list):
+        items = enumerate(joint_velocities)
+    else:
+        items = joint_velocities.items()
+    for idx, vel in items:
+        if abs(vel) > max_vel:
+            return RuleViolation(
+                rule_id="ARM_001",
+                category="arm",
+                severity="violation",
+                message=(
+                    f"Joint {idx} velocity {abs(vel):.3f} rad/s exceeds limit {max_vel:.3f} rad/s"
+                ),
+            )
+    return None
+
+
+def _check_arm_payload(
+    action: dict[str, Any], params: dict[str, Any]
+) -> Optional[RuleViolation]:
+    """ARM_002 — Payload mass limit for manipulators."""
+    payload_kg = action.get("payload_kg")
+    if payload_kg is None:
+        return None
+    limit = params.get("max_payload_kg", 5.0)
+    if payload_kg > limit:
+        return RuleViolation(
+            rule_id="ARM_002",
+            category="arm",
+            severity="violation",
+            message=f"Payload {payload_kg:.2f} kg exceeds rated limit {limit:.2f} kg",
+        )
+    return None
+
+
+def _check_arm_singularity(
+    action: dict[str, Any], params: dict[str, Any]
+) -> Optional[RuleViolation]:
+    """ARM_003 — Warn when arm is near a kinematic singularity."""
+    singularity_metric = action.get("singularity_metric")  # 0.0 = at singularity, 1.0 = far
+    if singularity_metric is None:
+        return None
+    warn_threshold = params.get("singularity_warn_threshold", 0.05)
+    critical_threshold = params.get("singularity_critical_threshold", 0.01)
+    if singularity_metric < critical_threshold:
+        return RuleViolation(
+            rule_id="ARM_003",
+            category="arm",
+            severity="critical",
+            message=(
+                f"Arm in kinematic singularity (metric={singularity_metric:.4f} < "
+                f"{critical_threshold:.4f}) — motion blocked"
+            ),
+        )
+    if singularity_metric < warn_threshold:
+        return RuleViolation(
+            rule_id="ARM_003",
+            category="arm",
+            severity="warning",
+            message=(
+                f"Arm near kinematic singularity (metric={singularity_metric:.4f}) — "
+                "reduce speed"
+            ),
+        )
+    return None
+
+
+def _check_motor_voltage(
+    action: dict[str, Any], params: dict[str, Any]
+) -> Optional[RuleViolation]:
+    """ELECTRICAL_001 — Motor supply voltage out of safe range."""
+    voltage_v = action.get("motor_voltage_v")
+    if voltage_v is None:
+        return None
+    v_min = params.get("min_voltage_v", 9.0)
+    v_max = params.get("max_voltage_v", 16.8)  # 4S LiPo max
+    if voltage_v < v_min:
+        return RuleViolation(
+            rule_id="ELECTRICAL_001",
+            category="electrical",
+            severity="critical",
+            message=f"Motor voltage {voltage_v:.2f}V below minimum {v_min:.2f}V — risk of brownout",
+        )
+    if voltage_v > v_max:
+        return RuleViolation(
+            rule_id="ELECTRICAL_001",
+            category="electrical",
+            severity="critical",
+            message=f"Motor voltage {voltage_v:.2f}V above maximum {v_max:.2f}V — risk of damage",
+        )
+    return None
+
+
+def _check_motor_current(
+    action: dict[str, Any], params: dict[str, Any]
+) -> Optional[RuleViolation]:
+    """ELECTRICAL_002 — Motor current draw over safe limit."""
+    current_a = action.get("motor_current_a")
+    if current_a is None:
+        return None
+    limit = params.get("max_current_a", 10.0)
+    critical = params.get("critical_current_a", 15.0)
+    severity = "critical" if abs(current_a) > critical else "violation"
+    if abs(current_a) > limit:
+        return RuleViolation(
+            rule_id="ELECTRICAL_002",
+            category="electrical",
+            severity=severity,
+            message=(
+                f"Motor current {abs(current_a):.2f}A exceeds {'critical' if severity == 'critical' else 'safe'} "
+                f"limit {critical if severity == 'critical' else limit:.2f}A"
+            ),
+        )
+    return None
+
+
+def _check_direction_reversal(
+    action: dict[str, Any], params: dict[str, Any]
+) -> Optional[RuleViolation]:
+    """MOTION_004 — Prevent sudden direction reversal at high speed.
+
+    A sign flip on linear_velocity when moving above threshold is a sudden
+    reversal that can stress drivetrain and destabilise the robot.
+    """
+    linear_vel = action.get("linear_velocity")
+    prev_linear_vel = action.get("prev_linear_velocity")
+    if linear_vel is None or prev_linear_vel is None:
+        return None
+    speed_threshold = params.get("min_speed_for_reversal_check_ms", 0.3)
+    if abs(prev_linear_vel) < speed_threshold:
+        return None
+    # Reversal: signs differ and previous speed was significant
+    if (linear_vel * prev_linear_vel) < 0:
+        return RuleViolation(
+            rule_id="MOTION_004",
+            category="motion",
+            severity="violation",
+            message=(
+                f"Sudden direction reversal at {abs(prev_linear_vel):.2f} m/s — "
+                "decelerate before reversing"
+            ),
+        )
+    return None
+
+
+def _check_ai_confidence(
+    action: dict[str, Any], params: dict[str, Any]
+) -> Optional[RuleViolation]:
+    """SOFTWARE_002 — AI confidence must meet per-scope threshold before actuation."""
+    confidence = action.get("ai_confidence")
+    if confidence is None:
+        return None
+    threshold = params.get("min_confidence", 0.7)
+    if confidence < threshold:
+        return RuleViolation(
+            rule_id="SOFTWARE_002",
+            category="software",
+            severity="violation",
+            message=(
+                f"AI confidence {confidence:.3f} below required threshold {threshold:.3f} — "
+                "command blocked per confidence gate"
+            ),
+        )
+    return None
+
+
+def _check_thought_log_required(
+    action: dict[str, Any], params: dict[str, Any]
+) -> Optional[RuleViolation]:
+    """SOFTWARE_003 — AI-generated actuator commands must carry a thought_id for audit."""
+    is_ai_generated = action.get("ai_generated", False)
+    if not is_ai_generated:
+        return None
+    thought_id = action.get("thought_id")
+    if not thought_id:
+        return RuleViolation(
+            rule_id="SOFTWARE_003",
+            category="software",
+            severity="violation",
+            message=(
+                "AI-generated actuator command missing thought_id — "
+                "cannot audit reasoning chain (RCAN §16.4)"
+            ),
+        )
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Default rules registry
 # ---------------------------------------------------------------------------
 
@@ -331,6 +574,91 @@ _DEFAULT_RULES: list[SafetyRule] = [
         severity="violation",
         params={"require_consent": True},
         check=_check_sensor_consent,
+    ),
+    # ── Human proximity (Protocol 66 Phase 2) ──────────────────────────────
+    SafetyRule(
+        rule_id="HUMAN_001",
+        category="human",
+        description="Immediate ESTOP if human within hard-stop distance (default 0.3m)",
+        severity="critical",
+        params={"estop_distance_m": 0.3},
+        check=_check_human_proximity_estop,
+    ),
+    SafetyRule(
+        rule_id="HUMAN_002",
+        category="human",
+        description="Reduce speed when human in slowdown zone (default 1.5m, max 0.25 m/s)",
+        severity="violation",
+        params={"slowdown_distance_m": 1.5, "max_velocity_in_zone_ms": 0.25},
+        check=_check_human_proximity_slowdown,
+    ),
+    # ── Manipulator / arm ─────────────────────────────────────────────────
+    SafetyRule(
+        rule_id="ARM_001",
+        category="arm",
+        description="Per-joint velocity limit (default π rad/s)",
+        severity="violation",
+        params={"max_joint_velocity_rads": 3.14159},
+        check=_check_arm_joint_velocity,
+    ),
+    SafetyRule(
+        rule_id="ARM_002",
+        category="arm",
+        description="Payload mass limit (default 5 kg)",
+        severity="violation",
+        params={"max_payload_kg": 5.0},
+        check=_check_arm_payload,
+    ),
+    SafetyRule(
+        rule_id="ARM_003",
+        category="arm",
+        description="Kinematic singularity proximity warning/block",
+        severity="warning",
+        params={"singularity_warn_threshold": 0.05, "singularity_critical_threshold": 0.01},
+        check=_check_arm_singularity,
+    ),
+    # ── Electrical / power ────────────────────────────────────────────────
+    SafetyRule(
+        rule_id="ELECTRICAL_001",
+        category="electrical",
+        description="Motor supply voltage must stay within safe range (9–16.8V)",
+        severity="critical",
+        params={"min_voltage_v": 9.0, "max_voltage_v": 16.8},
+        check=_check_motor_voltage,
+    ),
+    SafetyRule(
+        rule_id="ELECTRICAL_002",
+        category="electrical",
+        description="Motor current draw limit (default 10A warning, 15A critical)",
+        severity="violation",
+        params={"max_current_a": 10.0, "critical_current_a": 15.0},
+        check=_check_motor_current,
+    ),
+    # ── Motion dynamics ───────────────────────────────────────────────────
+    SafetyRule(
+        rule_id="MOTION_004",
+        category="motion",
+        description="Prevent sudden direction reversal above threshold speed (0.3 m/s)",
+        severity="violation",
+        params={"min_speed_for_reversal_check_ms": 0.3},
+        check=_check_direction_reversal,
+    ),
+    # ── AI accountability (RCAN §16) ──────────────────────────────────────
+    SafetyRule(
+        rule_id="SOFTWARE_002",
+        category="software",
+        description="AI confidence gate: block actuation below per-scope threshold",
+        severity="violation",
+        params={"min_confidence": 0.7},
+        check=_check_ai_confidence,
+    ),
+    SafetyRule(
+        rule_id="SOFTWARE_003",
+        category="software",
+        description="AI-generated commands must carry thought_id for audit (RCAN §16.4)",
+        severity="violation",
+        params={},
+        check=_check_thought_log_required,
     ),
 ]
 
