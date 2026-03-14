@@ -217,17 +217,20 @@ code, pre { font-family: var(--font-mono); }
 /* Right side */
 .nav-end {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-
-/* Mobile drawer theme row — hidden on desktop */
-.nav-drawer-theme { display: none; }
+  z-index: 1001;
 }
 
-/* Theme pill (☀ / 🌙) */
+/* Mobile drawer theme row — hidden on desktop, shown in open mobile menu */
+.nav-drawer-theme { display: none; }
+
+/* ── Theme pill (☀ / 🌙) ── */
 .theme-pill {
-  display: inline-flex;
+  display: flex;
+  flex-direction: row;
   align-items: center;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.1);
@@ -236,13 +239,15 @@ code, pre { font-family: var(--font-mono); }
   gap: 2px;
   cursor: pointer;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 [data-theme="light"] .theme-pill {
   background: rgba(0,0,0,0.04);
   border-color: rgba(0,0,0,0.1);
 }
 .theme-pill-opt {
-  display: inline-flex;
+  display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 5px;
   padding: 4px 9px;
@@ -255,12 +260,17 @@ code, pre { font-family: var(--font-mono); }
   line-height: 1;
 }
 .theme-pill-opt svg { display: block; flex-shrink: 0; }
-/* Active state: highlight current theme */
+/* Active option gets accent highlight */
 [data-theme="dark"]  .theme-pill-opt[data-opt="dark"],
 [data-theme="light"] .theme-pill-opt[data-opt="light"] {
   background: var(--accent, #06b6d4);
   color: #fff;
 }
+
+/* Desktop: icon-only pill (text hidden, icons show) */
+#themeToggle .theme-pill-opt { padding: 5px 8px; font-size: 0; gap: 0; }
+#themeToggle .theme-pill-opt svg { width: 14px; height: 14px; display: block; }
+
 
 /* GitHub CTA */
 .btn-nav {
@@ -621,18 +631,20 @@ code, pre { font-family: var(--font-mono); }
   [data-theme="light"] .nav-links { background: #fff; }
   .nav-links.open { display: flex; }
   .nav-links a { font-size: 0.9375rem; padding: 12px 14px; width: 100%; border-radius: 8px; }
-  .nav-end { gap: 6px; flex-wrap: nowrap; align-items: center; }
-  .mobile-toggle { display: flex; flex-shrink: 0; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; }
-  /* Shrink GitHub button to icon-only on mobile */
+  /* Nav-end: pill → GitHub → hamburger, all in one row */
+  .nav-end { gap: 6px; flex-direction: row; flex-wrap: nowrap; align-items: center; }
+  /* Hamburger: 44px touch target */
+  .mobile-toggle { display: flex; flex-shrink: 0; width: 44px; height: 44px; align-items: center; justify-content: center; }
+  /* GitHub: icon-only on mobile */
   .btn-nav .btn-label { display: none; }
-  .btn-nav { padding: 7px 10px; gap: 0; color: var(--text) !important; min-height: 44px; }
-  /* Desktop pill: hide text labels (just show icons) */
-  #themeToggle .theme-pill-opt { padding: 4px 6px; font-size: 0; gap: 0; }
+  .btn-nav { padding: 0 10px; height: 44px; gap: 0; color: var(--text) !important; min-width: 44px; justify-content: center; }
+  /* Desktop pill: icon-only (no text) */
+  #themeToggle .theme-pill-opt { padding: 5px 7px; font-size: 0; gap: 0; }
   #themeToggle .theme-pill-opt svg { width: 14px; height: 14px; }
-  /* Mobile drawer theme row */
-  .nav-drawer-theme { display: flex; padding: 8px 6px 4px; border-top: 1px solid var(--border); margin-top: 4px; }
-  #themeToggleMobile { width: 100%; justify-content: center; border-radius: 10px; padding: 4px; }
-  #themeToggleMobile .theme-pill-opt { flex: 1; justify-content: center; padding: 10px 8px; font-size: 0.875rem; border-radius: 8px; }
+  /* Show theme row inside mobile drawer */
+  .nav-drawer-theme { display: flex; justify-content: center; padding: 10px 6px 4px; border-top: 1px solid var(--border); margin-top: 4px; }
+  #themeToggleMobile { width: 100%; border-radius: 10px; padding: 4px; }
+  #themeToggleMobile .theme-pill-opt { flex: 1; justify-content: center; padding: 10px 8px; font-size: 0.9rem; border-radius: 8px; }
 
   .hero { min-height: auto; padding: 120px var(--gutter) 64px; }
   .hero-title { font-size: clamp(2.25rem, 10vw, 3.75rem); }
