@@ -259,6 +259,8 @@ class TestSafetyLayer:
         # Now motor values should not be clamped
         sl.write("/dev/motor", {"linear": 5.0}, principal="brain")
         assert ns.read("/dev/motor")["linear"] == 5.0
+        # Restore global policy so other tests are not affected
+        sl.set_policy("clamp_motor", True, principal="root")
 
 
 # =====================================================================
