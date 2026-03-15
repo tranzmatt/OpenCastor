@@ -1,6 +1,125 @@
-adept_generic:
-  metadata:
-    robot_name: waveshare_alpha
-    agent_provider: wave_driver
-    agent_model: wave_model
-    drivers: [amazon_kit_generic, arduino_l298n, dynamixel_arm]
+rcan_version: "1.3"
+
+metadata:
+  robot_name: "Waveshare_AlphaBot2"
+  robot_uuid: "00000000-0000-0000-0000-000000000016"
+  author: "OpenCastor Default"
+  license: "Apache-2.0"
+  manufacturer: "Waveshare"
+  model: "AlphaBot2-Pi"
+  tags:
+    - mobile
+    - differential_drive
+    - raspberry_pi
+    - gpio
+    - tracked
+    - tb6612
+    - alphabot2
+    - stem
+    - waveshare
+  description: >
+    Waveshare AlphaBot2 tracked differential-drive robot kit with Raspberry Pi on top.
+    Uses TB6612 motor driver controlled via direct Pi GPIO (pigpio/RPi.GPIO).
+    Equipped with infrared obstacle sensors, line-following sensors,
+    ultrasonic HC-SR04, Pi Camera, buzzer, and LEDs.
+
+agent:
+  provider: "anthropic"
+  model: "claude-sonnet-4-5"
+  vision_enabled: true
+  latency_budget_ms: 150
+  safety_stop: true
+
+physics:
+  type: "differential_drive"
+  dof: 2
+  chassis:
+    wheel_base_mm: 86
+    track_width_mm: 86
+    wheel_radius_mm: 25
+
+drivers:
+  - id: "motor_driver"
+    protocol: "gpio"
+    # TB6612FNG motor driver — controlled via Raspberry Pi GPIO
+    # Left motor: AIN1=13, AIN2=6, PWMA=12
+    # Right motor: BIN1=21, BIN2=20, PWMB=26
+    # STBY: 19
+    channels:
+      ain1_gpio: 13
+      ain2_gpio: 6
+      pwma_gpio: 12
+      bin1_gpio: 21
+      bin2_gpio: 20
+      pwmb_gpio: 26
+      standby_gpio: 19
+    pwm_freq_hz: 500
+    pwm_range: 100
+
+  - id: "ultrasonic_sensor"
+    protocol: "gpio"
+    sensor_type: "hcsr04"
+    trigger_gpio: 22
+    echo_gpio: 27
+
+  - id: "infrared_sensors"
+    protocol: "gpio"
+    sensor_type: "infrared_obstacle"
+    # Left/right obstacle IR sensors
+    channels:
+      ir_left_gpio: 12
+      ir_right_gpio: 17
+
+  - id: "line_sensors"
+    protocol: "gpio"
+    sensor_type: "line_follower"
+    # 5-channel line-following sensor array
+    channels:
+      sensor_1_gpio: 25
+      sensor_2_gpio: 8
+      sensor_3_gpio: 7
+      sensor_4_gpio: 1
+      sensor_5_gpio: 0
+
+  - id: "camera"
+    protocol: "picamera"
+    sensor_type: "picam"
+    resolution: [640, 480]
+    framerate: 30
+
+  - id: "buzzer"
+    protocol: "gpio"
+    sensor_type: "buzzer"
+    gpio: 4
+
+connection:
+  type: "local"
+
+network:
+  telemetry_stream: true
+  sim_to_real_sync: false
+  allow_remote_override: true
+
+rcan_protocol:
+  port: 8000
+  capabilities: [status, nav, teleop, chat, vision]
+  enable_mdns: true
+  enable_jwt: false
+
+safety:
+  obstacle_stop_cm: 20
+  estop_on_startup: false
+
+notes:
+  wiring: >
+    TB6612FNG wired to Raspberry Pi GPIO header.
+    Power: VM pin to battery (5–15V), VCC to 5V, GND shared.
+    Motor A = left track, Motor B = right track.
+  camera_setup: >
+    Enable Pi Camera via raspi-config → Interface Options → Camera.
+    Install picamera2: sudo apt install python3-picamera2
+  gpio_library: >
+    Uses RPi.GPIO or pigpio for direct motor control.
+    Install: sudo apt install python3-rpi.gpio
+    pigpio alternative: sudo apt install pigpio python3-pigpio
+  hardware_reference: "https://www.waveshare.com/alphabot2-pi.htm"
