@@ -28,6 +28,7 @@ Usage:
     castor benchmark --config robot.rcan.yaml          # Performance profiling
     castor lint --config robot.rcan.yaml               # Deep config validation
     castor validate --config bot.rcan.yaml             # RCAN conformance check
+    castor rcan-check [--config robot.rcan.yaml]       # RCAN §6 safety field check
     castor improve --enable                            # Enable self-improving loop
     castor improve --disable                           # Disable self-improving loop
     castor improve --episodes 10                       # Analyze last 10 episodes
@@ -1257,6 +1258,86 @@ def cmd_safety(args) -> None:
     print("castor safety: coming soon.")
 
 
+def cmd_conformance(args) -> None:
+    """castor conformance — Print Protocol 66 conformance report."""
+    import json as _json
+    import os
+
+    import yaml
+
+    config_path = getattr(args, "config", None) or os.path.expanduser("~/opencastor/bob.rcan.yaml")
+    json_out = getattr(args, "json", False)
+
+    # Load config if available
+    hw_caps: dict = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path) as _f:
+                rcan_cfg = yaml.safe_load(_f) or {}
+            hw_caps = rcan_cfg.get("hardware_safety", {})
+        except Exception as _e:
+            pass
+
+    # Build manifest (optionally with live SafetyLayer)
+    safety_layer = None
+    try:
+        from castor.fs import CastorFS
+
+        _fs = CastorFS()
+        safety_layer = _fs.safety
+    except Exception:
+        pass
+
+    from castor.safety.p66_manifest import build_manifest
+
+    manifest = build_manifest(safety_layer=safety_layer, hardware_caps=hw_caps)
+
+    if json_out:
+        print(_json.dumps(manifest, indent=2))
+        return
+
+    # Pretty-print report
+    summary = manifest.get("summary", {})
+    implemented = summary.get("implemented", 0)
+    partial = summary.get("partial", 0)
+    hardware_dep = summary.get("hardware_dependent", 0)
+    pct = summary.get("conformance_pct", 0.0)
+
+    bar_filled = int(pct / 10)
+    bar_empty = 10 - bar_filled
+    bar = "█" * bar_filled + "░" * bar_empty
+
+    print()
+    print("Protocol 66 Conformance Report")
+    print("================================")
+    print(f"Conformance: {pct:.0f}%  [{bar}] {pct:.0f}/100")
+    print()
+
+    status_icons = {
+        "implemented": "✅",
+        "partial": "⚠️ ",
+        "planned": "🔲",
+        "hardware": "⚠️ ",
+    }
+
+    for rule in manifest.get("rules", []):
+        rule_id = rule.get("rule_id", "?")
+        desc = rule.get("description", "")
+        status = rule.get("status", "?")
+        icon = status_icons.get(status, "❓")
+        notes = rule.get("notes", "")
+        suffix = f" — {notes}" if notes else ""
+        print(f"  {icon} {rule_id:<14} {desc}{suffix}")
+
+    print()
+    sw_gated = summary.get("planned", 0)
+    print(
+        f"Summary: {implemented} implemented, {partial} partial"
+        f" (hardware: {hardware_dep}), {sw_gated} software-gated"
+    )
+    print()
+
+
 def cmd_scan(args) -> None:
     """castor scan — detect connected hardware and suggest a preset."""
     import json as _json
@@ -1570,6 +1651,149 @@ def cmd_upgrade(args) -> None:
 
     print(f"  Upgraded to: {castor.__version__}")
     print("  Run 'castor doctor' to verify.")
+
+
+def cmd_rcan_check(args) -> None:
+    """castor rcan-check — focused RCAN §6 safety field conformance check.
+
+    Validates that all required RCAN §6 safety invariants are present and
+    correct in the robot's .rcan.yaml config:
+      - safety.local_safety_wins: true
+      - watchdog.timeout_s configured (≤ 30 s)
+      - safety.confidence_gates configured
+    """
+    import os
+
+    config_path = getattr(args, "config", None) or os.path.expanduser(
+        "~/.opencastor/config.rcan.yaml"
+    )
+    if not os.path.exists(config_path):
+        # Fall back to cwd search
+        import glob as _glob
+
+        candidates = sorted(_glob.glob("*.rcan.yaml"))
+        if candidates:
+            config_path = candidates[0]
+        else:
+            print(f"  ❌ Config not found: {config_path}")
+            print("  Hint: castor rcan-check --config robot.rcan.yaml")
+            raise SystemExit(1)
+
+    try:
+        import yaml
+
+        with open(config_path) as _f:
+            cfg = yaml.safe_load(_f) or {}
+    except Exception as exc:
+        print(f"  ❌ Error reading {config_path}: {exc}")
+        raise SystemExit(1) from None
+
+    print(f"\n  RCAN §6 Safety Conformance: {config_path}\n")
+
+    results: list[tuple[str, bool, str]] = []  # (check_id, passed, detail)
+
+    # ── Check 1: local_safety_wins ────────────────────────────────────────
+    safety_cfg = cfg.get("safety", {}) or {}
+    lsw = safety_cfg.get("local_safety_wins")
+    if lsw is True:
+        results.append(
+            (
+                "safety.local_safety_wins",
+                True,
+                "local_safety_wins=true  (RCAN §6 invariant satisfied)",
+            )
+        )
+    else:
+        results.append(
+            (
+                "safety.local_safety_wins",
+                False,
+                f"local_safety_wins={lsw!r}  — must be true; remote commands may override local "
+                "safety constraints (RCAN §6 violated).  Fix: set safety.local_safety_wins: true",
+            )
+        )
+
+    # ── Check 2: watchdog ────────────────────────────────────────────────
+    watchdog = cfg.get("watchdog", {}) or {}
+    timeout = watchdog.get("timeout_s")
+    if timeout is None:
+        results.append(
+            (
+                "safety.watchdog",
+                False,
+                "watchdog.timeout_s not configured.  Fix: add watchdog: timeout_s: 10",
+            )
+        )
+    else:
+        try:
+            fval = float(timeout)
+            if fval <= 0:
+                results.append(("safety.watchdog", False, f"watchdog.timeout_s={fval} must be > 0"))
+            elif fval > 30:
+                results.append(
+                    (
+                        "safety.watchdog",
+                        False,
+                        f"watchdog.timeout_s={fval} exceeds recommended max of 30 s.  "
+                        "Fix: reduce to ≤ 30",
+                    )
+                )
+            else:
+                results.append(
+                    ("safety.watchdog", True, f"watchdog.timeout_s={fval}  (≤ 30 s, OK)")
+                )
+        except (TypeError, ValueError):
+            results.append(
+                (
+                    "safety.watchdog",
+                    False,
+                    f"watchdog.timeout_s={timeout!r} is not a number",
+                )
+            )
+
+    # ── Check 3: confidence_gates ────────────────────────────────────────
+    cg = safety_cfg.get("confidence_gates")
+    if not cg:
+        results.append(
+            (
+                "safety.confidence_gates",
+                False,
+                "safety.confidence_gates not configured.  "
+                "Fix: add safety: confidence_gates: {action: 0.7, navigation: 0.8}",
+            )
+        )
+    elif not isinstance(cg, dict):
+        results.append(
+            (
+                "safety.confidence_gates",
+                False,
+                f"safety.confidence_gates must be a mapping, got {type(cg).__name__}",
+            )
+        )
+    else:
+        results.append(
+            (
+                "safety.confidence_gates",
+                True,
+                f"confidence_gates configured: {list(cg.keys())}",
+            )
+        )
+
+    # ── Print results ────────────────────────────────────────────────────
+    passed = 0
+    failed = 0
+    for check_id, ok, detail in results:
+        icon = "✅" if ok else "❌"
+        print(f"  {icon} [{check_id}]  {detail}")
+        if ok:
+            passed += 1
+        else:
+            failed += 1
+
+    print(f"\n  Result: {passed} passed, {failed} failed\n")
+
+    if failed:
+        raise SystemExit(1)
 
 
 def cmd_validate(args) -> None:
@@ -3226,6 +3450,22 @@ def main() -> None:
     p_validate.add_argument("--strict", action="store_true", help="Exit with non-zero if any WARN")
     p_validate.set_defaults(func=cmd_validate)
 
+    # castor rcan-check
+    p_rcan_check = sub.add_parser(
+        "rcan-check",
+        help="Focused RCAN §6 safety field conformance check",
+        epilog=(
+            "Examples:\n"
+            "  castor rcan-check                              # auto-detect *.rcan.yaml\n"
+            "  castor rcan-check --config robot.rcan.yaml\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_rcan_check.add_argument(
+        "--config", default=None, help="RCAN config file (default: auto-detect)"
+    )
+    p_rcan_check.set_defaults(func=cmd_rcan_check)
+
     # castor swarm
     p_swarm = sub.add_parser(
         "swarm",
@@ -3851,6 +4091,23 @@ def main() -> None:
         help="Path to safety protocol YAML config",
     )
 
+    # castor conformance
+    p_conformance = sub.add_parser(
+        "conformance",
+        help="Print Protocol 66 conformance report",
+        epilog=(
+            "Examples:\n"
+            "  castor conformance\n"
+            "  castor conformance --config ~/my-robot.rcan.yaml\n"
+            "  castor conformance --json\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_conformance.add_argument(
+        "--config", default=None, help="Path to RCAN config (default: ~/opencastor/bob.rcan.yaml)"
+    )
+    p_conformance.add_argument("--json", action="store_true", help="Output raw JSON manifest")
+
     p_audit = sub.add_parser(
         "audit",
         help="View the append-only audit log",
@@ -3991,6 +4248,7 @@ def main() -> None:
         "benchmark": cmd_benchmark,
         "lint": cmd_lint,
         "validate": cmd_validate,
+        "rcan-check": cmd_rcan_check,
         "swarm": cmd_swarm,
         "learn": cmd_learn,
         "improve": cmd_improve,
@@ -4015,6 +4273,7 @@ def main() -> None:
         "audit": cmd_audit,
         "monitor": _cmd_monitor,
         "safety": cmd_safety,
+        "conformance": cmd_conformance,
         "login": cmd_login,
         "flash": cmd_flash,
         "hub": cmd_hub,

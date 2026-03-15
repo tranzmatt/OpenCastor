@@ -347,6 +347,24 @@ class SafetyLayer:
         logger.warning(
             "SESSION EXPIRY STOP for %s — motor commands blocked until re-auth", principal
         )
+        # Send zero-velocity stop to motor controller
+        try:
+            import json
+            import os
+
+            motor_path = "/dev/motor"
+            if os.path.exists(motor_path):
+                with open(motor_path, "w") as _mf:
+                    _mf.write(
+                        json.dumps(
+                            {"velocity": 0.0, "angular": 0.0, "source": "session_expiry_stop"}
+                        )
+                    )
+                self._audit_action(
+                    principal, motor_path, "session_expiry_zero_velocity", source="local"
+                )
+        except Exception as _e:
+            logger.warning(f"session expiry zero-velocity write failed: {_e}")
 
     def _check_motor_rate(self) -> bool:
         """Enforce motor command rate limiting."""

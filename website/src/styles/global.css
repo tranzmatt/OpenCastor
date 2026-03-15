@@ -214,6 +214,54 @@ code, pre { font-family: var(--font-mono); }
 .nav-links a.nav-active { color: var(--text); background: rgba(255,255,255,0.07); }
 [data-theme="light"] .nav-links a.nav-active { background: rgba(0,0,0,0.05); }
 
+/* Docs dropdown */
+.nav-dropdown { position: relative; display: inline-flex; align-items: center; }
+.nav-dropdown > a { display: inline-flex; align-items: center; gap: 4px; }
+.nav-dropdown > a::after {
+  content: '';
+  display: inline-block;
+  width: 0; height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.5;
+  margin-left: 1px;
+}
+.nav-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 180px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color, rgba(255,255,255,0.08));
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  padding: 6px;
+  z-index: 200;
+  flex-direction: column;
+}
+[data-theme="light"] .nav-dropdown-menu {
+  background: #fff;
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+}
+.nav-dropdown-menu a {
+  display: block;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 0.8375rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.nav-dropdown-menu a:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+[data-theme="light"] .nav-dropdown-menu a:hover { background: rgba(0,0,0,0.05); }
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu { display: flex; }
+
 /* Right side */
 .nav-end {
   display: flex;
@@ -631,6 +679,11 @@ code, pre { font-family: var(--font-mono); }
   [data-theme="light"] .nav-links { background: #fff; }
   .nav-links.open { display: flex; }
   .nav-links a { font-size: 0.9375rem; padding: 12px 14px; width: 100%; border-radius: 8px; }
+  /* Dropdown: show inline in mobile drawer */
+  .nav-dropdown { flex-direction: column; width: 100%; }
+  .nav-dropdown > a { width: 100%; }
+  .nav-dropdown-menu { display: flex; position: static; transform: none; min-width: unset; box-shadow: none; border: none; background: transparent; padding: 0 0 0 16px; border-left: 2px solid var(--border); margin: 2px 0 4px 14px; }
+  .nav-dropdown-menu a { padding: 8px 10px; font-size: 0.875rem; }
   /* Nav-end: pill → GitHub → hamburger, all in one row */
   .nav-end { gap: 6px; flex-direction: row; flex-wrap: nowrap; align-items: center; }
   /* Hamburger: 44px touch target */

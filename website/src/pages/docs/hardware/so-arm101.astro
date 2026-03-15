@@ -1,0 +1,445 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="SO-ARM101 Hardware Guide — OpenCastor"
+  description="Set up the SO-ARM101 6-DOF desktop arm with OpenCastor. Motor IDs, calibration, Docker, and LeRobot integration."
+  ogUrl="https://opencastor.com/docs/hardware/so-arm101"
+>
+
+<main>
+
+  <!-- Page Hero -->
+  <section class="page-hero">
+    <p class="section-label reveal">Hardware Guide</p>
+    <h1 class="reveal reveal-d1">SO-ARM101<br><span class="gradient-text">Desktop Arm.</span></h1>
+    <p class="reveal reveal-d2">6-DOF Feetech STS3215 servo arm. Leader-follower teleoperation, LeRobot training, and OpenCastor AI control — all in one config.</p>
+  </section>
+
+  <!-- Breadcrumb + TOC -->
+  <section class="section" style="padding-top:0;padding-bottom:20px">
+    <div class="container">
+      <p style="color:var(--text-secondary);font-size:0.875rem;margin-bottom:20px">
+        <a href="/docs/getting-started" style="color:var(--accent)">Getting Started</a> → Hardware → SO-ARM101
+      </p>
+      <div class="toc reveal">
+        <h3>📖 On this page</h3>
+        <div class="toc-cols">
+          <div>
+            <a href="#overview">Overview</a>
+            <a href="#requirements">Requirements</a>
+            <a href="#motor-ids">Motor IDs</a>
+            <a href="#quick-setup">Quick Setup</a>
+          </div>
+          <div>
+            <a href="#safety">Safety Notes</a>
+            <a href="#docker">Docker (alex.local)</a>
+            <a href="#lerobot">LeRobot Integration</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Overview -->
+  <section class="section" id="overview" style="padding-top:20px">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Overview</p>
+        <h2 class="section-title">What is the SO-ARM101?</h2>
+      </div>
+      <div class="doc-section reveal">
+        <p>
+          The <strong>SO-ARM101</strong> is a compact 6-DOF (six degrees of freedom) desktop robotic arm developed by Hugging Face and the LeRobot community.
+          It uses <strong>Feetech STS3215 smart serial bus servos</strong> — brushless motors with built-in encoder feedback, torque control, and hardware voltage monitoring.
+        </p>
+        <p style="margin-top:12px">
+          OpenCastor treats it as a first-class platform: <code>castor scan</code> auto-detects the Waveshare Serial Bus Servo Driver Board (CH340 USB), and <code>castor wizard --preset so_arm101</code> generates a ready-to-run config for follower, leader, or bimanual modes.
+        </p>
+
+        <div class="guide-grid" style="margin-top:24px">
+          <div class="guide-card reveal">
+            <h3>🦾 6-DOF</h3>
+            <p>Six Feetech STS3215 servos: shoulder pan/lift, elbow flex, wrist flex/roll, and gripper.</p>
+          </div>
+          <div class="guide-card reveal reveal-d1">
+            <h3>🎮 Leader-Follower</h3>
+            <p>Teleoperate with a second arm as leader. Record demonstrations for imitation learning.</p>
+          </div>
+          <div class="guide-card reveal reveal-d2">
+            <h3>🤗 LeRobot Native</h3>
+            <p>Integrates with Hugging Face LeRobot for dataset recording, policy training, and deployment.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Requirements -->
+  <section class="section alt-section" id="requirements">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Before you start</p>
+        <h2 class="section-title">Requirements</h2>
+      </div>
+      <div class="doc-section reveal">
+        <ul style="line-height:2">
+          <li><strong>Host machine</strong> — <code>alex.local</code> (the OpenCastor Pi), or any Linux host with USB. macOS also works.</li>
+          <li><strong>Python 3.12+</strong> — LeRobot requires 3.12. Check with <code>python3 --version</code>.</li>
+          <li><strong>Docker</strong> — optional but recommended on <code>alex.local</code> for the pre-built arm image (includes all LeRobot deps).</li>
+          <li><strong>USB port</strong> — The Waveshare Serial Bus Servo Driver Board appears as <code>/dev/ttyACM0</code> or <code>/dev/ttyUSB0</code>.</li>
+          <li><strong>opencastor[lerobot]</strong> — install the LeRobot extras: <code>pip install opencastor[lerobot]</code></li>
+        </ul>
+
+        <div class="code-block" style="margin-top:16px;max-width:640px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">Install with LeRobot support</span>
+          </div>
+          <div class="code-body"><span class="k">pip install opencastor[lerobot]</span>
+<span class="cm"># or on alex.local via Docker (recommended — see below)</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Motor IDs -->
+  <section class="section" id="motor-ids">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Hardware</p>
+        <h2 class="section-title">Motor IDs</h2>
+      </div>
+      <div class="doc-section reveal">
+        <p>Each Feetech STS3215 servo has a unique bus ID programmed during setup. The SO-ARM101 follower arm uses the following default IDs:</p>
+
+        <div style="overflow-x:auto;margin-top:20px">
+          <table style="width:100%;border-collapse:collapse;font-size:0.9375rem">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border-color,#e5e7eb)">
+                <th style="text-align:left;padding:10px 12px;font-weight:600">ID</th>
+                <th style="text-align:left;padding:10px 12px;font-weight:600">Joint Name</th>
+                <th style="text-align:left;padding:10px 12px;font-weight:600">Description</th>
+                <th style="text-align:left;padding:10px 12px;font-weight:600">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border-subtle,#f3f4f6)">
+                <td style="padding:10px 12px"><code>1</code></td>
+                <td style="padding:10px 12px"><strong>shoulder_pan</strong></td>
+                <td style="padding:10px 12px">Base rotation (left/right)</td>
+                <td style="padding:10px 12px">—</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-subtle,#f3f4f6)">
+                <td style="padding:10px 12px"><code>2</code></td>
+                <td style="padding:10px 12px"><strong>shoulder_lift</strong></td>
+                <td style="padding:10px 12px">Shoulder up/down</td>
+                <td style="padding:10px 12px">⚠️ May trigger voltage fault on some units — see Safety below</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-subtle,#f3f4f6)">
+                <td style="padding:10px 12px"><code>3</code></td>
+                <td style="padding:10px 12px"><strong>elbow_flex</strong></td>
+                <td style="padding:10px 12px">Elbow bend</td>
+                <td style="padding:10px 12px">—</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-subtle,#f3f4f6)">
+                <td style="padding:10px 12px"><code>4</code></td>
+                <td style="padding:10px 12px"><strong>wrist_flex</strong></td>
+                <td style="padding:10px 12px">Wrist pitch</td>
+                <td style="padding:10px 12px">—</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border-subtle,#f3f4f6)">
+                <td style="padding:10px 12px"><code>5</code></td>
+                <td style="padding:10px 12px"><strong>wrist_roll</strong></td>
+                <td style="padding:10px 12px">Wrist rotation</td>
+                <td style="padding:10px 12px">—</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 12px"><code>6</code></td>
+                <td style="padding:10px 12px"><strong>gripper</strong></td>
+                <td style="padding:10px 12px">Open/close end effector</td>
+                <td style="padding:10px 12px">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p style="margin-top:16px;color:var(--text-secondary);font-size:0.875rem">
+          Leader arm uses IDs 7–12 (same joints, offset by 6). Bimanual mode uses both boards simultaneously.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Setup -->
+  <section class="section alt-section" id="quick-setup">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Step by step</p>
+        <h2 class="section-title">Quick setup with OpenCastor</h2>
+      </div>
+
+      <div class="quickstart reveal">
+        <div class="quickstart-step">
+          <div class="quickstart-num">1</div>
+          <div>
+            <h4>Find the USB port</h4>
+            <p style="font-size:0.9375rem;color:var(--text-secondary);margin-bottom:8px">Plug in the Waveshare Serial Bus Servo Driver Board, then run:</p>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><span></span><span></span><span></span></div>
+                <span class="code-filename">Terminal</span>
+              </div>
+              <div class="code-body"><span class="k">castor arm scan</span>
+<span class="cm"># Example output:</span>
+<span class="s">✓ Feetech STS3215 board on /dev/ttyACM0 (CH340, 1Mbaud)</span>
+<span class="s">  Found 6 servos: IDs 1 2 3 4 5 6</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quickstart-step">
+          <div class="quickstart-num">2</div>
+          <div>
+            <h4>Configure the arm</h4>
+            <p style="font-size:0.9375rem;color:var(--text-secondary);margin-bottom:8px">Run setup with the detected port. This writes an <code>so_arm101.rcan.yaml</code> config:</p>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><span></span><span></span><span></span></div>
+                <span class="code-filename">Terminal</span>
+              </div>
+              <div class="code-body"><span class="k">castor arm setup --port /dev/ttyACM0</span>
+<span class="cm"># or use the wizard for guided setup:</span>
+<span class="k">castor wizard --preset so_arm101</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quickstart-step">
+          <div class="quickstart-num">3</div>
+          <div>
+            <h4>Calibrate</h4>
+            <p style="font-size:0.9375rem;color:var(--text-secondary);margin-bottom:8px">Interactive calibration — moves each joint to its min/max positions and records encoder values:</p>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><span></span><span></span><span></span></div>
+                <span class="code-filename">Terminal</span>
+              </div>
+              <div class="code-body"><span class="k">castor arm calibrate</span>
+<span class="cm"># Follow the on-screen prompts for each joint.</span>
+<span class="cm"># Calibration data is saved to .calibration/so_arm101.json</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quickstart-step">
+          <div class="quickstart-num">4</div>
+          <div>
+            <h4>Start the runtime</h4>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><span></span><span></span><span></span></div>
+                <span class="code-filename">Terminal</span>
+              </div>
+              <div class="code-body"><span class="k">castor run --config so_arm101.rcan.yaml</span>
+<span class="cm"># API live at http://localhost:8000</span>
+<span class="cm"># Send commands via REST, WhatsApp, or Telegram</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Safety Notes -->
+  <section class="section" id="safety">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">⚠️ Important</p>
+        <h2 class="section-title">Safety notes</h2>
+      </div>
+      <div class="doc-section reveal">
+
+        <div class="guide-grid">
+          <div class="guide-card reveal" style="border-left: 3px solid var(--accent)">
+            <h3>🔋 Voltage Monitoring</h3>
+            <p>
+              The Feetech STS3215 has <strong>built-in hardware voltage monitoring</strong>. If supply voltage drops below the servo's threshold (typically under load or with a weak power supply), the servo locks and reports a voltage fault.
+            </p>
+            <p style="margin-top:8px">Use a dedicated 5–7.4V power supply rated for the arm's peak current draw (~2A per servo). Do <strong>not</strong> power the arm from USB alone.</p>
+          </div>
+          <div class="guide-card reveal reveal-d1" style="border-left: 3px solid #f59e0b">
+            <h3>⚠️ ID 2 Voltage Fault</h3>
+            <p>
+              <strong>shoulder_lift (ID 2)</strong> is the heaviest-loaded joint and may trigger a voltage fault on some units, especially at startup or when moving from a stowed position.
+            </p>
+            <p style="margin-top:8px">If ID 2 locks: power-cycle the arm, ensure your supply voltage is ≥6V under load, and re-run <code>castor arm calibrate</code>.</p>
+          </div>
+          <div class="guide-card reveal reveal-d2">
+            <h3>🚨 Keep Clear</h3>
+            <p>
+              The arm can move quickly and with significant force. Keep hands and objects clear of the workspace during calibration, teleoperation, and AI-controlled operation.
+            </p>
+            <p style="margin-top:8px">The OpenCastor safety layer enforces Protocol 66 invariants — but always maintain manual control of the power supply as a final backstop.</p>
+          </div>
+        </div>
+
+        <div class="code-block reveal" style="margin-top:24px;max-width:680px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">Diagnose a voltage fault</span>
+          </div>
+          <div class="code-body"><span class="k">castor arm scan --verbose</span>
+<span class="cm"># If ID 2 shows voltage fault:</span>
+<span class="s">[WARN] servo ID 2: voltage_fault=true, voltage=4.8V (min 5.5V)</span>
+<span class="cm"># → Check power supply, re-seat connectors, power-cycle</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Docker -->
+  <section class="section alt-section" id="docker">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Recommended on alex.local</p>
+        <h2 class="section-title">Docker setup</h2>
+      </div>
+      <div class="doc-section reveal">
+        <p>
+          On <code>alex.local</code> (or any ARM64 Linux host), the pre-built Docker image includes all LeRobot dependencies, CUDA/HailoRT drivers, and the OpenCastor runtime — no manual pip installs needed.
+        </p>
+
+        <div class="code-block" style="margin:20px 0;max-width:680px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">Start the arm container</span>
+          </div>
+          <div class="code-body"><span class="k">docker compose -f docker-compose.arm.yml up -d</span>
+
+<span class="cm"># Then exec into the container:</span>
+<span class="k">docker exec -it opencastor-arm bash</span>
+
+<span class="cm"># Inside the container, run setup:</span>
+<span class="k">castor arm setup</span>
+<span class="k">castor arm calibrate</span>
+<span class="k">castor run --config so_arm101.rcan.yaml</span></div>
+        </div>
+
+        <p>The <code>docker-compose.arm.yml</code> mounts <code>/dev/ttyACM0</code> (and <code>/dev/ttyUSB0</code>) into the container automatically. If your board appears on a different device, edit the <code>devices:</code> section:</p>
+
+        <div class="code-block" style="margin:16px 0;max-width:680px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">docker-compose.arm.yml (devices section)</span>
+          </div>
+          <div class="code-body"><span class="k">services</span>:
+  <span class="k">opencastor-arm</span>:
+    <span class="k">devices</span>:
+      - <span class="s">/dev/ttyACM0:/dev/ttyACM0</span>
+      - <span class="s">/dev/ttyUSB0:/dev/ttyUSB0</span>   <span class="cm"># add if needed</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LeRobot Integration -->
+  <section class="section" id="lerobot">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Training</p>
+        <h2 class="section-title">LeRobot integration</h2>
+      </div>
+      <div class="doc-section reveal">
+        <p>
+          OpenCastor's <code>castor arm record</code> command delegates to <strong>lerobot-record</strong> to capture demonstrations in the LeRobot dataset format (HDF5 + video). These datasets can be uploaded to the Hugging Face Hub and used to train ACT, Diffusion Policy, or other imitation learning models.
+        </p>
+
+        <div class="code-block" style="margin:20px 0;max-width:680px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">Record a demonstration dataset</span>
+          </div>
+          <div class="code-body"><span class="cm"># Record 50 episodes for training</span>
+<span class="k">castor arm record</span> \
+  --robot so_arm101 \
+  --dataset-name my-pick-place \
+  --num-episodes 50
+
+<span class="cm"># This delegates to lerobot-record internally.
+# Output: ./datasets/my-pick-place/ (HDF5 + MP4)</span></div>
+        </div>
+
+        <div class="guide-grid" style="margin-top:24px">
+          <div class="guide-card reveal">
+            <h3>📸 Record</h3>
+            <p><code>castor arm record</code> — capture leader-follower demos. Syncs servo state + camera frames at 30 FPS.</p>
+          </div>
+          <div class="guide-card reveal reveal-d1">
+            <h3>☁️ Upload</h3>
+            <p>Push to Hugging Face Hub with <code>castor arm upload --dataset my-pick-place</code>.</p>
+          </div>
+          <div class="guide-card reveal reveal-d2">
+            <h3>🧠 Train</h3>
+            <p>Use <code>lerobot train --policy act</code> (or diffusion) on your dataset. Deploy the policy back to OpenCastor.</p>
+          </div>
+        </div>
+
+        <p style="margin-top:24px">
+          For full LeRobot documentation: <a href="https://github.com/huggingface/lerobot" target="_blank" rel="noopener" style="color:var(--accent)">github.com/huggingface/lerobot →</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <h2 class="reveal">Ready to teach your arm?</h2>
+    <p class="reveal reveal-d1">Record a few demonstrations, train a policy, and let the arm learn from you.</p>
+    <div class="hero-actions reveal reveal-d2">
+      <a href="/docs/getting-started" class="btn btn-primary btn-lg">Getting Started Guide</a>
+      <a href="https://github.com/craigm26/OpenCastor/issues" class="btn btn-secondary btn-lg" target="_blank" rel="noopener">Open an Issue</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="/" class="nav-logo">
+          <div class="nav-logo-img"></div>
+          <span>OpenCastor</span>
+        </a>
+        <p>The universal runtime for embodied AI.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Docs</h4>
+        <a href="/docs/getting-started">Getting Started</a>
+        <a href="/docs/hardware/so-arm101">SO-ARM101</a>
+        <a href="/docs">Full Docs</a>
+        <a href="https://rcan.dev/spec/">RCAN Spec</a>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <a href="/hardware">Hardware</a>
+        <a href="https://github.com/craigm26/OpenCastor">GitHub</a>
+        <a href="https://github.com/craigm26/OpenCastor/issues">Issues</a>
+        <a href="https://discord.gg/jMjA8B26Bq">Discord</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="/hub">Hub</a>
+        <a href="/about">About</a>
+        <a href="mailto:hello@opencastor.com">Contact</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2025-2026 Craig Merry. Apache 2.0 License.</p>
+    </div>
+  </div>
+</footer>
+
+</BaseLayout>

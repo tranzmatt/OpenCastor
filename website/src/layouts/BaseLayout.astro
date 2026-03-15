@@ -67,7 +67,16 @@ const moonSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" 
 
     <!-- Center links + mobile drawer -->
     <div class="nav-links" id="navLinks">
-      <a href="/docs"      class={currentPath === '/docs'      ? 'nav-active' : ''}>Docs</a>
+      <div class="nav-dropdown">
+        <a href="/docs" class={currentPath === '/docs' || currentPath.startsWith('/docs/') ? 'nav-active' : ''}>Docs</a>
+        <div class="nav-dropdown-menu">
+          <a href="/docs/getting-started">Getting Started</a>
+          <a href="/docs/hardware/so-arm101">SO-ARM101</a>
+          <a href="/docs#configuration">RCAN Config</a>
+          <a href="/docs#safety">Protocol 66</a>
+          <a href="/docs#cli">CLI Reference</a>
+        </div>
+      </div>
       <a href="/hardware"  class={currentPath === '/hardware'  ? 'nav-active' : ''}>Hardware</a>
       <a href="/tutorials" class={currentPath === '/tutorials' ? 'nav-active' : ''}>Tutorials</a>
       <a href="/hub"       class={currentPath === '/hub'       ? 'nav-active' : ''}>Hub</a>

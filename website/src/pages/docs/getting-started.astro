@@ -1,0 +1,487 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Getting Started — OpenCastor"
+  description="Get up and running with OpenCastor in minutes. Install, configure, and connect your first AI-powered robot."
+  ogUrl="https://opencastor.com/docs/getting-started"
+>
+
+<main>
+
+  <!-- Page Hero -->
+  <section class="page-hero">
+    <p class="section-label reveal">Getting Started</p>
+    <h1 class="reveal reveal-d1">Up and running<br>in minutes.</h1>
+    <p class="reveal reveal-d2">Install OpenCastor, init your robot, and start issuing commands — all from a single config file.</p>
+  </section>
+
+  <!-- Table of Contents -->
+  <section class="section" style="padding-top:0;padding-bottom:20px">
+    <div class="container">
+      <div class="toc reveal">
+        <h3>📖 On this page</h3>
+        <div class="toc-cols">
+          <div>
+            <a href="#what-is">What is OpenCastor?</a>
+            <a href="#prerequisites">Prerequisites</a>
+            <a href="#install">Install</a>
+            <a href="#first-run">First Run</a>
+          </div>
+          <div>
+            <a href="#config">Config Basics (RCAN)</a>
+            <a href="#connect">Connect a Robot</a>
+            <a href="#safety">Safety First</a>
+            <a href="#cli">CLI Reference</a>
+            <a href="#next-steps">Next Steps</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- What is OpenCastor -->
+  <section class="section" id="what-is" style="padding-top:20px">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Overview</p>
+        <h2 class="section-title">What is OpenCastor?</h2>
+      </div>
+      <div class="doc-section reveal">
+        <p>
+          <strong>OpenCastor</strong> is an AI-native robot runtime that gives any robot a language-model brain — connecting 13+ AI providers (Anthropic, Google, OpenAI, Apple Foundation Models, Ollama, and more) to hardware via a single YAML config file.
+          It implements the <a href="https://rcan.dev" style="color:var(--accent)">RCAN protocol</a> (Robot Capability and Action Network), a vendor-neutral standard for AI-robot communication that defines how robots declare capabilities, receive commands, and enforce safety invariants.
+        </p>
+        <div class="guide-grid" style="margin-top:24px">
+          <div class="guide-card reveal">
+            <h3>🤖 AI-Native Runtime</h3>
+            <p>Drop in Claude, GPT-4, Gemini, or a local model. Swap providers with one config line — no code changes required.</p>
+          </div>
+          <div class="guide-card reveal reveal-d1">
+            <h3>📡 RCAN Protocol</h3>
+            <p>Standardized robot communication. Declare capabilities, receive structured commands, and expose a live conformance manifest.</p>
+          </div>
+          <div class="guide-card reveal reveal-d2">
+            <h3>🛡️ Safety-First</h3>
+            <p>Protocol 66 safety invariants baked into the runtime layer. The AI layer sits above safety — it can never override it.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Prerequisites -->
+  <section class="section alt-section" id="prerequisites">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Before you begin</p>
+        <h2 class="section-title">Prerequisites</h2>
+      </div>
+      <div class="doc-section reveal">
+        <ul style="line-height:2">
+          <li><strong>Python 3.10+</strong> — check with <code>python3 --version</code></li>
+          <li><strong>pip</strong> — check with <code>pip --version</code></li>
+          <li><strong>A robot (or simulation)</strong> — physical hardware, a simulator like Gazebo, or even just a Pi with servos</li>
+          <li><strong>(Optional) API key</strong> — for cloud providers (Anthropic, OpenAI, Google). Not needed for local providers like Ollama or Apple Foundation Models.</li>
+        </ul>
+        <div class="code-block" style="margin-top:16px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">Check your Python version</span>
+          </div>
+          <div class="code-body"><span class="k">python3 --version</span>   <span class="cm"># needs 3.10+</span>
+<span class="k">pip --version</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section class="section" id="install">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Step 1</p>
+        <h2 class="section-title">Install OpenCastor</h2>
+      </div>
+      <div class="doc-section reveal">
+        <p>Install from PyPI. This pulls in the runtime, CLI, and all hardware drivers:</p>
+        <div class="code-block" style="margin:16px 0;max-width:640px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">All platforms</span>
+          </div>
+          <div class="code-body"><span class="k">pip install opencastor</span></div>
+        </div>
+        <p>Or use the one-liner installer (Linux / macOS) for a full environment setup including hardware drivers:</p>
+        <div class="code-block" style="margin:16px 0;max-width:640px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">Linux / macOS</span>
+          </div>
+          <div class="code-body"><span class="k">curl -sL opencastor.com/install | bash</span></div>
+        </div>
+        <p>Want arm manipulation support (SO-ARM101, LeRobot)?</p>
+        <div class="code-block" style="margin:16px 0;max-width:640px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">With LeRobot extras</span>
+          </div>
+          <div class="code-body"><span class="k">pip install opencastor[lerobot]</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- First Run -->
+  <section class="section alt-section" id="first-run">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Step 2</p>
+        <h2 class="section-title">First run</h2>
+      </div>
+
+      <div class="quickstart reveal">
+        <div class="quickstart-step">
+          <div class="quickstart-num">1</div>
+          <div>
+            <h4>Init your robot project</h4>
+            <p style="font-size:0.9375rem;color:var(--text-secondary);margin-bottom:8px">Creates a <code>.rcan.yaml</code> config and project scaffold in the current directory.</p>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><span></span><span></span><span></span></div>
+                <span class="code-filename">Terminal</span>
+              </div>
+              <div class="code-body"><span class="k">castor init --name my-robot</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quickstart-step">
+          <div class="quickstart-num">2</div>
+          <div>
+            <h4>Run preflight checks</h4>
+            <p style="font-size:0.9375rem;color:var(--text-secondary);margin-bottom:8px">Verifies Python deps, hardware drivers, provider credentials, and safety config. Fix any <code>[WARN]</code> or <code>[FAIL]</code> items before continuing.</p>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><span></span><span></span><span></span></div>
+                <span class="code-filename">Terminal</span>
+              </div>
+              <div class="code-body"><span class="k">castor doctor</span>
+<span class="cm"># Example output:</span>
+<span class="v">[OK]</span>  python 3.12.2
+<span class="v">[OK]</span>  opencastor 2026.3.14.6
+<span class="v">[OK]</span>  anthropic SDK installed
+<span class="v">[OK]</span>  ANTHROPIC_API_KEY set
+<span class="v">[OK]</span>  safety: local_safety_wins = true
+<span class="s">[WARN]</span> camera: no device found (optional)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quickstart-step">
+          <div class="quickstart-num">3</div>
+          <div>
+            <h4>Start the runtime</h4>
+            <p style="font-size:0.9375rem;color:var(--text-secondary);margin-bottom:8px">Loads your config, connects hardware, and opens the RCAN API on port 8000.</p>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><span></span><span></span><span></span></div>
+                <span class="code-filename">Terminal</span>
+              </div>
+              <div class="code-body"><span class="k">castor start</span>
+<span class="cm"># or: castor run --config my-robot.rcan.yaml</span>
+
+<span class="cm"># You should see:</span>
+<span class="v">[OK]</span>  RCAN runtime v1.4 started
+<span class="v">[OK]</span>  API: http://localhost:8000
+<span class="v">[OK]</span>  Safety kernel: P66 conformant
+<span class="v">[OK]</span>  Agent: anthropic/claude-sonnet-4-5 ready</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Config Basics -->
+  <section class="section" id="config">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Step 3</p>
+        <h2 class="section-title">Config basics — the <code style="font-family:var(--font-mono);color:var(--accent)">.rcan.yaml</code> file</h2>
+      </div>
+      <div class="doc-section reveal">
+        <p>Every OpenCastor robot is defined by a single <code>.rcan.yaml</code> file. <code>castor init</code> generates one for you — here's the minimal structure:</p>
+
+        <div class="code-block" style="max-width:680px;margin:20px 0">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">my-robot.rcan.yaml</span>
+          </div>
+          <div class="code-body"><span class="k">rcan_version</span>: <span class="s">"1.4"</span>
+
+<span class="k">metadata</span>:
+  <span class="k">robot_name</span>: <span class="s">"my-robot"</span>
+
+<span class="k">agent</span>:
+  <span class="k">provider</span>: <span class="s">"anthropic"</span>
+  <span class="k">model</span>: <span class="s">"claude-sonnet-4-5"</span>
+  <span class="k">safety_stop</span>: <span class="v">true</span></div>
+        </div>
+
+        <h3>Key config blocks</h3>
+        <ul style="line-height:2">
+          <li><strong>rcan_version</strong> — RCAN spec version. Use <code>"1.4"</code>.</li>
+          <li><strong>metadata</strong> — Robot name and UUID (auto-generated by wizard).</li>
+          <li><strong>agent</strong> — AI provider, model, and feature flags. Set <code>safety_stop: true</code> for all physical robots.</li>
+          <li><strong>drivers</strong> — Hardware drivers: PCA9685, Dynamixel, Arduino, serial. Auto-detected if you use <code>type: "auto"</code>.</li>
+          <li><strong>reactive</strong> — Hardware-level safety: e-stop, collision avoidance, velocity limits.</li>
+          <li><strong>safety</strong> — Protocol 66 configuration: local_safety_wins, estop distance, confidence gates.</li>
+        </ul>
+
+        <p>See the full <a href="/docs#configuration" style="color:var(--accent)">RCAN config reference →</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Connect a Robot -->
+  <section class="section alt-section" id="connect">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Step 4</p>
+        <h2 class="section-title">Connect a robot</h2>
+      </div>
+      <div class="doc-section reveal">
+        <p>Use <code>castor scan</code> to auto-detect connected hardware, then pick a preset config or write your own:</p>
+        <div class="code-block" style="margin:16px 0;max-width:680px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">Scan connected hardware</span>
+          </div>
+          <div class="code-body"><span class="k">castor scan</span>
+<span class="cm"># Example:</span>
+<span class="s">✓ Feetech STS3215 on /dev/ttyUSB0 → preset: so_arm101_follower</span>
+<span class="s">✓ OAK-D Lite USB → camera.type: "oakd"</span>
+<span class="s">✓ RPLiDAR A1 /dev/ttyUSB1 → lidar.type: "rplidar"</span></div>
+        </div>
+
+        <h3>Pre-built preset configs</h3>
+        <div class="guide-grid" style="margin-top:16px">
+          <div class="guide-card reveal">
+            <h3>🐢 TurtleBot3</h3>
+            <p>ROS2-compatible differential drive. Supports Burger and Waffle Pi.</p>
+            <div class="hw-card-meta" style="margin-top:10px"><code>castor wizard --preset turtlebot3</code></div>
+          </div>
+          <div class="guide-card reveal reveal-d1">
+            <h3>🦾 SO-ARM101</h3>
+            <p>6-DOF desktop arm with Feetech STS3215 servos. Leader-follower teleoperation.</p>
+            <div class="hw-card-meta" style="margin-top:10px"><a href="/docs/hardware/so-arm101" style="color:var(--accent)">SO-ARM101 guide →</a></div>
+          </div>
+          <div class="guide-card reveal reveal-d2">
+            <h3>⚡ Arduino / ESP32</h3>
+            <p>Serial bus servo controller or custom firmware via USB CDC.</p>
+            <div class="hw-card-meta" style="margin-top:10px"><code>castor wizard --preset arduino</code></div>
+          </div>
+          <div class="guide-card reveal reveal-d3">
+            <h3>🍓 Pi + PCA9685</h3>
+            <p>Raspberry Pi with I2C servo controller. Great for wheeled bots and arms.</p>
+            <div class="hw-card-meta" style="margin-top:10px"><code>castor wizard --preset pi_pca9685</code></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Safety First -->
+  <section class="section" id="safety">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Safety</p>
+        <h2 class="section-title">Safety first — Protocol 66</h2>
+      </div>
+      <div class="doc-section reveal">
+        <p>
+          OpenCastor implements <strong>Protocol 66 (P66)</strong> — the RCAN safety conformance framework.
+          P66 defines five invariants that are enforced at the <em>runtime layer</em>, structurally below the AI layer.
+          No model output — regardless of provider or confidence score — can override them.
+        </p>
+
+        <div class="guide-grid" style="margin-top:24px">
+          <div class="guide-card reveal">
+            <h3>① local_safety_wins</h3>
+            <p>Local safety checks run before any remote command is dispatched. Remote orchestrators cannot bypass e-stop or confidence gates.</p>
+          </div>
+          <div class="guide-card reveal reveal-d1">
+            <h3>🚨 E-Stop</h3>
+            <p>ESTOP requires an explicit hardware-level clear. The AI cannot automatically resume a halted robot.</p>
+          </div>
+          <div class="guide-card reveal reveal-d2">
+            <h3>🎯 Confidence Gates</h3>
+            <p>Commands below a minimum confidence threshold are blocked before dispatch. Configurable per command type.</p>
+          </div>
+        </div>
+
+        <p style="margin-top:24px">Add a <code>safety</code> block to your config (generated by default by <code>castor init</code>):</p>
+        <div class="code-block" style="max-width:680px;margin:16px 0">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">my-robot.rcan.yaml — safety block</span>
+          </div>
+          <div class="code-body"><span class="k">safety</span>:
+  <span class="k">local_safety_wins</span>: <span class="v">true</span>          <span class="cm"># required — RCAN §6</span>
+  <span class="k">emergency_stop_distance</span>: <span class="n">15</span>      <span class="cm"># cm</span>
+  <span class="k">watchdog</span>:
+    <span class="k">enabled</span>: <span class="v">true</span>
+    <span class="k">timeout_ms</span>: <span class="n">500</span>
+  <span class="k">confidence_gates</span>:
+    <span class="k">CONTROL</span>: <span class="n">0.75</span>
+    <span class="k">STATUS</span>: <span class="n">0.0</span></div>
+        </div>
+
+        <p>Verify P66 conformance live via the API:</p>
+        <div class="code-block" style="max-width:680px;margin:16px 0">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">Check conformance</span>
+          </div>
+          <div class="code-body"><span class="k">castor conformance</span>
+<span class="cm"># or:</span>
+<span class="k">curl</span> http://localhost:8000/api/safety/manifest</div>
+        </div>
+
+        <p>Full Protocol 66 docs: <a href="https://rcan.dev/docs/safety" style="color:var(--accent)">rcan.dev/docs/safety →</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLI Reference -->
+  <section class="section alt-section" id="cli">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label">Reference</p>
+        <h2 class="section-title">Key CLI commands</h2>
+      </div>
+      <div class="doc-section reveal">
+        <div class="code-block" style="max-width:720px;margin:0 auto">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">Terminal</span>
+          </div>
+          <div class="code-body"><span class="cm"># Start the runtime</span>
+<span class="k">castor start</span>                             <span class="cm"># uses ./my-robot.rcan.yaml</span>
+<span class="k">castor run --config robot.rcan.yaml</span>      <span class="cm"># explicit config path</span>
+
+<span class="cm"># Arm manipulation</span>
+<span class="k">castor arm scan</span>                          <span class="cm"># find USB port for arm</span>
+<span class="k">castor arm setup --port /dev/ttyACM0</span>    <span class="cm"># configure motor IDs</span>
+<span class="k">castor arm calibrate</span>                     <span class="cm"># interactive calibration</span>
+<span class="k">castor arm record</span>                        <span class="cm"># record demo for training</span>
+
+<span class="cm"># Hardware scan</span>
+<span class="k">castor scan</span>                              <span class="cm"># detect all connected hardware</span>
+
+<span class="cm"># Health &amp; safety</span>
+<span class="k">castor doctor</span>                            <span class="cm"># check deps, hardware, providers</span>
+<span class="k">castor conformance</span>                       <span class="cm"># verify P66 safety invariants</span>
+
+<span class="cm"># Interactive setup wizard</span>
+<span class="k">castor wizard</span>
+<span class="k">castor wizard --preset so_arm101</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Next Steps -->
+  <section class="section" id="next-steps">
+    <div class="container">
+      <div class="section-header reveal" style="text-align:center;margin-left:auto;margin-right:auto">
+        <p class="section-label">What's next</p>
+        <h2 class="section-title">Keep going</h2>
+      </div>
+      <div class="guide-grid reveal">
+        <a href="/docs/hardware/so-arm101" class="guide-card" style="text-decoration:none">
+          <h3>🦾 SO-ARM101 Hardware Guide</h3>
+          <p>Motor IDs, wiring, calibration, Docker setup, and LeRobot integration for the SO-ARM101 desktop arm.</p>
+          <div class="hw-card-meta" style="margin-top:10px;color:var(--accent)">Hardware guide →</div>
+        </a>
+        <a href="/hardware" class="guide-card" style="text-decoration:none">
+          <h3>🤖 TurtleBot3 & More</h3>
+          <p>Hardware presets for TurtleBot3, Arduino, ESP32, OAK-D, LiDAR, and all supported peripheral categories.</p>
+          <div class="hw-card-meta" style="margin-top:10px;color:var(--accent)">Hardware →</div>
+        </a>
+        <a href="/docs#safety" class="guide-card" style="text-decoration:none">
+          <h3>🛡️ Protocol 66 Safety</h3>
+          <p>Deep dive into the five P66 invariants, confidence gates, and the live conformance manifest endpoint.</p>
+          <div class="hw-card-meta" style="margin-top:10px;color:var(--accent)">Safety docs →</div>
+        </a>
+        <a href="https://rcan.dev" target="_blank" rel="noopener" class="guide-card" style="text-decoration:none">
+          <h3>📡 RCAN Spec</h3>
+          <p>The full Robot Capability and Action Network specification — message types, capability declarations, §19 skill invocation.</p>
+          <div class="hw-card-meta" style="margin-top:10px;color:var(--accent)">rcan.dev →</div>
+        </a>
+        <a href="https://github.com/craigm26/OpenCastor/issues" target="_blank" rel="noopener" class="guide-card" style="text-decoration:none">
+          <h3>🐛 GitHub Issues</h3>
+          <p>Report bugs, request features, or browse known issues and workarounds.</p>
+          <div class="hw-card-meta" style="margin-top:10px;color:var(--accent)">Open an issue →</div>
+        </a>
+        <a href="/hub" class="guide-card" style="text-decoration:none">
+          <h3>🧩 Community Hub</h3>
+          <p>Browse and share robot configs, presets, and recipes from the OpenCastor community.</p>
+          <div class="hw-card-meta" style="margin-top:10px;color:var(--accent)">Browse Hub →</div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <h2 class="reveal">Something not working?</h2>
+    <p class="reveal reveal-d1">Run <code>castor doctor</code> first. Still stuck? Open an issue on GitHub.</p>
+    <div class="hero-actions reveal reveal-d2">
+      <a href="https://github.com/craigm26/OpenCastor/issues" class="btn btn-primary btn-lg" target="_blank" rel="noopener">Open an Issue</a>
+      <a href="https://discord.gg/jMjA8B26Bq" class="btn btn-secondary btn-lg" target="_blank" rel="noopener">Join Discord</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="/" class="nav-logo">
+          <div class="nav-logo-img"></div>
+          <span>OpenCastor</span>
+        </a>
+        <p>The universal runtime for embodied AI.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Docs</h4>
+        <a href="/docs/getting-started">Getting Started</a>
+        <a href="/docs/hardware/so-arm101">SO-ARM101</a>
+        <a href="/docs">Full Docs</a>
+        <a href="https://rcan.dev/spec/">RCAN Spec</a>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <a href="/hardware">Hardware</a>
+        <a href="https://github.com/craigm26/OpenCastor">GitHub</a>
+        <a href="https://github.com/craigm26/OpenCastor/issues">Issues</a>
+        <a href="https://discord.gg/jMjA8B26Bq">Discord</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="/hub">Hub</a>
+        <a href="/about">About</a>
+        <a href="mailto:hello@opencastor.com">Contact</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2025-2026 Craig Merry. Apache 2.0 License.</p>
+    </div>
+  </div>
+</footer>
+
+</BaseLayout>

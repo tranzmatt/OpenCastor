@@ -988,6 +988,29 @@ def main():
     except Exception as e:
         logger.debug(f"Watchdog skipped: {e}")
 
+    # 6e-ii. SENSOR MONITOR — wire to SafetyLayer for thermal/electrical auto-estop
+    sensor_monitor = None
+    try:
+        from castor.safety.monitor import SensorMonitor, wire_safety_layer
+
+        monitor_cfg = config.get("monitor", {})
+        thresholds_cfg = monitor_cfg.get("thresholds", {})
+        from castor.safety.monitor import MonitorThresholds
+
+        thresholds = MonitorThresholds(**thresholds_cfg) if thresholds_cfg else None
+        sensor_monitor = SensorMonitor(
+            thresholds=thresholds,
+            interval=float(monitor_cfg.get("interval", 5.0)),
+            consecutive_critical=int(monitor_cfg.get("consecutive_critical", 3)),
+        )
+        wire_safety_layer(sensor_monitor, fs.safety)
+        sensor_monitor.start()
+        logger.info(
+            "SensorMonitor wired to SafetyLayer — thermal/electrical events will trigger estop"
+        )
+    except Exception as e:
+        logger.debug(f"Sensor monitor skipped: {e}")
+
     # 6f. GEOFENCE (limit operating radius)
     geofence = None
     try:
@@ -1670,6 +1693,13 @@ def main():
             try:
                 battery_monitor.stop()
                 logger.info("  ✓ Battery monitor stopped")
+            except Exception:
+                pass
+
+        if sensor_monitor:
+            try:
+                sensor_monitor.stop()
+                logger.info("  ✓ Sensor monitor stopped")
             except Exception:
                 pass
 

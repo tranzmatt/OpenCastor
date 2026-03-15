@@ -33,6 +33,10 @@ from .base import BaseProvider, Thought
 
 logger = logging.getLogger("OpenCastor.VLA")
 
+# Joints written via write_arm_command at inference time (indices 2–6 of the 7-DoF vector).
+# Index 0 (linear) and 1 (angular) drive the mobile base, not the arm.
+_ARM_JOINT_KEYS = ["grip_x", "grip_y", "grip_z", "wrist", "gripper"]
+
 _VLA_DEVICE = os.getenv("VLA_DEVICE", "cpu")
 _UNNORM_KEY = os.getenv("VLA_UNNORM_KEY", "bridge_orig")
 
@@ -61,6 +65,9 @@ class VLAProvider(BaseProvider):
         self._processor = None
         self._model = None
         self._mode = "mock"
+        # Safety layer for arm command gating (injected from CastorFS at runtime).
+        self._safety_layer = config.get("safety_layer")
+        self._principal: str = config.get("principal", "vla_provider")
 
         if HAS_TRANSFORMERS:
             try:
@@ -107,6 +114,11 @@ class VLAProvider(BaseProvider):
                 action_vec = self._run_openvla(image_bytes, instruction)
                 latency_ms = round((time.monotonic() - t0) * 1000, 1)
                 action = self._vec_to_action(action_vec)
+                # ── Safety gate: pass every arm joint through write_arm_command ──
+                if not self._write_arm_joints(action, action_vec):
+                    raw = "VLA arm command blocked by SafetyLayer"
+                    logger.warning(raw)
+                    return Thought(raw_text=raw, action={"type": "blocked"})
                 raw = f"VLA action ({latency_ms} ms): " + ", ".join(
                     f"{k}={v:.3f}" for k, v in action.items() if k != "type"
                 )
@@ -127,6 +139,37 @@ class VLAProvider(BaseProvider):
         yield thought.raw_text
 
     # ── Internal ──────────────────────────────────────────────────────
+
+    def _write_arm_joints(self, action: dict, vec: list[float]) -> bool:
+        """Gate each arm joint through write_arm_command before committing the action.
+
+        Returns True if all commands are accepted (or no safety layer is attached).
+        Returns False if any arm joint command is blocked by the SafetyLayer.
+        """
+        from castor.hardware.so_arm101.safety_bridge import write_arm_command
+
+        safety_layer = self._safety_layer
+        principal = self._principal
+
+        # Map action keys to (position_rad, velocity_rad_s) from the raw vector.
+        # vec[2..6] correspond to _ARM_JOINT_KEYS in order.
+        for idx, joint_name in enumerate(_ARM_JOINT_KEYS):
+            position = float(vec[idx + 2]) if len(vec) > idx + 2 else float(action.get(joint_name, 0.0))
+            velocity = 0.0  # VLA outputs position deltas; velocity unknown, default safe
+            if safety_layer:
+                allowed = write_arm_command(
+                    safety_layer=safety_layer,
+                    joint=joint_name,
+                    position=position,
+                    velocity=velocity,
+                    principal=principal,
+                )
+                if not allowed:
+                    logger.warning(
+                        "arm command blocked by SafetyLayer: %s=%.4f", joint_name, position
+                    )
+                    return False
+        return True
 
     def _run_openvla(self, jpeg_bytes: bytes, instruction: str) -> list[float]:
         """Run OpenVLA inference and return the 7-DoF action vector."""
