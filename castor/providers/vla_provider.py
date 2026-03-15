@@ -154,7 +154,9 @@ class VLAProvider(BaseProvider):
         # Map action keys to (position_rad, velocity_rad_s) from the raw vector.
         # vec[2..6] correspond to _ARM_JOINT_KEYS in order.
         for idx, joint_name in enumerate(_ARM_JOINT_KEYS):
-            position = float(vec[idx + 2]) if len(vec) > idx + 2 else float(action.get(joint_name, 0.0))
+            position = (
+                float(vec[idx + 2]) if len(vec) > idx + 2 else float(action.get(joint_name, 0.0))
+            )
             velocity = 0.0  # VLA outputs position deltas; velocity unknown, default safe
             if safety_layer:
                 allowed = write_arm_command(

@@ -7,10 +7,7 @@ command to the motor controller device after marking the session as expired.
 from __future__ import annotations
 
 import json
-from io import StringIO
-from unittest.mock import MagicMock, call, mock_open, patch
-
-import pytest
+from unittest.mock import mock_open, patch
 
 from castor.fs.namespace import Namespace
 from castor.fs.permissions import PermissionTable
@@ -71,8 +68,9 @@ def test_session_expiry_swallows_write_exception():
     """A failed motor write should not propagate — session expiry must still complete."""
     sl = _make_safety_layer()
 
-    with patch("os.path.exists", return_value=True), patch(
-        "builtins.open", side_effect=OSError("device busy")
+    with (
+        patch("os.path.exists", return_value=True),
+        patch("builtins.open", side_effect=OSError("device busy")),
     ):
         # Should not raise
         sl._trigger_session_expiry_stop("test_principal")
