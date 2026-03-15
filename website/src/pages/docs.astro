@@ -829,20 +829,20 @@ import BaseLayout from '../layouts/BaseLayout.astro';
             <div class="code-body"><span class="k">curl</span> http://localhost:8000/api/safety/manifest
 
               <span class="cm"># Response:</span>
-              {
+              {'{'}
               <span class="k">"p66_conformant"</span>: <span class="v">true</span>,
               <span class="k">"conformance_pct"</span>: <span class="n">100.0</span>,
-              <span class="k">"invariants"</span>: {
+              <span class="k">"invariants"</span>: {'{'}
                 <span class="k">"local_safety_always_wins"</span>: <span class="v">true</span>,
                 <span class="k">"safety_messages_bypass_queues"</span>: <span class="v">true</span>,
                 <span class="k">"estop_requires_explicit_clear"</span>: <span class="v">true</span>,
                 <span class="k">"ai_cannot_override_safety"</span>: <span class="v">true</span>,
                 <span class="k">"audit_trail_complete"</span>: <span class="v">true</span>
-              },
+              {'}'},
               <span class="k">"watchdog_ok"</span>: <span class="v">true</span>,
               <span class="k">"estop_active"</span>: <span class="v">false</span>,
               <span class="k">"timestamp_ms"</span>: <span class="n">1741996800000</span>
-              }
+              {'}'}
             </div>
           </div>
 
