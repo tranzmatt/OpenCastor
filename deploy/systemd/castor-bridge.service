@@ -1,0 +1,55 @@
+[Unit]
+Description=OpenCastor Firebase Bridge — remote fleet management relay
+Documentation=https://github.com/craigm26/OpenCastor
+After=network-online.target castor-gateway.service
+Wants=network-online.target
+# Start after gateway is up (bridge needs local gateway to be responsive)
+Requires=castor-gateway.service
+
+[Service]
+Type=simple
+User=castor
+Group=castor
+WorkingDirectory=/home/castor
+
+# -----------------------------------------------------------------------
+# Configure these for your robot:
+# -----------------------------------------------------------------------
+Environment=FIREBASE_PROJECT=live-captions-xr
+Environment=RCAN_CONFIG=/home/castor/config/bob.rcan.yaml
+Environment=GATEWAY_URL=http://127.0.0.1:8000
+# Optional: explicit service account JSON (omit to use ADC)
+# Environment=GOOGLE_APPLICATION_CREDENTIALS=/home/castor/.config/gcloud/application_default_credentials.json
+# -----------------------------------------------------------------------
+
+ExecStart=/usr/local/bin/castor bridge \
+    --config ${RCAN_CONFIG} \
+    --firebase-project ${FIREBASE_PROJECT} \
+    --gateway-url ${GATEWAY_URL} \
+    --telemetry-interval 30 \
+    --poll-interval 5
+
+# Restart on failure — bridge is long-running
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Resource limits
+MemoryMax=256M
+CPUQuota=20%
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/home/castor /tmp
+ProtectHome=read-only
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=castor-bridge
+
+[Install]
+WantedBy=multi-user.target

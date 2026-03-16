@@ -1,0 +1,38 @@
+[Unit]
+Description=OpenCastor Gateway — local robot REST API
+Documentation=https://github.com/craigm26/OpenCastor
+After=network.target
+
+[Service]
+Type=simple
+User=castor
+Group=castor
+WorkingDirectory=/home/castor
+
+Environment=RCAN_CONFIG=/home/castor/config/bob.rcan.yaml
+
+ExecStart=/usr/local/bin/castor gateway \
+    --config ${RCAN_CONFIG} \
+    --host 127.0.0.1 \
+    --port 8000
+
+Restart=on-failure
+RestartSec=5
+StartLimitInterval=60
+StartLimitBurst=5
+
+MemoryMax=512M
+CPUQuota=50%
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/home/castor /tmp
+ProtectHome=read-only
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=castor-gateway
+
+[Install]
+WantedBy=multi-user.target

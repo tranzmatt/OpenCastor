@@ -85,6 +85,19 @@ rcan_protocol:
   enabled: true
   capabilities: []           # Auto-detected from drivers above
   # registry_url: "https://robotregistryfoundation.org/api/v1"
+
+# Remote fleet management (castor bridge)
+# Uncomment and configure to enable remote access via Firebase
+# cloud:
+#   firebase_project: live-captions-xr    # Your Firebase project ID
+#   gateway_url: http://127.0.0.1:8000   # Local castor gateway URL
+#   telemetry_interval_s: 30             # How often to push telemetry
+#   poll_interval_s: 5                   # Command queue poll interval
+#   # credentials: /path/to/serviceAccount.json  # Optional; uses ADC if omitted
+#
+# Start with: castor bridge --config robot.rcan.yaml --firebase-project <project>
+# Or with systemd: cp deploy/systemd/castor-bridge.service /etc/systemd/system/
+#                  systemctl enable --now castor-bridge
 """
 
 
