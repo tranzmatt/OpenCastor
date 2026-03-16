@@ -131,6 +131,22 @@ class BaseProvider(ABC):
                 "You are embedded in the OpenCastor web dashboard. "
                 "The user is watching live telemetry alongside this chat."
             ),
+            "opencastor_app": (
+                "You are communicating via the OpenCastor Fleet UI — a dedicated web app "
+                "for robot management. This is NOT WhatsApp or any third-party messaging "
+                "service. You can reference sending files, images, or telemetry directly "
+                "through this interface. Keep replies concise and informative."
+            ),
+            "opencastor_fleet_ui": (
+                "You are communicating via the OpenCastor Fleet UI — a dedicated web app "
+                "for robot management. This is NOT WhatsApp or any third-party messaging "
+                "service. You can reference sending files, images, or telemetry directly "
+                "through this interface. Keep replies concise and informative."
+            ),
+            "rcan": (
+                "You are responding to a command sent over the RCAN protocol. "
+                "Be concise and structured. The caller may be another robot or an automated system."
+            ),
             "voice": (
                 "Your replies will be read aloud via TTS. "
                 "Use natural spoken-word phrasing. No symbols, no JSON, no lists."

@@ -386,7 +386,13 @@ class CastorBridge:
             with httpx.Client(timeout=60.0) as client:
                 resp = client.post(
                     f"{self.gateway_url}/api/command",
-                    json={"instruction": instruction},
+                    json={
+                        "instruction": instruction,
+                        # Tell the brain this is the OpenCastor Fleet UI channel,
+                        # not WhatsApp/Telegram — avoids "I can't send files on WhatsApp"
+                        "channel": "opencastor_app",
+                        "context": "opencastor_fleet_ui",
+                    },
                     headers=headers,
                 )
 
@@ -395,7 +401,11 @@ class CastorBridge:
             with httpx.Client(timeout=30.0) as client:
                 resp = client.post(
                     f"{self.gateway_url}/api/command",
-                    json={"instruction": instruction},
+                    json={
+                        "instruction": instruction,
+                        "channel": "opencastor_app",
+                        "context": "opencastor_fleet_ui",
+                    },
                     headers=headers,
                 )
 

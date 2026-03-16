@@ -325,6 +325,10 @@ async def verify_token(request: Request):
 class CommandRequest(BaseModel):
     instruction: str
     image_base64: Optional[str] = None
+    # Surface/channel context — tells the brain which UI it's responding to.
+    # Values: "whatsapp" | "terminal" | "dashboard" | "opencastor_app" | "rcan" | "voice"
+    channel: Optional[str] = None
+    context: Optional[str] = None  # alias for channel (bridge sends both)
 
 
 class ActionRequest(BaseModel):
@@ -605,9 +609,11 @@ async def send_command(cmd: CommandRequest, request: Request):
         image_bytes = _capture_live_frame()
 
     active = _get_active_brain()
+    # Resolve surface from channel/context fields (bridge sends "opencastor_app")
+    _surface = cmd.channel or cmd.context or "whatsapp"
     _think_t0 = time.perf_counter()
     try:
-        thought = active.think(image_bytes, cmd.instruction)
+        thought = active.think(image_bytes, cmd.instruction, surface=_surface)
     except Exception as _think_exc:
         from castor.providers.base import ProviderQuotaError
 
