@@ -98,6 +98,10 @@ dynamixel = ["dynamixel-sdk>=3.7.31"]
 hlabs = ["python-can>=4.0"]  # HLaboratories ACB v2.0 CAN Bus support (pyserial is a core dep)
 lerobot = ["feetech-servo-sdk", "dynamixel-sdk>=3.8", "gym-pusht", "gym-aloha"]  # Feetech STS3215 + Dynamixel + gym environments for LeRobot kits
 reachy = ["reachy2-sdk>=1.0", "zeroconf>=0.120"]  # Pollen Robotics Reachy 2 / Mini
+cloud = [
+    "firebase-admin>=6.0.0",
+    "httpx>=0.27",
+]  # Firebase bridge for remote fleet management (castor bridge)
 esp32 = ["websocket-client>=1.7.0"]
 ev3 = ["python-ev3dev2>=2.1.0.post1; sys_platform == 'linux'"]
 spike = ["bleak>=0.22.0"]

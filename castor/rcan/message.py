@@ -63,6 +63,9 @@ class MessageType(IntEnum):
     REGISTRY_RESOLVE_RESULT = 17  # §21 — result of REGISTRY_RESOLVE (RURI + metadata or error)
     TRANSPARENCY = 18  # EU AI Act Art. 13 transparency disclosure
     HANDOFF = 19  # Transfer control between principals
+    CONSENT_REQUEST = 20  # R2RAM §5: request cross-owner robot-to-robot authorization
+    CONSENT_GRANT = 21   # R2RAM §5: grant cross-owner authorization with scopes
+    CONSENT_DENY = 22    # R2RAM §5: deny cross-owner authorization request
 
 
 class Priority(IntEnum):

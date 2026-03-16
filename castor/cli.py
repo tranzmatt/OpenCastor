@@ -1509,6 +1509,13 @@ def cmd_swarm(args) -> None:
     print("castor swarm: coming soon.")
 
 
+def _cmd_bridge(args) -> None:
+    """castor bridge — Firebase relay daemon for remote fleet management."""
+    from castor.cloud.bridge import run_bridge
+
+    run_bridge(args)
+
+
 def _cmd_arm(args) -> None:
     """castor arm — SO-ARM101 assembly, port detection, motor setup, config generation."""
     from castor.hardware.so_arm101.cli import build_parser as _arm_build_parser
@@ -4199,6 +4206,66 @@ def main() -> None:
     )
     p_arm.add_argument("arm_subcmd", nargs="?", help="Subcommand (see above)")
 
+    # castor bridge — Firebase remote fleet relay
+    p_bridge = sub.add_parser(
+        "bridge",
+        help="Start the Firebase relay bridge for remote fleet management",
+        description=(
+            "Connects this robot to Firebase Firestore + FCM, enabling the\n"
+            "OpenCastor Client Flutter app to manage the fleet from anywhere.\n\n"
+            "Robots initiate outbound connections only — no public ports.\n"
+            "All commands pass through R2RAM authorization and Protocol 66\n"
+            "safety enforcement before reaching the local gateway.\n\n"
+            "  castor bridge --firebase-project live-captions-xr\n"
+            "  castor bridge --firebase-project myproject --credentials /path/to/sa.json\n"
+            "  castor bridge --firebase-project myproject --gateway-url http://127.0.0.1:8001\n"
+        ),
+    )
+    p_bridge.add_argument(
+        "--config",
+        default=None,
+        metavar="PATH",
+        help="Path to RCAN config file (default: auto-detect)",
+    )
+    p_bridge.add_argument(
+        "--firebase-project",
+        default=None,
+        metavar="PROJECT_ID",
+        help="Firebase project ID (e.g. live-captions-xr)",
+    )
+    p_bridge.add_argument(
+        "--credentials",
+        default=None,
+        metavar="PATH",
+        help="Path to Firebase service account JSON (default: use ADC)",
+    )
+    p_bridge.add_argument(
+        "--gateway-url",
+        default="http://127.0.0.1:8000",
+        metavar="URL",
+        help="Local castor gateway URL (default: http://127.0.0.1:8000)",
+    )
+    p_bridge.add_argument(
+        "--gateway-token",
+        default=None,
+        metavar="TOKEN",
+        help="Bearer token for local castor gateway auth",
+    )
+    p_bridge.add_argument(
+        "--poll-interval",
+        default=5,
+        type=float,
+        metavar="SECONDS",
+        help="Firestore poll interval in seconds when listener unavailable (default: 5)",
+    )
+    p_bridge.add_argument(
+        "--telemetry-interval",
+        default=30,
+        type=float,
+        metavar="SECONDS",
+        help="Telemetry publish interval in seconds (default: 30)",
+    )
+
     # Shell completions (argcomplete)
     try:
         import argcomplete
@@ -4290,6 +4357,8 @@ def main() -> None:
         "init": cmd_init,
         # SO-ARM101 arm setup (issue #658)
         "arm": _cmd_arm,
+        # Firebase remote fleet bridge
+        "bridge": _cmd_bridge,
     }
 
     # Load plugins and merge any plugin-provided commands
