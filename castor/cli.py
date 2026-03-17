@@ -3656,6 +3656,28 @@ def _cmd_optimize(args) -> None:
     show_report = getattr(args, "show_report", False)
     config_file = getattr(args, "config", None)
 
+    # Schedule/unschedule cron
+    schedule = getattr(args, "schedule", False)
+    unschedule = getattr(args, "unschedule", False)
+    if schedule:
+        from castor.idle import install_cron_schedule
+
+        try:
+            result = install_cron_schedule()
+            if result == "already installed":
+                print("  ✓ Optimizer cron job already installed.")
+            else:
+                print(f"  ✓ Cron job installed: {result}")
+        except Exception as exc:
+            print(f"  ✗ Failed to install cron: {exc}")
+        return
+    if unschedule:
+        from castor.idle import uninstall_cron_schedule
+
+        removed = uninstall_cron_schedule()
+        print("  ✓ Cron job removed." if removed else "  No cron job found.")
+        return
+
     if show_report:
         # Show last optimization report
         history_path = Path.home() / ".config" / "opencastor" / "optimizer-history.json"
@@ -5363,6 +5385,12 @@ def main() -> None:
         "--report", action="store_true", dest="show_report", help="Show last optimization report"
     )
     p_optimize.add_argument("--config", "-c", metavar="PATH", help="Path to RCAN yaml config")
+    p_optimize.add_argument(
+        "--schedule", action="store_true", help="Install cron job to run optimizer at 3 AM daily"
+    )
+    p_optimize.add_argument(
+        "--unschedule", action="store_true", help="Remove the optimizer cron job"
+    )
 
     args = parser.parse_args()
 

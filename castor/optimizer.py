@@ -211,43 +211,61 @@ class RobotOptimizer:
         )
 
         try:
-            # Safety: don't run during active sessions
-            if await self._is_active_session():
-                logger.info("Optimizer: active session detected — skipping pass")
+            # Safety: use IdleGuard to detect if robot becomes active mid-pass
+            from castor.idle import IdleGuard, is_robot_idle
+
+            idle_state = await is_robot_idle()
+            if not idle_state:
+                logger.info("Optimizer: robot not idle (%s) — skipping pass", idle_state.summary)
                 report.skipped_active_session = True
                 return report
 
-            # Load trajectory data
-            rows = self._load_trajectories(days=7)
-            if len(rows) < 5:
-                logger.info(
-                    "Optimizer: insufficient trajectory data (%d rows) — skipping", len(rows)
-                )
-                return report
+            # Run optimization under IdleGuard — abort if activity resumes mid-pass
+            async with IdleGuard(poll_interval_s=15.0) as guard:
+                # Load trajectory data
+                rows = self._load_trajectories(days=7)
+                if len(rows) < 5:
+                    logger.info(
+                        "Optimizer: insufficient trajectory data (%d rows) — skipping", len(rows)
+                    )
+                    self._persist_report(report)
+                    return report
 
-            # Run each optimization target
-            candidates: list[OptimizationChange] = []
-            candidates.extend(await asyncio.to_thread(self._check_skill_trigger_tuning, rows))
-            candidates.extend(await asyncio.to_thread(self._check_context_budget, rows))
-            candidates.extend(await asyncio.to_thread(self._check_max_iterations, rows))
-            candidates.extend(await asyncio.to_thread(self._check_tool_pruning, rows))
-            candidates.extend(await asyncio.to_thread(self._check_memory_consolidation, rows))
+                # Run each optimization target
+                candidates: list[OptimizationChange] = []
+                candidates.extend(await asyncio.to_thread(self._check_skill_trigger_tuning, rows))
+                candidates.extend(await asyncio.to_thread(self._check_context_budget, rows))
+                candidates.extend(await asyncio.to_thread(self._check_max_iterations, rows))
+                candidates.extend(await asyncio.to_thread(self._check_tool_pruning, rows))
+                candidates.extend(await asyncio.to_thread(self._check_memory_consolidation, rows))
 
-            # Sort by metric improvement, cap at MAX_CHANGES_PER_PASS
-            candidates.sort(key=lambda c: c.metric_delta, reverse=True)
-            candidates = candidates[:_MAX_CHANGES_PER_PASS]
-            report.changes_proposed = candidates
+                # Sort by metric improvement, cap at MAX_CHANGES_PER_PASS
+                candidates.sort(key=lambda c: c.metric_delta, reverse=True)
+                candidates = candidates[:_MAX_CHANGES_PER_PASS]
+                report.changes_proposed = candidates
 
-            if not self._dry_run and candidates:
-                self._backup_config()
-                for change in candidates:
-                    applied = self._apply_change(change)
-                    if applied:
-                        change.applied = True
-                        report.changes_applied += 1
-                    else:
-                        change.reverted = True
-                        report.changes_reverted += 1
+                if guard.interrupted:
+                    logger.info("Optimizer: activity detected mid-pass — aborting without changes")
+                    report.skipped_active_session = True
+                    self._persist_report(report)
+                    return report
+
+                if not self._dry_run and candidates:
+                    self._backup_config()
+                    for change in candidates:
+                        if guard.interrupted:
+                            # Abort mid-change — restore backup
+                            if self._backup_path and self._backup_path.exists():
+                                self._restore_backup(self._backup_path)
+                            report.skipped_active_session = True
+                            break
+                        applied = self._apply_change(change)
+                        if applied:
+                            change.applied = True
+                            report.changes_applied += 1
+                        else:
+                            change.reverted = True
+                            report.changes_reverted += 1
 
         except Exception as exc:
             logger.exception("Optimizer pass failed: %s", exc)
@@ -260,24 +278,6 @@ class RobotOptimizer:
         return report
 
     # ── Safety ────────────────────────────────────────────────────────────────
-
-    async def _is_active_session(self) -> bool:
-        """Return True if a castor session is currently active."""
-        try:
-            import subprocess
-
-            result = subprocess.run(
-                ["castor", "status", "--json"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                data = json.loads(result.stdout)
-                return data.get("session_active", False)
-        except Exception:
-            pass
-        return False  # fail-open: if we can't tell, proceed
 
     def _is_safe_key(self, yaml_key: str) -> bool:
         """Return True if a YAML key is safe to modify."""
