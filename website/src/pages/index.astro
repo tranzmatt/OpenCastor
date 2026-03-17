@@ -14,7 +14,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 <section class="hero">
   <div class="badge reveal">
     <span class="dot"></span>
-    v2026.3.14.6 Released
+    v2026.4.1.0 Released
   </div>
 
   <h1 class="hero-title reveal reveal-d1">
@@ -250,8 +250,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <div class="quickstart-num">02</div>
         <div>
           <h4>Configure</h4>
-          <p>Interactive wizard probes your device, suggests a stack, runs preflight, and guides fallbacks when needed.</p>
-          <code>castor wizard</code>
+          <p>Interactive setup wizard probes your device, suggests a stack, and guides onboarding with inline QR codes. Bridge and fleet registration included.</p>
+          <code>castor setup</code>
         </div>
       </div>
       <div class="quickstart-step">
@@ -361,27 +361,27 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 <section class="section" id="release">
   <div class="container">
     <div class="section-header center reveal">
-      <p class="section-label">v2026.3.13.3 — March 13, 2026</p>
+      <p class="section-label">v2026.4.1.0 — March 17, 2026</p>
       <h2 class="section-title">What's New</h2>
     </div>
     <div class="feature-grid">
       <div class="card reveal">
-        <div class="card-icon" style="background: var(--green-light);">🔗</div>
-        <h3>v2026.3.13.3 — RCAN v1.3 Migration + Config Fixes</h3>
-        <p>Full migration chain from <code>1.0.0-alpha → 1.3</code> implemented. Default config template, setup service, and conformance output now consistently emit <code>rcan_version: "1.3"</code>. Hardware doc examples updated.</p>
-        <a href="changelog.html#v2026.3.13.3">Release notes →</a>
+        <div class="card-icon" style="background: var(--green-light);">🌐</div>
+        <h3>v2026.4.1.0 — RCAN v1.6: Federation &amp; Constrained Transports</h3>
+        <p>Registry Federation Protocol (GAP-16), RCAN-Minimal 32-byte ESTOP for LoRa/BLE (GAP-17), multi-modal payloads with SHA-256 audit trail (GAP-18), and Human identity LoA 1/2/3 via FIDO2 (GAP-14). All 22 security/safety audit gaps addressed. rcan-py v0.6.0 (587 tests), rcan-ts v0.6.0 (405 tests).</p>
+        <a href="/changelog#v2026.4.1.0">Release notes →</a>
       </div>
       <div class="card reveal reveal-d1">
-        <div class="card-icon" style="background: var(--purple-light);">⚡</div>
-        <h3>v2026.3.13.2 — §19 INVOKE_CANCEL + Parallel Skills</h3>
-        <p><code>INVOKE_CANCEL</code> dataclass and dispatch via <code>MessageRouter.route_invoke_cancel()</code>. New <code>ParallelSkillExecutor</code> with fan-out and race semantics. 9-test <code>TestInvokeFamily</code> suite.</p>
-        <a href="changelog.html#v2026.3.13.2">Release notes →</a>
+        <div class="card-icon" style="background: var(--purple-light);">🛡️</div>
+        <h3>v2026.3.17.0 — RCAN v1.5: Production Safety Hardening</h3>
+        <p>Replay attack prevention (GAP-03), robot identity revocation (GAP-02), ESTOP QoS exactly-once delivery (GAP-11), consent wire protocol (GAP-05), offline operation mode (GAP-06). Protocol 66 conformance: 87% → 94%.</p>
+        <a href="/changelog#v2026.3.17.0">Release notes →</a>
       </div>
       <div class="card reveal reveal-d2">
-        <div class="card-icon" style="background: var(--cyan-light);">🧠</div>
-        <h3>v2026.3.13.0 / .1 — Episodic Memory + Rolling Compression</h3>
-        <p>SQLite-backed episodic memory with recall and context injection. Rolling context compression for 24/7 continuous operation. Shared-context <code>ThreadContextBus</code>. Timeout enforcement for INVOKE.</p>
-        <a href="changelog.html#v2026.3.13.0">Release notes →</a>
+        <div class="card-icon" style="background: var(--cyan-light);">🔧</div>
+        <h3>v2026.3.16.3 — Surface Routing Fix + Chat E2E</h3>
+        <p>Surface routing fix confirmed chat end-to-end. Bob↔Alex live robot conversation milestone reached. Fleet UI launched at <a href="https://app.opencastor.com" style="color:var(--accent)">app.opencastor.com</a>.</p>
+        <a href="/changelog#v2026.3.16.3">Release notes →</a>
       </div>
       <div class="card reveal reveal-d3">
         <div class="card-icon" style="background: var(--orange-light);">📋</div>

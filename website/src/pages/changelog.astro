@@ -19,12 +19,56 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <div class="container">
       <div class="changelog-timeline">
 
+        <!-- v2026.4.1.0 -->
+        <div class="changelog-release current reveal" id="v2026.4.1.0">
+          <div class="release-header">
+            <span class="release-version">v2026.4.1.0</span>
+            <span class="release-badge badge-new">Latest</span>
+            <span class="release-date">March 17, 2026</span>
+          </div>
+          <div class="release-body">
+            <h3>RCAN v1.6 — Federation, Constrained Transports, Multi-Modal, Identity LoA</h3>
+            <ul>
+              <li>GAP-16: Registry Federation Protocol — FEDERATION_SYNC wire format, cross-registry JWT trust chains, 3-tier registry hierarchy (root/authoritative/community), DNSSEC trust anchor discovery</li>
+              <li>GAP-17: Bandwidth-constrained transports — RCAN-Minimal (32-byte ESTOP for LoRa/BLE), RCAN-Compact (CBOR, &lt;200 bytes ESTOP), BLE L2CAP framing</li>
+              <li>GAP-18: Multi-modal payloads — media_chunks[] field, SHA-256 audit trail, streaming mode, TRAINING_DATA now requires media payload</li>
+              <li>GAP-14: Human identity LoA 1/2/3 — FIDO2 binding, registry trust tiers, min_loa_for_control in P66 manifest</li>
+              <li>All 22 original security/safety audit gaps addressed</li>
+              <li>castor setup wizard: interactive onboarding with inline QR codes, castor bridge setup, castor fleet-link</li>
+              <li>rcan-py v0.6.0 (587 tests), rcan-ts v0.6.0 (405 tests)</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- v2026.3.17.0 -->
+        <div class="changelog-release reveal" id="v2026.3.17.0">
+          <div class="release-header">
+            <span class="release-version">v2026.3.17.0</span>
+            <span class="release-badge badge-fix">RCAN v1.5</span>
+            <span class="release-date">March 17, 2026</span>
+          </div>
+          <div class="release-body">
+            <h3>RCAN v1.5 — Production Safety Hardening (18 gaps addressed)</h3>
+            <ul>
+              <li>GAP-03: Replay attack prevention — 30s sliding window seen-set, 10s for safety messages</li>
+              <li>GAP-02: Robot identity revocation — ROBOT_REVOCATION broadcast, 1h TTL cache</li>
+              <li>GAP-01: Command delegation chains — 4-hop max, Ed25519-signed, audit trail</li>
+              <li>GAP-05: Consent wire protocol — CONSENT_REQUEST/GRANT/DENY on-wire format</li>
+              <li>GAP-11: ESTOP QoS exactly-once delivery — retry until ACK, SafetyHaltError on timeout</li>
+              <li>GAP-06: Offline operation mode — 300s grace, ESTOP always allowed</li>
+              <li>GAP-10: Training data consent — EU AI Act Art.10, DataCategory enum</li>
+              <li>GAP-08: Cloud relay identity audit — sender_type: cloud_function</li>
+              <li>Protocol 66 conformance: 87% → 94%</li>
+              <li>rcan-py v0.5.0 (430 tests), rcan-ts v0.5.0 (311 tests)</li>
+            </ul>
+          </div>
+        </div>
+
         <!-- v2026.3.14.6 -->
-        <div class="changelog-release current reveal" id="v2026.3.14.6">
+        <div class="changelog-release reveal" id="v2026.3.14.6">
           <div class="release-header">
             <span class="release-version">v2026.3.14.6</span>
             <span class="release-date">2026-03-14</span>
-            <span class="release-badge badge-new">Latest</span>
           </div>
           <div class="release-body">
             <div class="release-group">
@@ -45,7 +89,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <div class="release-header">
             <span class="release-version">v2026.3.14.5</span>
             <span class="release-date">2026-03-14</span>
-            <span class="release-badge badge-new">Latest</span>
           </div>
           <div class="release-body">
             <div class="release-group">
@@ -88,7 +131,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <div class="release-header">
             <span class="release-version">v2026.3.13.12</span>
             <span class="release-date">2026-03-13</span>
-            <span class="release-badge badge-new">Latest</span>
           </div>
           <div class="release-body">
             <div class="release-group">
@@ -114,7 +156,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <div class="release-header">
             <span class="release-version">v2026.3.13.11</span>
             <span class="release-date">2026-03-13</span>
-            <span class="release-badge badge-new">Latest</span>
           </div>
           <div class="release-body">
             <div class="release-group">

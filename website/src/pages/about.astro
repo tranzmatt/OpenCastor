@@ -75,8 +75,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
             project exploring the intersection of AI agents and physical robotics. What started as a personal
             frustration — writing custom glue code for every robot + AI combination — grew into a mission to build the
             universal adapter layer that the robotics community was missing.</p>
-          <p>The project evolved from a weekend hack into a serious open-source effort: 99,547 lines of battle-tested
-            Python, 3,431 tests, support for 12+ AI providers including Apple Foundation Models, hardware-accelerated
+          <p>The project evolved from a weekend hack into a serious open-source effort: 166,186 lines of battle-tested
+            Python, 6,404 tests, support for 13+ AI providers including Apple Foundation Models, hardware-accelerated
             vision via Hailo-8 NPU, and a tiered cognitive architecture that runs a $0 primary brain with optional paid
             fallbacks. All released under the Apache 2.0 license.</p>
         </div>
@@ -141,16 +141,25 @@ import BaseLayout from '../layouts/BaseLayout.astro';
             </div>
             <div class="timeline-item reveal">
               <div class="date">Mar 2026</div>
-              <h4>OpenCastor v2026.3.8.1</h4>
-              <p>AI Accountability Layer (RCAN §16): confidence gates, Human-in-the-Loop authorization, tamper-evident
-                thought logs with full model identity. RCAN v1.4 compliance: AUTHORIZE/PENDING_AUTH message types,
-                rcan_version 1.4. 5,989 tests passing.</p>
+              <h4>RCAN v1.5 + Fleet UI Launch</h4>
+              <p>Production safety hardening: replay prevention, ESTOP QoS exactly-once delivery, robot identity
+                revocation, consent wire protocol. Protocol 66 conformance reached 94%. Fleet UI launched at
+                <a href="https://app.opencastor.com" style="color:var(--accent)">app.opencastor.com</a>.
+                Bob↔Alex live robot conversation milestone confirmed end-to-end.</p>
+            </div>
+            <div class="timeline-item reveal">
+              <div class="date">Mar 2026</div>
+              <h4>OpenCastor v2026.4.1.0 — RCAN v1.6</h4>
+              <p>Registry Federation Protocol, bandwidth-constrained transports (LoRa/BLE), multi-modal payloads,
+                Human identity LoA 1/2/3 via FIDO2. All 22 original security/safety audit gaps addressed.
+                rcan-py v0.6.0 (587 tests), rcan-ts v0.6.0 (405 tests). <code>castor setup</code> wizard with
+                inline QR codes and fleet-link onboarding. 166,186 lines of code, 6,404 tests.</p>
             </div>
             <div class="timeline-item reveal">
               <div class="date">Next</div>
               <h4>Growing the Ecosystem</h4>
-              <p>More drivers, more presets, more providers. Fleet management, cloud deployment, and the first partner
-                integrations.</p>
+              <p>More drivers, more presets, more providers. Partner integrations, community hub expansion, and
+                continued RCAN spec development.</p>
             </div>
           </div>
         </div>
