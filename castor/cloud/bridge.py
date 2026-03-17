@@ -1277,7 +1277,7 @@ class CastorBridge:
 
             listener = self._commands_ref().on_snapshot(self._on_command_snapshot)
             log.info(
-                "Bridge LIVE — %s (%s) → Firebase %s [real-time listener, rcan=1.5]",
+                "Bridge LIVE — %s (%s) → Firebase %s [real-time listener, rcan=1.6]",
                 self.robot_name,
                 self.rrn,
                 self.firebase_project,
@@ -1294,7 +1294,7 @@ class CastorBridge:
                     pass
 
             log.info(
-                "Bridge LIVE — %s (%s) → Firebase %s [poll mode, interval=%.0fs, rcan=1.5]",
+                "Bridge LIVE — %s (%s) → Firebase %s [poll mode, interval=%.0fs, rcan=1.6]",
                 self.robot_name,
                 self.rrn,
                 self.firebase_project,
