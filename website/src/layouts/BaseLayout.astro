@@ -72,12 +72,28 @@ const moonSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" 
         <div class="nav-dropdown-menu">
           <a href="/docs/getting-started">Getting Started</a>
           <a href="/docs/hardware/so-arm101">SO-ARM101</a>
-          <a href="/docs#configuration">RCAN Config</a>
-          <a href="/docs#safety">Protocol 66</a>
-          <a href="/docs#cli">CLI Reference</a>
+          <a href="/docs/configuration">RCAN Config</a>
+          <a href="/docs/safety">Protocol 66</a>
+          <a href="/docs/setup-wizard">CLI Reference</a>
         </div>
       </div>
-      <a href="/hardware"  class={currentPath === '/hardware'  ? 'nav-active' : ''}>Hardware</a>
+      <div class="nav-dropdown">
+        <a href="/hardware" class={currentPath === '/hardware' || currentPath.startsWith('/hardware/') || currentPath === '/docs/harness' ? 'nav-active' : ''}>Hardware</a>
+        <div class="nav-dropdown-menu">
+          <a href="/hardware">Hardware Overview</a>
+          <a href="/docs/harness">Harnesses</a>
+        </div>
+      </div>
+      <div class="nav-dropdown">
+        <a href="/docs/ecosystem" class={currentPath === '/docs/ecosystem' ? 'nav-active' : ''}>Ecosystem</a>
+        <div class="nav-dropdown-menu">
+          <a href="/docs/ecosystem">Ecosystem Overview</a>
+          <a href="https://rcan.dev" target="_blank" rel="noopener">RCAN Protocol</a>
+          <a href="https://robotregistryfoundation.org" target="_blank" rel="noopener">Robot Registry</a>
+          <a href="https://app.opencastor.com" target="_blank" rel="noopener">OpenCastor Fleet</a>
+        </div>
+      </div>
+
       <a href="/tutorials" class={currentPath === '/tutorials' ? 'nav-active' : ''}>Tutorials</a>
       <a href="/hub"       class={currentPath === '/hub'       ? 'nav-active' : ''}>Hub</a>
       <a href="/about"     class={currentPath === '/about'     ? 'nav-active' : ''}>About</a>

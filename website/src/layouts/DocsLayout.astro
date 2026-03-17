@@ -1,0 +1,158 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+export interface Props {
+  title: string;
+  description?: string;
+  ogUrl?: string;
+}
+
+const { title, description, ogUrl } = Astro.props;
+let currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
+// special case for /docs which might map to /docs/index
+if (currentPath === '/docs/index') {
+  currentPath = '/docs';
+}
+
+const sidebarLinks = [
+  { label: 'Introduction & Quick Start', href: '/docs' },
+  { label: 'Setup Wizard', href: '/docs/setup-wizard' },
+  { label: 'Configuration (RCAN)', href: '/docs/configuration' },
+  { label: 'Architecture', href: '/docs/architecture' },
+  { label: 'AI Providers', href: '/docs/providers' },
+  { label: 'Hardware & Auto-Detect', href: '/docs/peripherals' },
+  { label: 'Safety & Protocol 66', href: '/docs/safety' },
+  { label: 'Ecosystem Reference', href: '/docs/ecosystem' },
+];
+---
+<BaseLayout title={title} description={description} ogUrl={ogUrl}>
+  <div class="docs-container container">
+    <aside class="docs-sidebar reveal">
+      <div class="sidebar-sticky">
+        <h3 class="sidebar-title">Documentation</h3>
+        <nav class="sidebar-nav">
+          {sidebarLinks.map(link => (
+            <a 
+              href={link.href} 
+              class={`sidebar-link ${currentPath === link.href ? 'active' : ''}`}
+            >
+              {link.label}
+            </a>
+          ))}
+        </nav>
+      </div>
+    </aside>
+    <main class="docs-content">
+      <slot />
+    </main>
+  </div>
+</BaseLayout>
+
+<style>
+.docs-container {
+  display: flex;
+  gap: 48px;
+  padding-top: 120px;
+  padding-bottom: 80px;
+}
+.docs-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+}
+.sidebar-sticky {
+  position: sticky;
+  top: 100px;
+}
+.sidebar-title {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin-bottom: 20px;
+}
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sidebar-link {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  transition: all var(--dur) var(--ease);
+}
+.sidebar-link:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+.sidebar-link.active {
+  background: var(--accent-glow);
+  color: var(--accent);
+  font-weight: 600;
+}
+.docs-content {
+  flex: 1;
+  min-width: 0;
+  max-width: 800px;
+}
+
+/* Base styling for generated docs pages */
+.docs-content :global(.page-hero) {
+  padding: 0 0 40px 0;
+  text-align: left;
+}
+.docs-content :global(h1) {
+  font-size: 3rem;
+  margin-bottom: 16px;
+}
+.docs-content :global(h2) {
+  font-size: 2rem;
+  margin-top: 48px;
+  margin-bottom: 24px;
+}
+.docs-content :global(h3) {
+  font-size: 1.5rem;
+  margin-top: 32px;
+  margin-bottom: 16px;
+}
+.docs-content :global(p) {
+  margin-bottom: 16px;
+  font-size: 1.0625rem;
+}
+.docs-content :global(ul:not(.sidebar-nav)) {
+  list-style: disc;
+  padding-left: 20px;
+  margin-bottom: 24px;
+}
+.docs-content :global(li) {
+  margin-bottom: 8px;
+  font-size: 1.0625rem;
+  color: var(--text-secondary);
+}
+.docs-content :global(.section) {
+  padding: 0;
+  margin-bottom: 40px;
+}
+.docs-content :global(.doc-section) {
+  margin-bottom: 40px;
+}
+
+@media (max-width: 900px) {
+  .docs-container {
+    flex-direction: column;
+    padding-top: 100px;
+  }
+  .docs-sidebar {
+    width: 100%;
+  }
+  .sidebar-sticky {
+    position: relative;
+    top: 0;
+  }
+  .docs-content :global(h1) {
+    font-size: 2.5rem;
+  }
+}
+</style>

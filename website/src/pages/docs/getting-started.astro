@@ -26,14 +26,15 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           <div>
             <a href="#what-is">What is OpenCastor?</a>
             <a href="#prerequisites">Prerequisites</a>
-            <a href="#install">Install</a>
+            <a href="#quickstart">Install</a>
             <a href="#first-run">First Run</a>
           </div>
           <div>
-            <a href="#config">Config Basics (RCAN)</a>
+            <h4 style="font-family:var(--font-display);font-size:0.875rem;margin-bottom:8px">Learn</h4>
+            <a href="/docs/configuration">Config Basics (RCAN)</a>
             <a href="#connect">Connect a Robot</a>
-            <a href="#safety">Safety First</a>
-            <a href="#cli">CLI Reference</a>
+            <a href="/docs/safety">Safety First</a>
+            <a href="/docs/setup-wizard">CLI Reference</a>
             <a href="#next-steps">Next Steps</a>
           </div>
         </div>
@@ -241,8 +242,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           <li><strong>reactive</strong> — Hardware-level safety: e-stop, collision avoidance, velocity limits.</li>
           <li><strong>safety</strong> — Protocol 66 configuration: local_safety_wins, estop distance, confidence gates.</li>
         </ul>
-
-        <p>See the full <a href="/docs#configuration" style="color:var(--accent)">RCAN config reference →</a></p>
+        <p>A barebones config connecting to Anthropic using an OAK-D camera will be generated. You can change this manually later.</p>
+        <p>See the full <a href="/docs/configuration" style="color:var(--accent)">RCAN config reference →</a></p>
       </div>
     </div>
   </section>
@@ -417,10 +418,12 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           <p>Hardware presets for TurtleBot3, Arduino, ESP32, OAK-D, LiDAR, and all supported peripheral categories.</p>
           <div class="hw-card-meta" style="margin-top:10px;color:var(--accent)">Hardware →</div>
         </a>
-        <a href="/docs#safety" class="guide-card" style="text-decoration:none">
-          <h3>🛡️ Protocol 66 Safety</h3>
-          <p>Deep dive into the five P66 invariants, confidence gates, and the live conformance manifest endpoint.</p>
-          <div class="hw-card-meta" style="margin-top:10px;color:var(--accent)">Safety docs →</div>
+        <a href="/docs/safety" class="guide-card" style="text-decoration:none">
+          <h3>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Safety & Protocol 66
+          </h3>
+          <p>Learn how to safely run AI agents on physical hardware without endangering people.</p>
         </a>
         <a href="https://rcan.dev" target="_blank" rel="noopener" class="guide-card" style="text-decoration:none">
           <h3>📡 RCAN Spec</h3>
