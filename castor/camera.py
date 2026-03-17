@@ -126,6 +126,87 @@ class _CameraSource:
             return self._last_frame
 
 
+class _HttpCameraSource:
+    """HTTP snapshot camera source — polls a URL that returns JPEG bytes.
+
+    Compatible with the ``oak_camera_proxy.py`` host-side proxy, IP cameras,
+    and any endpoint returning ``image/jpeg``.
+
+    Config example::
+
+        cameras:
+        - id: oak_rgb
+          type: http
+          url: http://127.0.0.1:8765/snapshot
+          role: primary
+    """
+
+    def __init__(self, cam_id: str, url: str, width: int = 640, height: int = 480) -> None:
+        self.cam_id = cam_id
+        self.url = url
+        self.width = width
+        self.height = height
+        self._last_frame: Optional[Any] = None
+        self._lock = threading.Lock()
+        self._session: Optional[Any] = None
+
+    def open(self) -> bool:
+        try:
+            import urllib.request
+
+            with urllib.request.urlopen(
+                f"{self.url.rstrip('/')}/health".replace("/snapshot/health", "/health"), timeout=2
+            ) as r:
+                ok = r.status == 200
+        except Exception:
+            ok = False
+        try:
+            import requests as _req  # type: ignore[import-untyped]
+
+            self._session = _req.Session()
+        except ImportError:
+            self._session = None
+        logger.info("HTTP camera '%s' → %s (reachable=%s)", self.cam_id, self.url, ok)
+        return True  # non-fatal if not reachable yet; read() handles errors
+
+    def read(self) -> Optional[Any]:
+        try:
+            import numpy as np
+
+            if self._session is not None:
+                resp = self._session.get(self.url, timeout=2)
+                data = resp.content
+            else:
+                import urllib.request
+
+                with urllib.request.urlopen(self.url, timeout=2) as r:
+                    data = r.read()
+            arr = np.frombuffer(data, dtype=np.uint8)
+            import cv2 as _cv2
+
+            frame = _cv2.imdecode(arr, _cv2.IMREAD_COLOR)
+            if frame is not None:
+                with self._lock:
+                    self._last_frame = frame
+        except Exception as exc:
+            logger.debug("HTTP camera '%s' fetch error: %s", self.cam_id, exc)
+        with self._lock:
+            return self._last_frame
+
+    def close(self) -> None:
+        if self._session is not None:
+            try:
+                self._session.close()
+            except Exception:
+                pass
+            self._session = None
+
+    @property
+    def last_frame(self) -> Optional[Any]:
+        with self._lock:
+            return self._last_frame
+
+
 class _OakCameraSource:
     """DepthAI (OAK-D / OAK-4 Pro) camera source."""
 
@@ -240,6 +321,9 @@ class CameraManager:
 
             if cam_type in ("oak_d", "oak", "oak4"):
                 src: Any = _OakCameraSource(cam_id, width, height)
+            elif cam_type == "http":
+                url = cam_cfg.get("url", "http://127.0.0.1:8765/snapshot")
+                src = _HttpCameraSource(cam_id, url, width, height)
             else:
                 src = _CameraSource(cam_id, index, width, height)
             self._sources[cam_id] = src
