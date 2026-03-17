@@ -563,3 +563,155 @@ class TestWriteRemoteAuditSource(_Base):
         safety_log = ns.read("/var/log/safety")
         denied = [e for e in safety_log if e.get("event") == "remote_write_denied"]
         assert len(denied) >= 1, "Denied write_remote must produce remote_write_denied audit entry"
+
+
+# =====================================================================
+# RCAN v1.5 Safety Invariants (OpenCastor v2026.3.17.0)
+# =====================================================================
+
+class TestV15SafetyInvariants:
+    """RCAN v1.5 invariant checks — added in OpenCastor v2026.3.17.0.
+
+    Verifies that v1.5 Protocol 66 requirements are wired in the
+    manifest, bridge, and message layer.
+    """
+
+    # ─────────────────────────────────────────────────────────────────
+    # 1. Replay cache invariant
+    # ─────────────────────────────────────────────────────────────────
+
+    def test_p66_manifest_replay_cache_enabled(self):
+        """P66 manifest declares replay_cache_enabled=True."""
+        from castor.safety.p66_manifest import build_manifest
+        manifest = build_manifest()
+        assert manifest.get("replay_cache_enabled") is True, (
+            "replay_cache_enabled must be True in P66 manifest (RCAN v1.5 GAP-03)"
+        )
+
+    def test_bridge_has_replay_cache(self):
+        """CastorBridge has both replay caches initialized."""
+        from castor.cloud.bridge import CastorBridge
+        bridge = CastorBridge(
+            config={"rrn": "RRN-00000001", "metadata": {"name": "T"}},
+            firebase_project="test",
+        )
+        assert bridge._replay_cache is not None
+        assert bridge._safety_replay_cache is not None
+
+    def test_safety_replay_window_10s(self):
+        """Safety replay cache uses 10s window (not 30s)."""
+        from castor.cloud.bridge import CastorBridge, SAFETY_REPLAY_WINDOW_S
+        bridge = CastorBridge(
+            config={"rrn": "RRN-00000001", "metadata": {"name": "T"}},
+            firebase_project="test",
+        )
+        assert bridge._safety_replay_cache.window_s == 10
+        assert SAFETY_REPLAY_WINDOW_S == 10
+
+    # ─────────────────────────────────────────────────────────────────
+    # 2. Sender type audit invariant
+    # ─────────────────────────────────────────────────────────────────
+
+    def test_p66_manifest_sender_type_logged(self):
+        """P66 manifest declares sender_type_logged=True."""
+        from castor.safety.p66_manifest import build_manifest
+        manifest = build_manifest()
+        assert manifest.get("sender_type_logged") is True, (
+            "sender_type_logged must be True in P66 manifest (RCAN v1.5 GAP-08)"
+        )
+
+    # ─────────────────────────────────────────────────────────────────
+    # 3. Offline mode invariant
+    # ─────────────────────────────────────────────────────────────────
+
+    def test_p66_manifest_offline_mode_capable(self):
+        """P66 manifest declares offline_mode_capable=True."""
+        from castor.safety.p66_manifest import build_manifest
+        manifest = build_manifest()
+        assert manifest.get("offline_mode_capable") is True, (
+            "offline_mode_capable must be True in P66 manifest (RCAN v1.5 GAP-06)"
+        )
+
+    def test_offline_mode_threshold_300s(self):
+        """OFFLINE_THRESHOLD_S is 300 (5 minutes) per spec."""
+        from castor.cloud.bridge import OFFLINE_THRESHOLD_S
+        assert OFFLINE_THRESHOLD_S == 300
+
+    def test_estop_always_allowed_offline(self):
+        """ESTOP cannot be blocked by offline mode (Protocol 66 critical invariant)."""
+        from castor.cloud.bridge import CastorBridge
+        bridge = CastorBridge(
+            config={"rrn": "RRN-00000001", "metadata": {"name": "T"}},
+            firebase_project="test",
+        )
+        bridge._offline_mode = True
+        # ESTOP MUST be allowed
+        assert bridge._is_command_allowed_offline("safety", "estop now") is True
+        assert bridge._is_command_allowed_offline("safety", "ESTOP") is True
+        # Regular commands must be blocked
+        assert bridge._is_command_allowed_offline("chat", "hello") is False
+        assert bridge._is_command_allowed_offline("control", "move forward") is False
+
+    # ─────────────────────────────────────────────────────────────────
+    # 4. ESTOP QoS invariant
+    # ─────────────────────────────────────────────────────────────────
+
+    def test_estop_ack_deadline_2s(self):
+        """ESTOP QoS ACK deadline is 2.0 seconds (GAP-11)."""
+        from castor.cloud.bridge import ESTOP_ACK_DEADLINE_S
+        assert ESTOP_ACK_DEADLINE_S == 2.0
+
+    # ─────────────────────────────────────────────────────────────────
+    # 5. RCAN version negotiation invariant
+    # ─────────────────────────────────────────────────────────────────
+
+    def test_rcan_spec_version_is_15(self):
+        """castor.rcan.message declares RCAN_SPEC_VERSION='1.5'."""
+        from castor.rcan.message import RCAN_SPEC_VERSION
+        assert RCAN_SPEC_VERSION == "1.5"
+
+    def test_p66_manifest_rcan_version(self):
+        """P66 manifest declares rcan_version='1.5'."""
+        from castor.safety.p66_manifest import build_manifest
+        manifest = build_manifest()
+        assert manifest.get("rcan_version") == "1.5", (
+            "rcan_version must be '1.5' in P66 manifest (RCAN v1.5 GAP-12)"
+        )
+        assert manifest.get("rcan_spec_version") == "1.5"
+
+    def test_outgoing_message_includes_rcan_version(self):
+        """RCANMessage.to_dict() includes rcan_version field."""
+        from castor.rcan.message import RCANMessage, MessageType, Priority
+        msg = RCANMessage(
+            type=MessageType.COMMAND,
+            source="rcan://test/src",
+            target="rcan://test/tgt",
+            payload={"cmd": "test"},
+        )
+        d = msg.to_dict()
+        assert "rcan_version" in d, "rcan_version field must be present in outgoing message"
+        assert d["rcan_version"] == "1.5"
+
+    # ─────────────────────────────────────────────────────────────────
+    # 6. Version bump invariant
+    # ─────────────────────────────────────────────────────────────────
+
+    def test_opencastor_version_2026_3_17(self):
+        """OpenCastor version is bumped to 2026.3.17.0."""
+        import castor
+        version = castor.__version__
+        assert version.startswith("2026.3.17"), (
+            f"Expected version 2026.3.17.x, got {version}"
+        )
+
+    def test_pyproject_version_2026_3_17(self):
+        """pyproject.toml declares version 2026.3.17.0."""
+        import os
+        pyproject = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "pyproject.toml"
+        )
+        with open(pyproject) as f:
+            content = f.read()
+        assert "2026.3.17.0" in content, (
+            "pyproject.toml must declare version=2026.3.17.0"
+        )

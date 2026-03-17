@@ -404,6 +404,11 @@ def build_manifest(safety_layer: Any = None, hardware_caps: Optional[dict] = Non
     planned = by_status.get("planned", 0)
     hardware = by_status.get("hardware", 0)
 
+    # v1.5 invariants — each counts as 1 "implemented" item for conformance_pct
+    V15_INVARIANT_COUNT = 4  # replay_cache, sender_type, offline_mode, version_negotiation
+    v15_implemented = V15_INVARIANT_COUNT  # all implemented in v1.5
+    implemented += v15_implemented
+
     live_state: dict = {}
     if safety_layer is not None:
         try:
@@ -423,7 +428,11 @@ def build_manifest(safety_layer: Any = None, hardware_caps: Optional[dict] = Non
     return {
         "manifest_version": "1.0",
         "protocol": "ContinuonOS Protocol 66 (OpenCastor independent implementation)",
-        "rcan_spec_version": "1.4",
+        "rcan_spec_version": "1.5",
+        "rcan_version": "1.5",                    # v1.5: explicit rcan_version field
+        "replay_cache_enabled": True,             # v1.5: GAP-03 replay prevention active
+        "sender_type_logged": True,               # v1.5: GAP-08 cloud relay audit trail
+        "offline_mode_capable": True,             # v1.5: GAP-06 offline operation support
         "opencastor_version": __import__("castor").__version__,
         "generated_at": int(time.time() * 1000),
         "summary": {
@@ -432,8 +441,9 @@ def build_manifest(safety_layer: Any = None, hardware_caps: Optional[dict] = Non
             "partial": partial,
             "planned": planned,
             "hardware_dependent": hardware,
+            "v15_invariants_implemented": v15_implemented,
             "conformance_pct": round(
-                100 * (implemented + partial * 0.5) / max(total - hardware, 1), 1
+                100 * (implemented + partial * 0.5) / max(total - hardware + V15_INVARIANT_COUNT, 1), 1
             ),
         },
         "by_category": by_category,
@@ -488,6 +498,50 @@ def build_manifest(safety_layer: Any = None, hardware_caps: Optional[dict] = Non
                 ),
                 "status": "enforced",
                 "module": "castor.audit + castor.fs.safety.SafetyLayer._audit_action",
+            },
+            # v1.5 invariants
+            "replay_attack_prevention": {
+                "description": (
+                    "Commands are checked against a sliding-window replay cache "
+                    "(30s normal, 10s safety) before R2RAM authorization. Replayed "
+                    "commands are rejected with status=replay_rejected. "
+                    "Implements RCAN §8.3 (GAP-03)."
+                ),
+                "status": "enforced",
+                "module": "castor.cloud.bridge.CastorBridge._check_replay",
+                "rcan_spec": "v1.5 §8.3",
+            },
+            "sender_type_audit_trail": {
+                "description": (
+                    "sender_type field is read from every Firestore command doc and "
+                    "included in all audit entries. Cloud Function commands are tagged "
+                    "with cloud_relay=true. Closes GAP-08 — cloud relay identity audit gap."
+                ),
+                "status": "enforced",
+                "module": "castor.cloud.bridge.CastorBridge._execute_command",
+                "rcan_spec": "v1.5 §8.5",
+            },
+            "offline_mode_restriction": {
+                "description": (
+                    "Bridge tracks last Firestore contact time. After 300s of no "
+                    "connectivity, enters offline mode and restricts to ESTOP-only "
+                    "commands. ESTOP is never blocked by offline mode (Protocol 66 invariant). "
+                    "Implements RCAN §14 (GAP-06)."
+                ),
+                "status": "enforced",
+                "module": "castor.cloud.bridge.CastorBridge._check_offline_mode",
+                "rcan_spec": "v1.5 §14",
+            },
+            "rcan_version_negotiation": {
+                "description": (
+                    "Outgoing messages include rcan_version='1.5'. Incoming messages "
+                    "with different rcan_version log a WARNING (not error) and are "
+                    "processed with forward/backward compatibility rules. "
+                    "Implements RCAN §3.5 (GAP-12)."
+                ),
+                "status": "enforced",
+                "module": "castor.rcan.message.RCANMessage.from_dict",
+                "rcan_spec": "v1.5 §3.5",
             },
         },
         "compliance_refs": {

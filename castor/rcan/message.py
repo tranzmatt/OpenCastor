@@ -32,11 +32,17 @@ queue ordering.  SAFETY priority messages skip the queue entirely
 
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from enum import IntEnum
 from typing import Any, Optional
+
+log = logging.getLogger(__name__)
+
+# RCAN spec version implemented by this module
+RCAN_SPEC_VERSION = "1.5"
 
 
 class MessageType(IntEnum):
@@ -106,6 +112,7 @@ class RCANMessage:
     reply_to: Optional[str] = field(default=None)
     scope: list[str] = field(default_factory=list)
     version: str = field(default="1.0.0")
+    rcan_version: str = field(default_factory=lambda: RCAN_SPEC_VERSION)  # v1.5 §3.5
 
     # ------------------------------------------------------------------
     # Factory methods
@@ -265,11 +272,16 @@ class RCANMessage:
     # Serialisation
     # ------------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:
-        """Serialise to a plain dict (JSON-ready)."""
+        """Serialise to a plain dict (JSON-ready).
+
+        v1.5: includes rcan_version in outgoing messages (GAP-12).
+        """
         d = asdict(self)
         # Convert enum ints to their names for readability
         d["type_name"] = MessageType(self.type).name
         d["priority_name"] = Priority(self.priority).name
+        # Ensure rcan_version is always present in outgoing messages
+        d.setdefault("rcan_version", RCAN_SPEC_VERSION)
         return d
 
     @classmethod
@@ -277,6 +289,9 @@ class RCANMessage:
         """Deserialise from a dict.
 
         Accepts both integer type/priority values and string names.
+
+        v1.5: logs a warning (not error) when receiving messages with a
+        different rcan_version (GAP-12 — forward/backward compat).
         """
         d = dict(data)
 
@@ -284,12 +299,43 @@ class RCANMessage:
         d.pop("type_name", None)
         d.pop("priority_name", None)
 
+        # v1.5 version negotiation — warn on mismatch, don't reject
+        incoming_version = d.get("rcan_version")
+        if incoming_version and incoming_version != RCAN_SPEC_VERSION:
+            try:
+                inc_parts = incoming_version.split(".")
+                our_parts = RCAN_SPEC_VERSION.split(".")
+                inc_major = int(inc_parts[0])
+                our_major = int(our_parts[0])
+                if inc_major != our_major:
+                    log.warning(
+                        "Received RCAN message with incompatible MAJOR version "
+                        "%s (ours: %s) — proceeding with caution",
+                        incoming_version, RCAN_SPEC_VERSION,
+                    )
+                else:
+                    log.warning(
+                        "Received RCAN message with version %s (ours: %s) — "
+                        "unknown fields will be ignored",
+                        incoming_version, RCAN_SPEC_VERSION,
+                    )
+            except (ValueError, IndexError):
+                log.warning(
+                    "Received RCAN message with unparseable rcan_version=%r",
+                    incoming_version,
+                )
+
         # Coerce type from name if needed
         if isinstance(d.get("type"), str):
             d["type"] = MessageType[d["type"].upper()]
         # Coerce priority from name if needed
         if isinstance(d.get("priority"), str):
             d["priority"] = Priority[d["priority"].upper()]
+
+        # Strip unknown fields not in the dataclass (forward-compat)
+        import dataclasses as _dc
+        known = {f.name for f in _dc.fields(cls)}
+        d = {k: v for k, v in d.items() if k in known}
 
         return cls(**d)
 

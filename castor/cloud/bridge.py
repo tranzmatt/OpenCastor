@@ -13,6 +13,13 @@ Robots never listen on a public port. All traffic is outbound-initiated
 by the robot polling/listening to Firestore. Protocol 66 safety and R2RAM
 authorization are both enforced before any command reaches the gateway.
 
+v1.5 additions (RCAN v1.5):
+    GAP-03: ReplayCache prevents command replay attacks
+    GAP-06: Offline mode — track connectivity, restrict when offline >300s
+    GAP-08: SenderType audit trail — log sender_type for every command
+    GAP-10: Training data consent gate
+    GAP-11: QoS for ESTOP — ACK within 2s with ack_qos field
+
 Usage::
 
     castor bridge --config arm.rcan.yaml \\
@@ -40,11 +47,66 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 log = logging.getLogger(__name__)
 
-BRIDGE_VERSION = "1.0.0"
+BRIDGE_VERSION = "1.5.0"
+
+# Offline mode threshold — if we haven't connected for this long, enter offline mode
+OFFLINE_THRESHOLD_S: int = 300  # 5 minutes per spec GAP-06
+
+# ESTOP QoS ACK deadline (seconds) — GAP-11
+ESTOP_ACK_DEADLINE_S: float = 2.0
+
+# Replay cache window for safety commands (10s per spec §8.3)
+SAFETY_REPLAY_WINDOW_S: int = 10
+
+
+def _try_import_replay() -> Any:
+    """Attempt to import ReplayCache from rcan.replay; return stub if unavailable."""
+    try:
+        import sys as _sys
+        import os as _os
+        _rcan_path = _os.path.expanduser("~/rcan-py")
+        if _rcan_path not in _sys.path:
+            _sys.path.insert(0, _rcan_path)
+        from rcan.replay import ReplayCache
+        return ReplayCache
+    except ImportError:
+        return None
+
+
+class _ReplayCacheStub:
+    """Fallback stub when rcan.replay is not yet available.
+
+    Logs a warning and allows all commands through (fail-open for availability,
+    but this means replay prevention is not active — see TODO below).
+    """
+
+    def __init__(self, window_s: int = 30) -> None:
+        self.window_s = window_s
+        log.warning(
+            "rcan.replay not available — replay prevention is DISABLED. "
+            "Install rcan-py v0.5.0+ for full protection."
+        )
+
+    def check_and_record(
+        self,
+        msg_id: str,
+        timestamp: float,
+        is_safety: bool = False,
+    ) -> tuple[bool, str]:
+        """Stub: always returns (True, '') — no replay protection."""
+        return (True, "")
+
+
+def _make_replay_cache(window_s: int = 30) -> Any:
+    """Create a ReplayCache from rcan-py or fall back to the stub."""
+    ReplayCacheCls = _try_import_replay()
+    if ReplayCacheCls is not None:
+        return ReplayCacheCls(window_s=window_s)
+    return _ReplayCacheStub(window_s=window_s)
 
 
 class CastorBridge:
@@ -59,6 +121,13 @@ class CastorBridge:
         - Main thread: Firestore real-time listener (blocking)
         - Telemetry thread: periodic status publish every ``telemetry_interval_s``
         - Command threads: one short-lived thread per command execution
+
+    v1.5 additions:
+        - ReplayCache for command replay prevention (GAP-03)
+        - Offline mode tracking (GAP-06)
+        - SenderType audit trail (GAP-08)
+        - Training data consent gate (GAP-10)
+        - ESTOP QoS ACK within 2s (GAP-11)
     """
 
     def __init__(
@@ -91,8 +160,8 @@ class CastorBridge:
         self.robot_name: str = (
             config.get("robot_name")
             or config.get("name")
-            or meta.get("name")          # metadata.name has display name (e.g. "Bob")
-            or meta.get("robot_name")    # fallback to robot_name (e.g. "bob")
+            or meta.get("name")
+            or meta.get("robot_name")
             or "unnamed-robot"
         )
         self.owner: str = (
@@ -118,11 +187,146 @@ class CastorBridge:
         )
         self.firebase_uid: str = config.get("firebase_uid", "")
 
+        # v1.5: Training data consent config (GAP-10)
+        self.training_consent_required: bool = bool(
+            config.get("training_consent_required", False)
+        )
+
         self._db: Any = None        # Firestore client
         self._consent: Any = None   # ConsentManager
         self._running = False
         self._telemetry_thread: threading.Thread | None = None
         self._last_processed: set[str] = set()  # command IDs already handled
+
+        # GAP-03: Replay caches — normal window (30s) and safety window (10s)
+        self._replay_cache = _make_replay_cache(window_s=30)
+        self._safety_replay_cache = _make_replay_cache(window_s=SAFETY_REPLAY_WINDOW_S)
+
+        # GAP-06: Offline mode tracking
+        self._last_firestore_success: float = time.time()
+        self._offline_mode: bool = False
+        self._offline_since: Optional[float] = None
+
+    # ------------------------------------------------------------------
+    # v1.5 Offline mode helpers (GAP-06)
+    # ------------------------------------------------------------------
+
+    def _record_firestore_success(self) -> None:
+        """Record a successful Firestore operation — resets offline tracking."""
+        was_offline = self._offline_mode
+        offline_duration = 0.0
+        if was_offline and self._offline_since is not None:
+            offline_duration = time.time() - self._offline_since
+
+        self._last_firestore_success = time.time()
+        self._offline_mode = False
+        self._offline_since = None
+
+        if was_offline:
+            log.info(
+                "back online after %.0fs — Firestore connectivity restored",
+                offline_duration,
+            )
+
+    def _check_offline_mode(self) -> bool:
+        """Check whether we should enter offline mode.
+
+        Returns True if currently in offline mode.
+        """
+        elapsed = time.time() - self._last_firestore_success
+        if elapsed > OFFLINE_THRESHOLD_S:
+            if not self._offline_mode:
+                self._offline_mode = True
+                self._offline_since = time.time() - elapsed
+                log.warning(
+                    "entering OFFLINE MODE — no Firestore contact for %.0fs (threshold=%ds). "
+                    "Restricting to local-only commands. ESTOP still accepted from any source.",
+                    elapsed,
+                    OFFLINE_THRESHOLD_S,
+                )
+            return True
+        return False
+
+    def _is_command_allowed_offline(self, scope: str, instruction: str) -> bool:
+        """Offline mode command filter.
+
+        In offline mode:
+        - ESTOP is ALWAYS allowed (safety invariant — must never be blocked)
+        - All other commands are rejected
+
+        Returns True if the command should be allowed.
+        """
+        if not self._offline_mode:
+            return True
+
+        # ESTOP always allowed regardless of offline mode (Protocol 66 invariant)
+        is_estop = scope == "safety" and "estop" in instruction.lower()
+        if is_estop:
+            return True
+
+        log.warning(
+            "OFFLINE MODE: command rejected (scope=%s) — not an ESTOP", scope
+        )
+        return False
+
+    # ------------------------------------------------------------------
+    # v1.5 Replay prevention helpers (GAP-03)
+    # ------------------------------------------------------------------
+
+    def _check_replay(
+        self, cmd_id: str, doc: dict[str, Any], is_safety: bool = False
+    ) -> bool:
+        """Check for command replay before executing.
+
+        Uses separate caches for safety vs. normal commands (10s vs 30s window).
+
+        Returns:
+            True if command is fresh (not a replay)
+            False if rejected as a replay
+        """
+        issued_at: Optional[float] = None
+
+        # Try to parse issued_at from the Firestore doc
+        raw_issued = doc.get("issued_at")
+        if raw_issued is not None:
+            try:
+                if isinstance(raw_issued, (int, float)):
+                    issued_at = float(raw_issued)
+                elif hasattr(raw_issued, "timestamp"):
+                    # Firestore Timestamp object
+                    issued_at = raw_issued.timestamp()
+                elif isinstance(raw_issued, str):
+                    from datetime import datetime as _dt
+                    issued_at = _dt.fromisoformat(raw_issued.replace("Z", "+00:00")).timestamp()
+            except Exception:
+                pass
+
+        if issued_at is None:
+            # No timestamp — can't do replay check; allow with warning
+            log.debug("replay_check: no issued_at on cmd_id=%s — skipping freshness check", cmd_id)
+            return True
+
+        cache = self._safety_replay_cache if is_safety else self._replay_cache
+
+        try:
+            result = cache.check_and_record(cmd_id, issued_at, is_safety=is_safety)
+            # rcan-py returns (bool, str) tuple
+            if isinstance(result, tuple):
+                allowed, reason = result
+            else:
+                # Fallback for older/stub implementations that return bool
+                allowed = bool(result)
+                reason = "" if allowed else "replay detected"
+            if not allowed:
+                log.warning(
+                    "replay_check: REJECTED cmd_id=%s reason=%s", cmd_id, reason
+                )
+            return allowed
+        except Exception as exc:
+            log.warning(
+                "replay_check: REJECTED cmd_id=%s reason=%s", cmd_id, exc
+            )
+            return False
 
     # ------------------------------------------------------------------
     # Firebase initialisation
@@ -144,7 +348,6 @@ class CastorBridge:
                 cred = credentials.Certificate(self.credentials_path)
                 log.info("Firebase: using service account %s", self.credentials_path)
             else:
-                # Use ADC — works with gcloud auth application-default login
                 cred = credentials.ApplicationDefault()
                 log.info("Firebase: using Application Default Credentials")
 
@@ -192,6 +395,7 @@ class CastorBridge:
                 "capabilities": self.capabilities,
                 "version": self.version,
                 "bridge_version": BRIDGE_VERSION,
+                "rcan_version": "1.5",  # GAP-12 version negotiation
                 "registered_at": datetime.now(timezone.utc).isoformat(),
                 "status": {
                     "online": True,
@@ -200,6 +404,7 @@ class CastorBridge:
             },
             merge=True,
         )
+        self._record_firestore_success()
         log.info("Robot %s (%s) registered in Firestore", self.robot_name, self.rrn)
 
     def _publish_telemetry(self) -> None:
@@ -237,6 +442,7 @@ class CastorBridge:
                 },
                 merge=True,
             )
+            self._record_firestore_success()
 
         except Exception as exc:
             log.warning("Telemetry publish failed: %s", exc)
@@ -253,6 +459,7 @@ class CastorBridge:
                 )
             except Exception:
                 pass
+            self._check_offline_mode()
 
     def _telemetry_loop(self) -> None:
         """Background thread: publish telemetry every telemetry_interval_s."""
@@ -276,21 +483,83 @@ class CastorBridge:
         cmd_ref = self._commands_ref().document(cmd_id)
 
         try:
+            # --- GAP-08: Read sender_type from Firestore doc ----------------
+            sender_type: str = doc.get("sender_type", "unknown")
+            is_cloud_relay = sender_type == "cloud_function"
+
             # Mark processing immediately
+            ack_ts = datetime.now(timezone.utc).isoformat()
             cmd_ref.update(
                 {
                     "status": "processing",
-                    "ack_at": datetime.now(timezone.utc).isoformat(),
+                    "ack_at": ack_ts,
+                    "sender_type": sender_type,  # GAP-08: echo back for audit
                 }
             )
 
-            # R2RAM scope check
-            requester_owner: str = doc.get("issued_by_owner", "")
             scope: str = doc.get("scope", "chat")
+            instruction: str = doc.get("instruction", "")
+            is_estop = scope == "safety" and "estop" in instruction.lower()
 
-            # Normalize: Cloud Functions sets issued_by_owner = "uid:<firebase_uid>"
-            # when the sender is the robot owner (human via Flutter app).
-            # Map this back to self.owner so _is_same_owner() recognises it.
+            # --- GAP-03: Replay check BEFORE R2RAM (prevents DoS) ----------
+            if not self._check_replay(cmd_id, doc, is_safety=(scope == "safety")):
+                log.warning(
+                    "Command %s rejected as replay (sender_type=%s, scope=%s)",
+                    cmd_id, sender_type, scope,
+                )
+                audit_entry: dict[str, Any] = {
+                    "status": "replay_rejected",
+                    "error": "replay attack prevention: command rejected",
+                    "sender_type": sender_type,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
+                if is_cloud_relay:
+                    audit_entry["cloud_relay"] = True
+                cmd_ref.update(audit_entry)
+                return
+
+            # --- GAP-11: ESTOP QoS — ACK written immediately ----------------
+            if is_estop:
+                estop_dispatch_start = time.monotonic()
+                try:
+                    estop_ack_entry: dict[str, Any] = {
+                        "ack_qos": "acknowledged",
+                        "ack_qos_at": datetime.now(timezone.utc).isoformat(),
+                        "sender_type": sender_type,
+                    }
+                    if is_cloud_relay:
+                        estop_ack_entry["cloud_relay"] = True
+                    cmd_ref.update(estop_ack_entry)
+                    ack_elapsed = time.monotonic() - estop_dispatch_start
+                    if ack_elapsed > ESTOP_ACK_DEADLINE_S:
+                        log.warning(
+                            "ESTOP QoS ACK took %.2fs — exceeded %.1fs deadline! "
+                            "cmd_id=%s",
+                            ack_elapsed, ESTOP_ACK_DEADLINE_S, cmd_id,
+                        )
+                    else:
+                        log.debug(
+                            "ESTOP QoS ACK written in %.3fs cmd_id=%s",
+                            ack_elapsed, cmd_id,
+                        )
+                except Exception as ack_exc:
+                    log.warning(
+                        "ESTOP QoS ACK write failed: %s (cmd_id=%s)", ack_exc, cmd_id
+                    )
+
+            # --- GAP-06: Offline mode check (after ESTOP is dispatched) -----
+            if not self._is_command_allowed_offline(scope, instruction):
+                offline_audit: dict[str, Any] = {
+                    "status": "denied",
+                    "error": "offline_mode: robot is offline, only ESTOP accepted",
+                    "sender_type": sender_type,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
+                cmd_ref.update(offline_audit)
+                return
+
+            # --- R2RAM scope check ------------------------------------------
+            requester_owner: str = doc.get("issued_by_owner", "")
             issued_by_uid: str = doc.get("issued_by_uid", "")
             if (
                 issued_by_uid
@@ -298,8 +567,6 @@ class CastorBridge:
                 and issued_by_uid == self.firebase_uid
             ):
                 requester_owner = self.owner
-            instruction: str = doc.get("instruction", "")
-            is_estop = scope == "safety" and "estop" in instruction.lower()
 
             authorized, reason = self._consent.is_authorized(
                 requester_owner=requester_owner,
@@ -310,29 +577,57 @@ class CastorBridge:
 
             if not authorized:
                 log.warning(
-                    "Command %s denied: %s (owner=%s, scope=%s)",
-                    cmd_id, reason, requester_owner, scope,
+                    "Command %s denied: %s (owner=%s, scope=%s, sender_type=%s)",
+                    cmd_id, reason, requester_owner, scope, sender_type,
                 )
-                cmd_ref.update(
-                    {
-                        "status": "denied",
-                        "error": f"R2RAM authorization failed: {reason}",
-                        "completed_at": datetime.now(timezone.utc).isoformat(),
-                    }
-                )
-                return
-
-            # Dispatch to local gateway
-            result = self._dispatch_to_gateway(scope, instruction, doc)
-
-            cmd_ref.update(
-                {
-                    "status": "complete",
-                    "result": result,
+                denied_entry: dict[str, Any] = {
+                    "status": "denied",
+                    "error": f"R2RAM authorization failed: {reason}",
+                    "sender_type": sender_type,
                     "completed_at": datetime.now(timezone.utc).isoformat(),
                 }
+                if is_cloud_relay:
+                    denied_entry["cloud_relay"] = True
+                cmd_ref.update(denied_entry)
+                return
+
+            # --- GAP-10: Training data consent gate --------------------------
+            if self._is_training_data_command(scope, instruction, doc):
+                if not self._check_training_consent(requester_owner, doc):
+                    log.warning(
+                        "Training data collection BLOCKED — consent required "
+                        "(training_consent_required=True, cmd_id=%s)",
+                        cmd_id,
+                    )
+                    cmd_ref.update(
+                        {
+                            "status": "denied",
+                            "error": "training_consent_required: no consent record found",
+                            "sender_type": sender_type,
+                            "completed_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
+                    return
+
+            # --- Dispatch to local gateway -----------------------------------
+            result = self._dispatch_to_gateway(scope, instruction, doc)
+
+            # --- GAP-08: Build audit entry with sender_type -----------------
+            complete_entry: dict[str, Any] = {
+                "status": "complete",
+                "result": result,
+                "sender_type": sender_type,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
+            if is_cloud_relay:
+                complete_entry["cloud_relay"] = True  # GAP-08: closes the audit gap
+
+            cmd_ref.update(complete_entry)
+            log.info(
+                "Command %s complete (scope=%s, sender_type=%s, cloud_relay=%s)",
+                cmd_id, scope, sender_type, is_cloud_relay,
             )
-            log.info("Command %s complete (scope=%s)", cmd_id, scope)
+            self._record_firestore_success()
 
         except Exception as exc:
             log.error("Command %s failed: %s", cmd_id, exc)
@@ -341,11 +636,56 @@ class CastorBridge:
                     {
                         "status": "failed",
                         "error": str(exc),
+                        "sender_type": doc.get("sender_type", "unknown"),
                         "completed_at": datetime.now(timezone.utc).isoformat(),
                     }
                 )
             except Exception:
                 pass
+
+    # ------------------------------------------------------------------
+    # GAP-10: Training data consent helpers
+    # ------------------------------------------------------------------
+
+    def _is_training_data_command(
+        self, scope: str, instruction: str, doc: dict[str, Any]
+    ) -> bool:
+        """Return True if this command would trigger training data collection."""
+        if not self.training_consent_required:
+            return False
+        # Check for known training data indicators
+        training_keywords = ("record", "training", "capture", "collect", "oak", "voice_clip")
+        instr_lower = instruction.lower()
+        return any(kw in instr_lower for kw in training_keywords)
+
+    def _check_training_consent(self, requester_owner: str, doc: dict[str, Any]) -> bool:
+        """Check whether training data consent is on file for the given owner.
+
+        Returns True if consent exists or is not required.
+        """
+        if not self.training_consent_required:
+            return True
+        try:
+            # Check Firestore consent records
+            consent_ref = (
+                self._robot_ref()
+                .collection("training_consents")
+                .where("subject_owner", "==", requester_owner)
+                .where("status", "==", "granted")
+                .limit(1)
+            )
+            docs = list(consent_ref.stream())
+            return len(docs) > 0
+        except Exception as exc:
+            log.warning(
+                "training consent check failed for owner=%s: %s — blocking collection",
+                requester_owner, exc,
+            )
+            return False
+
+    # ------------------------------------------------------------------
+    # Gateway dispatch
+    # ------------------------------------------------------------------
 
     def _dispatch_to_gateway(
         self, scope: str, instruction: str, doc: dict[str, Any]
@@ -388,8 +728,6 @@ class CastorBridge:
                     f"{self.gateway_url}/api/command",
                     json={
                         "instruction": instruction,
-                        # Tell the brain this is the OpenCastor Fleet UI channel,
-                        # not WhatsApp/Telegram — avoids "I can't send files on WhatsApp"
                         "channel": "opencastor_app",
                         "context": "opencastor_fleet_ui",
                     },
@@ -397,7 +735,6 @@ class CastorBridge:
                 )
 
         else:
-            # Default: send as command
             with httpx.Client(timeout=30.0) as client:
                 resp = client.post(
                     f"{self.gateway_url}/api/command",
@@ -432,16 +769,11 @@ class CastorBridge:
             status=ConsentStatus.PENDING,
         )
         self._consent_requests_ref().document(req_id).set(request.to_dict())
-
-        # Mark command as pending-consent (not failed — awaiting human decision)
-        self._commands_ref().document(req_id).update(
-            {"status": "pending_consent"}
-        )
+        self._commands_ref().document(req_id).update({"status": "pending_consent"})
         log.info(
             "Consent request %s from %s written — awaiting owner approval",
             req_id, doc.get("from_owner"),
         )
-        # Cloud Functions watch /consent_requests/ and send FCM push to owner
 
     def _handle_consent_grant(self, req_id: str, doc: dict[str, Any]) -> None:
         """Called when the Flutter app approves an incoming consent request."""
@@ -494,6 +826,7 @@ class CastorBridge:
 
     def _on_command_snapshot(self, col_snapshot: Any, changes: Any, read_time: Any) -> None:
         """Firestore real-time callback — called on every command collection change."""
+        self._record_firestore_success()
         for change in changes:
             if change.type.name == "ADDED":
                 cmd_id = change.document.id
@@ -566,8 +899,10 @@ class CastorBridge:
                         args=(cmd_id, data),
                         daemon=True,
                     ).start()
+            self._record_firestore_success()
         except Exception as exc:
             log.warning("Command poll failed: %s", exc)
+            self._check_offline_mode()
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -595,10 +930,9 @@ class CastorBridge:
 
             listener = self._commands_ref().on_snapshot(self._on_command_snapshot)
             log.info(
-                "Bridge LIVE — %s (%s) → Firebase %s [real-time listener]",
+                "Bridge LIVE — %s (%s) → Firebase %s [real-time listener, rcan=1.5]",
                 self.robot_name, self.rrn, self.firebase_project,
             )
-            # Block main thread while listener is active
             while self._running:
                 time.sleep(1.0)
 
@@ -611,7 +945,7 @@ class CastorBridge:
                     pass
 
             log.info(
-                "Bridge LIVE — %s (%s) → Firebase %s [poll mode, interval=%.0fs]",
+                "Bridge LIVE — %s (%s) → Firebase %s [poll mode, interval=%.0fs, rcan=1.5]",
                 self.robot_name, self.rrn, self.firebase_project, self.poll_interval_s,
             )
             while self._running:

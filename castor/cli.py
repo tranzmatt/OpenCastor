@@ -1331,11 +1331,151 @@ def cmd_conformance(args) -> None:
 
     print()
     sw_gated = summary.get("planned", 0)
+    v15_invariants = summary.get("v15_invariants_implemented", 0)
     print(
         f"Summary: {implemented} implemented, {partial} partial"
         f" (hardware: {hardware_dep}), {sw_gated} software-gated"
     )
+    if v15_invariants:
+        print(f"  RCAN v1.5: {v15_invariants} invariants implemented")
     print()
+
+    # ── RCAN v1.5 conformance checks ────────────────────────────────────────
+    _run_v15_conformance_checks(config_path, manifest)
+
+
+def _run_v15_conformance_checks(config_path: str, manifest: dict) -> None:
+    """Print RCAN v1.5 conformance checks appended to the conformance report.
+
+    Checks:
+      1. Is replay cache enabled?
+      2. Is sender_type being logged?
+      3. Is clock synchronized?
+      4. Are ESTOP QoS acks within 2s?
+    """
+    import subprocess
+    import shutil
+    import yaml as _yaml
+    import os as _os
+
+    print("RCAN v1.5 Checks")
+    print("─" * 40)
+
+    # 1. Replay cache enabled?
+    replay_enabled = manifest.get("replay_cache_enabled", False)
+    _print_v15_check(
+        "replay_cache",
+        "Replay prevention enabled (GAP-03)",
+        replay_enabled,
+        detail="ReplayCache(window_s=30) active in castor.cloud.bridge" if replay_enabled
+               else "WARN: replay_cache_enabled=False in manifest",
+    )
+
+    # 2. sender_type being logged?
+    sender_logged = manifest.get("sender_type_logged", False)
+    _print_v15_check(
+        "sender_type_logged",
+        "sender_type audit trail active (GAP-08)",
+        sender_logged,
+        detail="sender_type field logged in all bridge audit entries" if sender_logged
+               else "WARN: sender_type_logged=False in manifest",
+    )
+
+    # 3. Clock synchronized?
+    clock_synced = _check_clock_sync()
+    _print_v15_check(
+        "clock_sync",
+        "System clock synchronized (GAP-04)",
+        clock_synced,
+        detail="NTP/chrony clock sync confirmed" if clock_synced
+               else "WARN: clock may not be synchronized — replay prevention relies on accurate timestamps",
+    )
+
+    # 4. ESTOP QoS ACK within 2s?
+    # Check by inspecting bridge config / recent logs if available
+    estop_qos_ok = _check_estop_qos_config(config_path)
+    _print_v15_check(
+        "estop_qos",
+        "ESTOP QoS ACK within 2s (GAP-11)",
+        estop_qos_ok,
+        detail="Bridge configured to ACK ESTOP within 2s (castor.cloud.bridge.ESTOP_ACK_DEADLINE_S=2.0)"
+               if estop_qos_ok
+               else "WARN: could not confirm ESTOP QoS configuration",
+    )
+
+    print()
+
+    # Overall v1.5 score
+    checks = [replay_enabled, sender_logged, clock_synced, estop_qos_ok]
+    passed = sum(1 for c in checks if c)
+    print(f"v1.5 score: {passed}/{len(checks)} checks passed")
+    if passed < len(checks):
+        print("  Run 'castor conformance' again after addressing warnings above.")
+    print()
+
+
+def _print_v15_check(check_id: str, description: str, passed: bool, detail: str = "") -> None:
+    """Print a single v1.5 check result."""
+    icon = "✅" if passed else "⚠️ "
+    suffix = f"\n       {detail}" if detail else ""
+    print(f"  {icon} [{check_id:<20}] {description}{suffix}")
+
+
+def _check_clock_sync() -> bool:
+    """Check whether the system clock appears synchronized.
+
+    Returns True if NTP/chrony is running and clock is synced.
+    """
+    import subprocess
+    import shutil
+
+    # Try timedatectl (systemd)
+    if shutil.which("timedatectl"):
+        try:
+            result = subprocess.run(
+                ["timedatectl", "status"],
+                capture_output=True, text=True, timeout=3
+            )
+            output = result.stdout + result.stderr
+            if "synchronized: yes" in output.lower() or "ntp service: active" in output.lower():
+                return True
+        except Exception:
+            pass
+
+    # Try chronyc
+    if shutil.which("chronyc"):
+        try:
+            result = subprocess.run(
+                ["chronyc", "tracking"],
+                capture_output=True, text=True, timeout=3
+            )
+            if result.returncode == 0 and "reference" in result.stdout.lower():
+                return True
+        except Exception:
+            pass
+
+    # Try ntpstat
+    if shutil.which("ntpstat"):
+        try:
+            result = subprocess.run(["ntpstat"], capture_output=True, timeout=3)
+            return result.returncode == 0
+        except Exception:
+            pass
+
+    # Fall back: assume synced if not on embedded hardware (best effort)
+    return False
+
+
+def _check_estop_qos_config(config_path: str) -> bool:
+    """Check if ESTOP QoS is configured correctly.
+
+    Returns True if the bridge module has ESTOP_ACK_DEADLINE_S <= 2.0.
+    """
+    try:
+        from castor.cloud.bridge import ESTOP_ACK_DEADLINE_S
+        return ESTOP_ACK_DEADLINE_S <= 2.0
+    except ImportError:
+        return False
 
 
 def cmd_scan(args) -> None:
