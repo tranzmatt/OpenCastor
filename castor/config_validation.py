@@ -57,6 +57,10 @@ OPTIONAL_AGENT_KEYS: list[str] = [
 # Required keys inside the 'metadata' block
 REQUIRED_METADATA_KEYS: list[str] = ["robot_name"]
 
+# RCAN spec versions accepted by this runtime (imported from compliance for
+# single source of truth — re-exported here for backward compat).
+from castor.compliance import ACCEPTED_RCAN_VERSIONS as ACCEPTED_RCAN_VERSIONS  # noqa: E402,F401
+
 
 def validate_rcan_config(config: dict) -> tuple[bool, list[str]]:
     """Validate a loaded RCAN config dict.
@@ -85,6 +89,13 @@ def validate_rcan_config(config: dict) -> tuple[bool, list[str]]:
     for key in REQUIRED_TOP_LEVEL:
         if key not in config:
             errors.append(f"Missing required top-level key: '{key}'")
+
+    # ── rcan_version check ────────────────────────────────────────────────────
+    rcan_ver = config.get("rcan_version")
+    if rcan_ver is not None and str(rcan_ver) not in ACCEPTED_RCAN_VERSIONS:
+        errors.append(
+            f"Unrecognised rcan_version '{rcan_ver}'. Accepted: {', '.join(ACCEPTED_RCAN_VERSIONS)}"
+        )
 
     # ── agent block ───────────────────────────────────────────────────────────
     agent = config.get("agent")

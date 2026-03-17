@@ -23,7 +23,11 @@ from dataclasses import dataclass, field
 # Constants
 # ---------------------------------------------------------------------------
 
-SPEC_VERSION = "1.4"
+SPEC_VERSION = "1.6"
+
+# All RCAN spec versions that this runtime can accept (for inbound message validation).
+# Robots running older spec versions are still interoperable; newer versions are warned.
+ACCEPTED_RCAN_VERSIONS: tuple[str, ...] = ("1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6")
 
 
 # ---------------------------------------------------------------------------
