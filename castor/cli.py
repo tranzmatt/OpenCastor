@@ -1353,10 +1353,6 @@ def _run_v15_conformance_checks(config_path: str, manifest: dict) -> None:
       3. Is clock synchronized?
       4. Are ESTOP QoS acks within 2s?
     """
-    import subprocess
-    import shutil
-    import yaml as _yaml
-    import os as _os
 
     print("RCAN v1.5 Checks")
     print("─" * 40)
@@ -1367,8 +1363,9 @@ def _run_v15_conformance_checks(config_path: str, manifest: dict) -> None:
         "replay_cache",
         "Replay prevention enabled (GAP-03)",
         replay_enabled,
-        detail="ReplayCache(window_s=30) active in castor.cloud.bridge" if replay_enabled
-               else "WARN: replay_cache_enabled=False in manifest",
+        detail="ReplayCache(window_s=30) active in castor.cloud.bridge"
+        if replay_enabled
+        else "WARN: replay_cache_enabled=False in manifest",
     )
 
     # 2. sender_type being logged?
@@ -1377,8 +1374,9 @@ def _run_v15_conformance_checks(config_path: str, manifest: dict) -> None:
         "sender_type_logged",
         "sender_type audit trail active (GAP-08)",
         sender_logged,
-        detail="sender_type field logged in all bridge audit entries" if sender_logged
-               else "WARN: sender_type_logged=False in manifest",
+        detail="sender_type field logged in all bridge audit entries"
+        if sender_logged
+        else "WARN: sender_type_logged=False in manifest",
     )
 
     # 3. Clock synchronized?
@@ -1387,8 +1385,9 @@ def _run_v15_conformance_checks(config_path: str, manifest: dict) -> None:
         "clock_sync",
         "System clock synchronized (GAP-04)",
         clock_synced,
-        detail="NTP/chrony clock sync confirmed" if clock_synced
-               else "WARN: clock may not be synchronized — replay prevention relies on accurate timestamps",
+        detail="NTP/chrony clock sync confirmed"
+        if clock_synced
+        else "WARN: clock may not be synchronized — replay prevention relies on accurate timestamps",
     )
 
     # 4. ESTOP QoS ACK within 2s?
@@ -1399,8 +1398,8 @@ def _run_v15_conformance_checks(config_path: str, manifest: dict) -> None:
         "ESTOP QoS ACK within 2s (GAP-11)",
         estop_qos_ok,
         detail="Bridge configured to ACK ESTOP within 2s (castor.cloud.bridge.ESTOP_ACK_DEADLINE_S=2.0)"
-               if estop_qos_ok
-               else "WARN: could not confirm ESTOP QoS configuration",
+        if estop_qos_ok
+        else "WARN: could not confirm ESTOP QoS configuration",
     )
 
     print()
@@ -1426,15 +1425,14 @@ def _check_clock_sync() -> bool:
 
     Returns True if NTP/chrony is running and clock is synced.
     """
-    import subprocess
     import shutil
+    import subprocess
 
     # Try timedatectl (systemd)
     if shutil.which("timedatectl"):
         try:
             result = subprocess.run(
-                ["timedatectl", "status"],
-                capture_output=True, text=True, timeout=3
+                ["timedatectl", "status"], capture_output=True, text=True, timeout=3
             )
             output = result.stdout + result.stderr
             if "synchronized: yes" in output.lower() or "ntp service: active" in output.lower():
@@ -1446,8 +1444,7 @@ def _check_clock_sync() -> bool:
     if shutil.which("chronyc"):
         try:
             result = subprocess.run(
-                ["chronyc", "tracking"],
-                capture_output=True, text=True, timeout=3
+                ["chronyc", "tracking"], capture_output=True, text=True, timeout=3
             )
             if result.returncode == 0 and "reference" in result.stdout.lower():
                 return True
@@ -1473,6 +1470,7 @@ def _check_estop_qos_config(config_path: str) -> bool:
     """
     try:
         from castor.cloud.bridge import ESTOP_ACK_DEADLINE_S
+
         return ESTOP_ACK_DEADLINE_S <= 2.0
     except ImportError:
         return False
