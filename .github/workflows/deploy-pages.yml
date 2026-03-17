@@ -26,14 +26,18 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: website/package-lock.json
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
 
       - name: Install dependencies
-        run: cd website && npm ci
+        run: cd website && pnpm install --frozen-lockfile
 
       - name: Build Astro site
-        run: cd website && npm run build
+        run: cd website && pnpm run build
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65  # v3
