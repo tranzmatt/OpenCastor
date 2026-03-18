@@ -1491,6 +1491,34 @@ async def get_media_chunk(chunk_id: str):
     raise HTTPException(status_code=404, detail="media storage not yet implemented")
 
 
+async def _verify_rcan_or_token(
+    request: Request,
+) -> None:
+    """Accept either Bearer token OR RCAN-Signature header for R2R messages.
+
+    Robots posting inbound RCAN messages may use a per-robot HMAC signature
+    (``RCAN-Signature: v1:<base64-hmac-sha256>``) instead of sharing the local
+    API bearer token.  If neither is present the request is rejected.
+
+    This is intentionally lightweight: real crypto is wired when rcan-py adds
+    HMAC signing; for now any non-empty RCAN-Signature is accepted and logged.
+    """
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        # Delegate to the standard multi-layer token check
+        await verify_token(request)
+        return
+
+    sig = request.headers.get("RCAN-Signature", "")
+    if not sig:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing auth: Bearer token or RCAN-Signature required",
+        )
+    # Signature format: "v1:<base64-hmac-sha256>" — log prefix for audit trail
+    logger.info("RCAN-Signature auth: sig_prefix=%s", sig[:20])
+
+
 @app.get("/api/rcan/peers", dependencies=[Depends(verify_token)])
 async def get_peers():
     """List discovered RCAN peers on the local network."""
@@ -1499,13 +1527,12 @@ async def get_peers():
     return {"peers": [], "note": "mDNS not enabled"}
 
 
-@app.post("/api/rcan/message")
+@app.post("/api/rcan/message", dependencies=[Depends(_verify_rcan_or_token)])
 async def rcan_receive_message(request: Request):
     """Receive an inbound RCAN message from a remote robot (federation endpoint).
 
-    This endpoint is intentionally unauthenticated so peer robots can reach it
-    without sharing API tokens.  It accepts both the OpenCastor internal dict
-    format and the RCAN v1.2 spec format.
+    Accepts either a Bearer token (API token) or an ``RCAN-Signature`` header
+    (R2R HMAC path).  See ``_verify_rcan_or_token`` for auth details.
 
     For outbound sends, use ``castor.rcan.http_transport.send_message()``.
     """

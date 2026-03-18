@@ -243,6 +243,9 @@ def _try_decode_compact_transport(payload: bytes) -> dict[str, Any]:
 
 # Pre-load v1.6 module references
 _validate_cross_registry_command, _TrustAnchorCacheCls = _try_import_federation()
+
+# True when rcan.federation is unavailable and we fell back to the stub
+_FEDERATION_STUB_ACTIVE: bool = _TrustAnchorCacheCls is _TrustAnchorCacheStub
 _extract_loa_from_jwt, _validate_loa_for_scope = _try_import_loa()
 
 
@@ -332,6 +335,14 @@ class CastorBridge:
         # v1.6: LoA enforcement policy (GAP-16)
         self.min_loa_for_control: int = int(config.get("min_loa_for_control", 1))
         self.loa_enforcement: bool = bool(config.get("loa_enforcement", False))
+
+        # v1.6: Federation trust enforcement (GAP-14 fail-closed option)
+        # When True and rcan.federation stub is active, cross-registry commands are REJECTED.
+        # Default False = fail-open (backward-compatible).
+        self.require_federation_trust: bool = bool(rcan.get("require_federation_trust", False))
+
+        # Store rcan_protocol section for later use (e.g. peer allowlist)
+        self._rcan_cfg: dict[str, Any] = rcan
 
     # ------------------------------------------------------------------
     # v1.5 Offline mode helpers (GAP-06)
@@ -513,6 +524,17 @@ class CastorBridge:
                 self.signature = d.get("signature")
                 self.params = d.get("params", {})
 
+        # Fail-closed: when require_federation_trust is True and we're using
+        # the stub (rcan.federation unavailable), reject all cross-registry commands.
+        if _FEDERATION_STUB_ACTIVE and self.require_federation_trust:
+            log.warning(
+                "federation_check: REJECTED cross-registry cmd from %s — "
+                "require_federation_trust=True but rcan.federation stub active cmd_id=%s",
+                from_registry,
+                cmd_id,
+            )
+            return False
+
         allowed, reason = _validate_cross_registry_command(
             msg=_MsgShim(doc),
             local_registry=self.owner,
@@ -614,6 +636,77 @@ class CastorBridge:
             )
             return False
         return True
+
+    # ------------------------------------------------------------------
+    # v1.6: Config scrubbing — remove forbidden top-level YAML keys
+    # ------------------------------------------------------------------
+
+    #: Top-level config keys that must never be shared between peers
+    _CONFIG_FORBIDDEN_KEYS: frozenset[str] = frozenset({"safety", "auth", "p66"})
+
+    def _scrub_config_content(self, content: str) -> str:
+        """Strip forbidden top-level keys from a YAML config string.
+
+        Removes ``safety``, ``auth``, and ``p66`` sections before storing a
+        peer-shared config bundle — these keys must never leave the local
+        trust boundary.
+
+        Args:
+            content: Raw YAML text received from a peer robot.
+
+        Returns:
+            Scrubbed YAML text with forbidden sections removed.
+        """
+        try:
+            import yaml as _yaml
+
+            data = _yaml.safe_load(content) or {}
+        except Exception:
+            log.warning("_scrub_config_content: failed to parse YAML — returning empty config")
+            return ""
+
+        if not isinstance(data, dict):
+            return content
+
+        scrubbed = {k: v for k, v in data.items() if k not in self._CONFIG_FORBIDDEN_KEYS}
+        removed = [k for k in data if k in self._CONFIG_FORBIDDEN_KEYS]
+        if removed:
+            log.warning(
+                "_scrub_config_content: removed forbidden keys=%s from peer config", removed
+            )
+        try:
+            import yaml as _yaml
+
+            return _yaml.dump(scrubbed, default_flow_style=False)
+        except Exception:
+            return content
+
+    # ------------------------------------------------------------------
+    # v1.6: mDNS peer allowlist check
+    # ------------------------------------------------------------------
+
+    def _is_peer_allowed(self, peer_id: str) -> bool:
+        """Check whether a discovered mDNS peer is in the configured allowlist.
+
+        The ``rcan_protocol.peers`` config key holds an explicit list of allowed
+        peer identifiers (RRNs, hostnames, or RURIs).  If the list is absent or
+        empty, no peers are allowed (fail-closed).
+
+        Args:
+            peer_id: The peer's identifier (RRN, hostname, or RURI).
+
+        Returns:
+            True if the peer is in the allowlist, False otherwise.
+        """
+        rcan_cfg: dict[str, Any] = self._rcan_cfg
+        allowed_peers: list[str] = rcan_cfg.get("peers", [])
+        if not allowed_peers:
+            log.debug("_is_peer_allowed: empty allowlist — no peers allowed (peer=%s)", peer_id)
+            return False
+        result = peer_id in allowed_peers
+        if not result:
+            log.warning("_is_peer_allowed: peer %s not in allowlist=%s", peer_id, allowed_peers)
+        return result
 
     # ------------------------------------------------------------------
     # v1.6: Transport encoding detection (GAP-17)
@@ -1232,7 +1325,8 @@ class CastorBridge:
         log.info("CONFIG_SHARE received from %s — title=%s filename=%s", from_rrn, title, filename)
 
         # Validate federation consent at chat scope
-        allowed, reason = self._check_federation(cmd_id, doc, scope="chat")
+        allowed = self._check_federation(cmd_id, doc, scope="chat")
+        reason = "federation trust check failed" if not allowed else ""
         if not allowed:
             log.warning("CONFIG_SHARE from %s blocked: %s", from_rrn, reason)
             self._update_command_status(cmd_id, "rejected", {"reason": reason})
