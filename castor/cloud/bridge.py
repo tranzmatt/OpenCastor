@@ -902,12 +902,20 @@ class CastorBridge:
             except Exception:
                 pass
 
+            # Normalise: ensure opencastor_version is always set at both
+            # telemetry.opencastor_version AND top-level opencastor_version so
+            # all app screens (fleet card reads telemetry.version, detail page
+            # reads opencastor_version) show the same value.
+            oc_version: str = telemetry.get("version", "unknown")
+            telemetry.setdefault("opencastor_version", oc_version)
+
             self._robot_ref().set(
                 {
                     "telemetry": {
                         **telemetry,
                         "last_seen": datetime.now(timezone.utc).isoformat(),
                     },
+                    "opencastor_version": oc_version,
                     "status": {
                         "online": True,
                         "last_seen": datetime.now(timezone.utc).isoformat(),
