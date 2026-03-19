@@ -925,6 +925,15 @@ class CastorBridge:
             except Exception:
                 pass
 
+            # Also fetch harness config so the Flutter app can display it
+            try:
+                with httpx.Client(timeout=5.0) as client:
+                    hr2 = client.get(f"{self.gateway_url}/api/harness", headers=headers)
+                if hr2.status_code == 200:
+                    telemetry["harness_config"] = hr2.json()
+            except Exception:
+                pass
+
             # Normalise: ensure opencastor_version is always set at both
             # telemetry.opencastor_version AND top-level opencastor_version so
             # all app screens (fleet card reads telemetry.version, detail page
