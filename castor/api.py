@@ -1910,8 +1910,9 @@ async def _verify_rcan_or_token(
     (``RCAN-Signature: v1:<base64-hmac-sha256>``) instead of sharing the local
     API bearer token.  If neither is present the request is rejected.
 
-    This is intentionally lightweight: real crypto is wired when rcan-py adds
-    HMAC signing; for now any non-empty RCAN-Signature is accepted and logged.
+    When ``RCAN_SECRET`` is set the signature is verified via HMAC-SHA256;
+    otherwise a deprecation warning is logged and the request is accepted in
+    legacy mode (insecure — configure ``RCAN_SECRET`` to enable verification).
     """
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
@@ -1920,13 +1921,29 @@ async def _verify_rcan_or_token(
         return
 
     sig = request.headers.get("RCAN-Signature", "")
-    if not sig:
-        raise HTTPException(
-            status_code=401,
-            detail="Missing auth: Bearer token or RCAN-Signature required",
-        )
-    # Signature format: "v1:<base64-hmac-sha256>" — log prefix for audit trail
-    logger.info("RCAN-Signature auth: sig_prefix=%s", sig[:20])
+    if sig:
+        body = await request.body()
+        secret = os.getenv("RCAN_SECRET", "")
+        if secret:
+            import base64 as _b64
+            import hashlib as _hl
+            import hmac as _hm
+
+            try:
+                _, b64 = sig.split(":", 1)
+                provided = _b64.b64decode(b64)
+            except Exception as exc:
+                raise HTTPException(status_code=401, detail="Malformed RCAN-Signature") from exc
+            expected = _hm.new(secret.encode(), body, _hl.sha256).digest()
+            if not _hm.compare_digest(provided, expected):
+                logger.warning("RCAN-Signature HMAC mismatch — rejected")
+                raise HTTPException(status_code=401, detail="RCAN-Signature verification failed")
+        else:
+            logger.warning(
+                "RCAN_SECRET not configured — RCAN-Signature accepted in legacy mode (insecure)"
+            )
+        return
+    raise HTTPException(status_code=401, detail="Missing Authorization or RCAN-Signature")
 
 
 @app.get("/api/rcan/peers", dependencies=[Depends(verify_token)])
@@ -2571,6 +2588,28 @@ async def _build_telemetry_payload() -> dict:
     }
 
 
+def _ws_auth_ok(token: str) -> bool:
+    """Return True if the WS token is valid (API_TOKEN match or valid JWT)."""
+    if API_TOKEN and token == API_TOKEN:
+        return True
+    if token:
+        try:
+            import castor.auth as _auth
+
+            if hasattr(_auth, "decode_token"):
+                _auth.decode_token(token)
+                return True
+            elif hasattr(_auth, "verify_jwt"):
+                _auth.verify_jwt(token)
+                return True
+        except Exception:
+            pass
+    if not API_TOKEN:
+        logger.warning("WS: no auth configured — accepting unauthenticated connection (dev mode)")
+        return True
+    return False
+
+
 @app.websocket("/ws/telemetry")
 async def ws_telemetry(websocket: WebSocket, token: str = ""):
     """WebSocket endpoint that pushes telemetry JSON every 200 ms.
@@ -2598,7 +2637,7 @@ async def ws_telemetry(websocket: WebSocket, token: str = ""):
         {"cmd": "stop"}  — triggers driver.stop() if a driver is active.
     """
     # --- Auth check ---
-    if API_TOKEN and token != API_TOKEN:
+    if not _ws_auth_ok(token):
         await websocket.close(code=1008)
         return
 
@@ -3285,7 +3324,7 @@ async def ws_arduino_sensors(websocket: WebSocket, token: str = ""):
 
     Requires an ``ArduinoSerialDriver`` as the active driver.
     """
-    if API_TOKEN and token != API_TOKEN:
+    if not _ws_auth_ok(token):
         await websocket.close(code=1008)
         return
 
@@ -3414,10 +3453,39 @@ async def list_webhooks():
     return {"webhooks": get_dispatcher().list_hooks()}
 
 
+def _validate_webhook_url(url: str) -> None:
+    """Validate webhook URL — block SSRF targets (metadata endpoints, link-local)."""
+    import ipaddress as _ipaddress
+    from urllib.parse import urlparse as _urlparse
+
+    try:
+        parsed = _urlparse(url)
+    except Exception as exc:
+        raise ValueError(f"Invalid URL: {exc}") from exc
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("Webhook URL must use http or https")
+    host = parsed.hostname or ""
+    _BLOCKED = {"169.254.169.254", "metadata.google.internal"}
+    if host in _BLOCKED:
+        raise ValueError(f"Blocked host: {host}")
+    try:
+        addr = _ipaddress.ip_address(host)
+        if addr.is_link_local or addr.is_multicast:
+            raise ValueError(f"Link-local/multicast address not allowed: {host}")
+    except ValueError as ve:
+        if "not allowed" in str(ve) or "Blocked" in str(ve):
+            raise
+
+
 @app.post("/api/webhooks", dependencies=[Depends(verify_token)])
 async def add_webhook(req: _WebhookAddRequest):
     """POST /api/webhooks — Register a new outbound webhook."""
     from castor.webhooks import WEBHOOK_EVENTS, get_dispatcher
+
+    try:
+        _validate_webhook_url(req.url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     bad = [e for e in (req.events or []) if e not in WEBHOOK_EVENTS and e != "*"]
     if bad:
@@ -3883,8 +3951,8 @@ async def safety_manifest():
 async def ws_safety(websocket: WebSocket):
     """WS /ws/safety — Real-time safety event push at 2Hz."""
     token = websocket.query_params.get("token", "")
-    if API_TOKEN and token != API_TOKEN:
-        await websocket.close(code=4003)
+    if not _ws_auth_ok(token):
+        await websocket.close(code=1008)
         return
     await websocket.accept()
     from castor.safety_telemetry import get_telemetry
@@ -5601,18 +5669,15 @@ async def webrtc_offer(body: _WebRTCOfferRequest):
 async def setup_wizard():
     """Serve the web-based setup wizard UI.
 
-    Injects OPENCASTOR_API_TOKEN as window.__OC_TOKEN so the wizard JS can
-    attach Authorization headers to /setup/api/* calls when auth is enabled.
-    The token is only sent to this same-origin page — not exposed externally.
+    The wizard prompts for credentials via its own login form — the master API
+    token is never injected into the HTML response.
     """
     from fastapi.responses import HTMLResponse
 
     try:
         from castor.web_wizard import _HTML_TEMPLATE
 
-        token_script = f"<script>window.__OC_TOKEN = {repr(API_TOKEN or '')};</script>"
-        html = _HTML_TEMPLATE.replace("</head>", f"{token_script}\n</head>", 1)
-        return HTMLResponse(content=html)
+        return HTMLResponse(content=_HTML_TEMPLATE)
     except Exception as exc:
         return HTMLResponse(
             content=f"<html><body><h1>Setup Wizard Error</h1><pre>{exc}</pre></body></html>",
@@ -6727,7 +6792,7 @@ async def pointcloud_json():
     return get_capture().to_json_dict()
 
 
-@app.get("/api/depth/pointcloud.ply")
+@app.get("/api/depth/pointcloud.ply", dependencies=[Depends(verify_token)])
 async def pointcloud_ply():
     from fastapi.responses import Response
 
@@ -6751,7 +6816,7 @@ async def pointcloud_stats():
 # ── Object Detection ───────────────────────────────────────────────────────────
 
 
-@app.get("/api/detection/frame")
+@app.get("/api/detection/frame", dependencies=[Depends(verify_token)])
 async def detection_frame():
     """Return JPEG with bounding box overlays."""
     from fastapi.responses import Response

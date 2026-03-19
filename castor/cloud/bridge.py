@@ -205,7 +205,23 @@ def _try_import_loa() -> tuple[Any, Any]:
 
 
 def _extract_loa_stub(token: str, **kwargs: Any) -> int:
-    """Stub: always returns LoA 1 (email-verified baseline)."""
+    """Stub: try to read loa/acr claim from JWT payload, default to LoA 1."""
+    if token:
+        try:
+            import base64
+            import json
+
+            parts = token.split(".")
+            if len(parts) >= 2:
+                # Decode JWT payload (second segment)
+                payload_b64 = parts[1] + "=" * (-len(parts[1]) % 4)
+                payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+                if "loa" in payload:
+                    return int(payload["loa"])
+                if "acr" in payload:
+                    return int(payload["acr"])
+        except Exception:
+            pass
     return 1
 
 
@@ -334,7 +350,7 @@ class CastorBridge:
 
         # v1.6: LoA enforcement policy (GAP-16)
         self.min_loa_for_control: int = int(config.get("min_loa_for_control", 1))
-        self.loa_enforcement: bool = bool(config.get("loa_enforcement", False))
+        self.loa_enforcement: bool = bool(config.get("loa_enforcement", True))
 
         # v1.6: Federation trust enforcement (GAP-14 fail-closed option)
         # When True and rcan.federation stub is active, cross-registry commands are REJECTED.
