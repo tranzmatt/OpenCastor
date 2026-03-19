@@ -9,6 +9,7 @@ export async function getStaticPaths() {
   const dirs = [
     resolve(process.cwd(), '../config/community'),
     resolve(process.cwd(), '../config/presets'),
+    resolve(process.cwd(), '../config/official'),
   ];
 
   const paths = [];
@@ -22,7 +23,7 @@ export async function getStaticPaths() {
       try { parsed = yaml.load(content) as any; } catch {}
       paths.push({
         params: { id },
-        props: { filename, content, parsed, dir: dir.includes('community') ? 'community' : 'presets' }
+        props: { filename, content, parsed, dir: dir.includes('community') ? 'community' : dir.includes('official') ? 'official' : 'presets' }
       });
     }
   }
