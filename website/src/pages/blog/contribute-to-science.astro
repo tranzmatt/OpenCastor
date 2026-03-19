@@ -1,0 +1,264 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="From Robot Runtime to Climate Sensor — OpenCastor Blog"
+  description="How OpenCastor robots are donating idle AI compute to climate modeling, biodiversity monitoring, protein folding, and humanitarian AI."
+  ogUrl="https://opencastor.com/blog/contribute-to-science"
+>
+
+<main>
+  <!-- HERO -->
+  <section class="page-hero" style="padding-bottom:24px">
+    <p class="section-label reveal">Blog</p>
+    <h1 class="reveal reveal-d1" style="max-width:720px;margin:0 auto">From Robot Runtime to Climate Sensor:<br><span class="gradient-text">How OpenCastor Robots Are Donating Idle Compute to Science</span></h1>
+    <p class="reveal reveal-d2" style="font-size:0.9rem;color:var(--text-muted);margin-top:16px">March 19, 2026 &middot; Craig Merry</p>
+  </section>
+
+  <!-- ARTICLE -->
+  <section class="section" style="padding-top:0">
+    <div class="container" style="max-width:720px">
+
+      <!-- The spark -->
+      <div class="wizard-tip reveal" style="margin-bottom:32px">
+        <p style="font-style:italic;font-size:1.05rem;line-height:1.7;margin:0">"How long before someone launches SETI@Home but the AGI era?"</p>
+        <p style="margin:8px 0 0;font-size:0.875rem;color:var(--text-secondary)">
+          &mdash; Chris Albon (<a href="https://x.com/chrisalbon" style="color:var(--accent)">@chrisalbon</a>), Director of ML at Wikimedia Foundation<br>
+          <a href="https://x.com/chrisalbon/status/2034653589755559997" style="color:var(--text-muted);font-size:0.8rem">March 19, 2026</a>
+        </p>
+      </div>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        When Chris posted this, we were sitting in front of a Raspberry Pi 5 with a Hailo-8L NPU strapped to it.
+        The robot it controls &mdash; Bob, our reference platform &mdash; was idle. Had been for twenty minutes. Its 26 TOPS
+        neural processor was doing absolutely nothing, burning about 2 watts for the privilege of being ready.
+      </p>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        That question landed differently for us. We're not building a cloud service or an app &mdash; we're building
+        the runtime layer for physical robots that already have AI accelerators, cameras, and microphones deployed
+        in the real world. The answer to Chris's question isn't "someone should build that." It's: we already have the hardware. We just need to use it.
+      </p>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        So we built <code>castor contribute</code>.
+      </p>
+
+      <!-- SETI@Home parallel -->
+      <h2 class="reveal" style="font-size:1.75rem;margin-top:48px;margin-bottom:16px">The SETI@Home parallel</h2>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        SETI@Home ran from 1999 to 2020. At its peak, 5.2 million volunteers donated their home PCs to search
+        for extraterrestrial intelligence. The model worked: Folding@home later proved it could do real science,
+        contributing to COVID-19 research by simulating protein dynamics across millions of consumer CPUs and GPUs.
+      </p>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        But here's what's different in 2026: the nodes aren't just CPUs anymore. An OpenCastor robot is a
+        multimodal AI node with a neural processing unit, a depth camera, a microphone, and physical presence
+        in a real environment. That's not just compute &mdash; it's situated intelligence. A robot on a farm can
+        listen for bird calls. A robot in a school can classify local weather patterns from its camera feed.
+        The sensor data <em>is</em> the science.
+      </p>
+
+      <!-- What robots have -->
+      <h2 class="reveal" style="font-size:1.75rem;margin-top:48px;margin-bottom:16px">What OpenCastor robots have</h2>
+
+      <div class="bento reveal" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:1rem;margin:0 0 8px">Hailo-8L NPU</h3>
+          <p style="font-size:0.875rem;color:var(--text-secondary);margin:0">26 TOPS at ~2W. Purpose-built for edge AI inference &mdash; image classification, object detection, audio models.</p>
+        </div>
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:1rem;margin:0 0 8px">OAK-D Depth Camera</h3>
+          <p style="font-size:0.875rem;color:var(--text-secondary);margin:0">Stereo depth + RGB. Real-time vision processing for species identification, satellite imagery ground-truth, anomaly detection.</p>
+        </div>
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:1rem;margin:0 0 8px">Microphone</h3>
+          <p style="font-size:0.875rem;color:var(--text-secondary);margin:0">Audio classification at ~0.1W. BirdNET bioacoustics, environmental sound monitoring, acoustic anomaly detection.</p>
+        </div>
+        <div class="card" style="padding:20px">
+          <h3 style="font-size:1rem;margin:0 0 8px">Physical Presence</h3>
+          <p style="font-size:0.875rem;color:var(--text-secondary);margin:0">Deployed in homes, schools, farms, labs. Distributed sensor network that traditional compute clusters can never be.</p>
+        </div>
+      </div>
+
+      <!-- The idle compute problem -->
+      <h2 class="reveal" style="font-size:1.75rem;margin-top:48px;margin-bottom:16px">The idle compute problem</h2>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        A robot waiting for its next command is burning ~3W but producing zero useful work. Bob idles for
+        about 20 hours a day. That's 520 TOPS-hours of wasted neural compute, every single day, from one robot.
+      </p>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        Scale that to a fleet. 1,000 robots &times; 8 hours idle/day &times; 26 TOPS = 208,000 TOPS-hours/day.
+        That's the equivalent of a small GPU cluster, but physically distributed across real-world environments
+        where it can collect and process data that centralized servers never could.
+      </p>
+
+      <!-- What castor contribute does -->
+      <h2 class="reveal" style="font-size:1.75rem;margin-top:48px;margin-bottom:16px">What <code>castor contribute</code> does</h2>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        The feature is dead simple. Add a block to your RCAN config:
+      </p>
+
+      <div class="code-block reveal" style="margin-bottom:24px">
+        <div class="code-header">
+          <div class="code-dots"><span></span><span></span><span></span></div>
+          <span class="code-filename">robot.rcan.yaml</span>
+        </div>
+        <div class="code-body">
+<span class="k">agent</span>:
+  <span class="k">contribute</span>:
+    <span class="k">enabled</span>: <span class="s">true</span>
+    <span class="k">idle_after_minutes</span>: <span class="s">15</span>
+    <span class="k">projects</span>:
+      - <span class="s">climate</span>
+      - <span class="s">biodiversity</span>
+      - <span class="s">science</span>
+    <span class="k">coordinator</span>: <span class="s">boinc</span>
+        </div>
+      </div>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        After 15 minutes of idle time, the robot contacts a work coordinator (BOINC, Folding@home, or
+        OpenCastor's own coordinator for sensor-based projects). It fetches a work unit, runs it on the
+        Hailo NPU or CPU, and submits the result. The moment a real command comes in &mdash; a chat message,
+        a movement instruction, anything &mdash; the contribute work is cancelled within 100ms and the robot
+        returns to full duty.
+      </p>
+
+      <!-- Use cases -->
+      <h2 class="reveal" style="font-size:1.75rem;margin-top:48px;margin-bottom:16px">Use cases by domain</h2>
+
+      <div class="reveal" style="margin-bottom:32px">
+        <h3 style="font-size:1.25rem;margin-bottom:8px">Climate</h3>
+        <p style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+          Satellite imagery classification for deforestation monitoring. Federated climate model training
+          where each robot contributes local gradient updates without sharing raw data. Ground-truth weather
+          observation from cameras deployed in the field.
+        </p>
+
+        <h3 style="font-size:1.25rem;margin-top:24px;margin-bottom:8px">Biodiversity</h3>
+        <p style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+          BirdNET bioacoustics via the onboard microphone &mdash; robots in gardens and parks passively
+          monitoring bird populations at near-zero energy cost. OAK-D depth camera for insect and plant
+          species identification. This is science that only makes sense with distributed physical sensors.
+        </p>
+
+        <h3 style="font-size:1.25rem;margin-top:24px;margin-bottom:8px">Science</h3>
+        <p style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+          Folding@home-style protein structure prediction on the Hailo NPU. Rosetta@home work units compiled
+          to HEF format for efficient edge inference. Each robot contributes a small piece of a massive
+          distributed computation.
+        </p>
+
+        <h3 style="font-size:1.25rem;margin-top:24px;margin-bottom:8px">Humanitarian AI</h3>
+        <p style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+          Medical image pre-screening for WHO and MSF deployments. Chest X-ray classification for TB screening
+          in resource-limited settings. Edge inference means results are available in-country without sending
+          patient data to the cloud.
+        </p>
+      </div>
+
+      <!-- Fleet math -->
+      <h2 class="reveal" style="font-size:1.75rem;margin-top:48px;margin-bottom:16px">The fleet math</h2>
+
+      <div class="reveal" style="margin-bottom:24px">
+        <table class="arch-table">
+          <thead><tr><th>Fleet Size</th><th>Daily Idle Hours</th><th>TOPS-Hours/Day</th><th>Equivalent</th></tr></thead>
+          <tbody>
+            <tr><td>1 robot</td><td>8h</td><td>208</td><td>&mdash;</td></tr>
+            <tr><td>100 robots</td><td>8h</td><td>20,800</td><td>Small workstation GPU</td></tr>
+            <tr><td>1,000 robots</td><td>8h</td><td>208,000</td><td>Small GPU cluster</td></tr>
+            <tr><td>10,000 robots</td><td>8h</td><td>2,080,000</td><td>Large research cluster</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        The numbers aren't about raw FLOPS competing with an H100. They're about something no GPU cluster has:
+        physical distribution. Ten thousand robots in ten thousand locations, each with a camera, a microphone,
+        and an NPU. That's a planetary sensor network that does science when it's not doing robotics.
+      </p>
+
+      <!-- P66 safety -->
+      <h2 class="reveal" style="font-size:1.75rem;margin-top:48px;margin-bottom:16px">Safety first, always</h2>
+
+      <div class="wizard-tip reveal" style="margin-bottom:24px">
+        <strong>Protocol 66 guarantee:</strong> Contribute work is immediately preempted by any incoming command.
+        A robot helping fold proteins will drop everything the moment a user sends a message. The P66 safety protocol
+        takes absolute precedence &mdash; the robot signals <code>ContributeCancel</code> to the coordinator and
+        becomes available within 100ms. This is enforced at the kernel level and cannot be disabled by configuration.
+      </div>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        We designed this from the start as a background citizen, not a competing process. The contribute scheduler
+        checks for active commands before every work unit fetch. If your robot is needed, it's yours instantly.
+        Science gets the leftovers &mdash; which, in a fleet of idle robots, turns out to be a lot.
+      </p>
+
+      <!-- Closing -->
+      <h2 class="reveal" style="font-size:1.75rem;margin-top:48px;margin-bottom:16px">The AGI-era SETI@Home starts here</h2>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        Chris Albon asked how long before someone launches SETI@Home for the AGI era. The answer is: the infrastructure
+        already exists. Every OpenCastor robot has an AI accelerator that idles most of the day. We just had to
+        connect the idle cycles to the people who need them.
+      </p>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        This is version one. We're starting with BOINC integration and BirdNET bioacoustics. Climate@Home and
+        WHO-TB screening are in the pipeline. If you're a researcher with a distributed inference problem that
+        fits on a 26 TOPS NPU, we want to hear from you.
+      </p>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        Your robot is already awake. Let's put it to work.
+      </p>
+
+      <!-- CTA -->
+      <div class="reveal" style="margin-top:48px;padding:32px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;text-align:center">
+        <h3 style="font-size:1.25rem;margin-bottom:16px">Enable contribute on your robot</h3>
+        <div class="code-block" style="max-width:400px;margin:0 auto 20px">
+          <div class="code-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span class="code-filename">Terminal</span>
+          </div>
+          <div class="code-body">castor contribute start</div>
+        </div>
+        <div class="hero-actions" style="justify-content:center">
+          <a href="/docs/contribute" class="btn btn-primary">Read the docs</a>
+          <a href="https://github.com/craigm26/OpenCastor" class="btn btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<style>
+  .arch-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .arch-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--alt-bg);
+    border-bottom: 2px solid var(--border);
+    font-weight: 600;
+  }
+  .arch-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .arch-table tr:last-child td { border-bottom: none; }
+</style>
+
+</BaseLayout>

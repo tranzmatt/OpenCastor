@@ -19,11 +19,32 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <div class="container">
       <div class="changelog-timeline">
 
+        <!-- v2026.3.19.0 -->
+        <div class="changelog-release current reveal" id="v2026.3.19.0">
+          <div class="release-header">
+            <span class="release-version">v2026.3.19.0</span>
+            <span class="release-badge badge-new">Latest</span>
+            <span class="release-date">March 19, 2026</span>
+          </div>
+          <div class="release-body">
+            <h3>castor contribute &mdash; Idle Compute for Distributed Science</h3>
+            <ul>
+              <li><code>castor contribute start|stop|status|projects</code> CLI &mdash; donate idle NPU/CPU cycles to climate modeling, biodiversity monitoring, protein folding, and humanitarian AI</li>
+              <li>BOINC, Folding@home, and OpenCastor coordinator support with configurable project allowlists</li>
+              <li>P66-safe: any incoming command preempts contribute work within 100ms via <code>ContributeCancel</code></li>
+              <li>Hardware-aware work unit matching: Hailo-8L HEF models, CPU fallback, optional camera/microphone sensor projects</li>
+              <li>Power-capped (<code>max_power_w</code>) and CPU-throttled (<code>max_cpu_pct</code>) to respect thermal/battery budgets</li>
+              <li><code>GET /api/contribute</code> endpoint &mdash; live status, stats, and hardware profile</li>
+              <li>Fleet dashboard integration: per-robot contribution stats, active project indicator, enable/disable toggle</li>
+              <li>Privacy mode respected &mdash; contribute auto-pauses when <code>castor privacy on</code> is active</li>
+            </ul>
+          </div>
+        </div>
+
         <!-- v2026.3.17.1 -->
-        <div class="changelog-release current reveal" id="v2026.3.17.1">
+        <div class="changelog-release reveal" id="v2026.3.17.1">
           <div class="release-header">
             <span class="release-version">v2026.3.17.1</span>
-            <span class="release-badge badge-new">Latest</span>
             <span class="release-date">March 17, 2026</span>
           </div>
           <div class="release-body">
