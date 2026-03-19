@@ -8433,3 +8433,120 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ── Harness Component Endpoints ───────────────────────────────────────────────
+
+# Shared lazy accessors for harness components
+def _get_db_path() -> str:
+    import os as _os
+    return _os.path.expanduser("~/.config/opencastor/trajectories.db")
+
+
+# ── Rollback ──────────────────────────────────────────────────────────────────
+
+class _RollbackRestoreRequest(BaseModel):
+    snapshot_id: str
+
+
+@app.post("/api/rollback", dependencies=[Depends(verify_token)])
+async def rollback_restore(req: _RollbackRestoreRequest, request: Request):
+    """Restore a rollback snapshot (requires control scope)."""
+    _check_min_role(request, "control")
+    try:
+        from castor.harness.rollback import RollbackManager
+
+        mgr = RollbackManager(_get_db_path())
+        snapshot = mgr.restore(req.snapshot_id)
+        return {"ok": True, "snapshot_id": req.snapshot_id, "snapshot": snapshot}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Rollback component not available")
+
+
+@app.get("/api/rollback/recent", dependencies=[Depends(verify_token)])
+async def rollback_list(request: Request, limit: int = 10):
+    """List recent rollback snapshots (requires status scope)."""
+    _check_min_role(request, "status")
+    try:
+        from castor.harness.rollback import RollbackManager
+
+        mgr = RollbackManager(_get_db_path())
+        return {"snapshots": mgr.list_recent(limit=limit)}
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Rollback component not available")
+
+
+# ── Dead Letter Queue ─────────────────────────────────────────────────────────
+
+@app.get("/api/dlq", dependencies=[Depends(verify_token)])
+async def dlq_list(request: Request, limit: int = 20):
+    """Return pending dead letters (requires status scope)."""
+    _check_min_role(request, "status")
+    try:
+        from castor.harness.dlq import DeadLetterQueue
+
+        dlq = DeadLetterQueue(_get_db_path())
+        return {
+            "pending_count": dlq.count_pending(),
+            "items": dlq.list_pending(limit=limit),
+        }
+    except ImportError:
+        raise HTTPException(status_code=503, detail="DLQ component not available")
+
+
+@app.post("/api/dlq/{dlq_id}/review", dependencies=[Depends(verify_token)])
+async def dlq_review(dlq_id: str, request: Request):
+    """Mark a dead letter as reviewed (requires control scope)."""
+    _check_min_role(request, "control")
+    try:
+        from castor.harness.dlq import DeadLetterQueue
+
+        dlq = DeadLetterQueue(_get_db_path())
+        dlq.mark_reviewed(dlq_id)
+        return {"ok": True, "dlq_id": dlq_id}
+    except ImportError:
+        raise HTTPException(status_code=503, detail="DLQ component not available")
+
+
+# ── Span Tracer ───────────────────────────────────────────────────────────────
+
+@app.get("/api/traces", dependencies=[Depends(verify_token)])
+async def traces_list(request: Request, limit: int = 50):
+    """List recent trace IDs (requires status scope)."""
+    _check_min_role(request, "status")
+    try:
+        from castor.harness.span_tracer import SpanTracer
+
+        tracer = SpanTracer({})
+        return {"traces": tracer.list_traces(limit=limit)}
+    except ImportError:
+        raise HTTPException(status_code=503, detail="SpanTracer component not available")
+
+
+@app.get("/api/traces/{trace_id}", dependencies=[Depends(verify_token)])
+async def traces_get(trace_id: str, request: Request):
+    """Return full trace as JSON (requires status scope)."""
+    _check_min_role(request, "status")
+    try:
+        from castor.harness.span_tracer import SpanTracer
+
+        tracer = SpanTracer({})
+        spans = tracer.get_trace_from_disk(trace_id)
+        if not spans:
+            raise HTTPException(status_code=404, detail=f"Trace {trace_id!r} not found")
+        return {"trace_id": trace_id, "spans": spans}
+    except ImportError:
+        raise HTTPException(status_code=503, detail="SpanTracer component not available")
+
+
+# ── Circuit Breaker status ────────────────────────────────────────────────────
+
+@app.get("/api/circuit-breaker/status", dependencies=[Depends(verify_token)])
+async def circuit_breaker_status(request: Request):
+    """Return circuit breaker state for all tracked skills (requires status scope)."""
+    _check_min_role(request, "status")
+    # The circuit breaker is in-process; this endpoint is informational only.
+    return {"note": "Circuit breaker state is in-memory per process. Use harness logs for details."}
+

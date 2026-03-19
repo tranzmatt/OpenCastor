@@ -635,23 +635,11 @@ class AgentHarness:
             run_id=run_id,
         )
 
-        # 5. Snapshot working memory into result if enabled
-        if self.working_memory is not None:
-            _wm_cfg = self._config.get("working_memory", {})
-            if _wm_cfg.get("log_to_trajectory", True):
-                result.error = result.error  # no-op; snapshot stored below in trajectory log
-
-        # 6. Post-turn hooks
+        # 5. Post-turn hooks
         for hook in self.hooks:
-            if self.span_tracer and root_span:
-                with self.span_tracer.span(
-                    f"hook.post_turn.{type(hook).__name__}", parent=root_span
-                ):
-                    await hook.on_post_turn(ctx, result)
-            else:
-                await hook.on_post_turn(ctx, result)
+            await hook.on_post_turn(ctx, result)
 
-        # 7. Log trajectory (fire-and-forget)
+        # 6. Log trajectory (fire-and-forget)
         asyncio.ensure_future(self._log_trajectory(ctx, result))
 
         return result
@@ -660,8 +648,6 @@ class AgentHarness:
         self,
         ctx: HarnessContext,
         built: Any,
-        run_id: str = "",
-        root_span: Any = None,
     ) -> tuple[Thought, list[ToolCallRecord], int]:
         """Run model inference + tool execution loop.
 
@@ -677,24 +663,7 @@ class AgentHarness:
         consent_granted = ctx.consent_granted
 
         for iteration in range(self._max_iterations):
-            # ── Cost meter: check budget before each iteration ───────────────
-            if self.cost_meter is not None and run_id:
-                if self.cost_meter.is_over_budget(run_id):
-                    logger.warning("CostMeter: budget cap reached for run=%s", run_id)
-                    budget_thought = _Thought(
-                        raw_text="Budget cap reached. Run halted.",
-                        provider="harness",
-                    )
-                    return budget_thought, tools_called, iteration
-
-            # Call provider with tools (wrapped in span if tracer enabled)
-            if self.span_tracer and root_span:
-                model_span = self.span_tracer.start_span(
-                    "harness.think_with_tools",
-                    parent=root_span,
-                    attributes={"iteration": iteration},
-                )
-
+            # Call provider with tools
             raw_response = await asyncio.to_thread(
                 self._think_with_tools,
                 ctx.image_bytes,
@@ -703,20 +672,6 @@ class AgentHarness:
                 messages,
                 tools_schema,
             )
-
-            # ── Cost meter: record tokens after model call ───────────────────
-            if self.cost_meter is not None and run_id:
-                try:
-                    _usage = getattr(raw_response, "usage", None) or {}
-                    _in = int(_usage.get("input_tokens", 0) or _usage.get("prompt_tokens", 0))
-                    _out = int(_usage.get("output_tokens", 0) or _usage.get("completion_tokens", 0))
-                    if _in or _out:
-                        self.cost_meter.record(run_id, _in, _out)
-                except Exception as _cost_exc:
-                    logger.debug("CostMeter record failed: %s", _cost_exc)
-
-            if self.span_tracer and root_span:
-                self.span_tracer.end_span(model_span, status="ok")
 
             # Check if provider returned tool calls
             tool_calls = self._extract_tool_calls(raw_response)
@@ -730,15 +685,6 @@ class AgentHarness:
                 name = call.get("name", "")
                 args = call.get("args", {})
 
-                # ── Span: tool call ──────────────────────────────────────────
-                tool_span_ctx = None
-                if self.span_tracer and root_span:
-                    tool_span_ctx = self.span_tracer.start_span(
-                        f"tool.{name}",
-                        parent=root_span,
-                        attributes={"tool_name": name, "scope": ctx.scope},
-                    )
-
                 # P66: ESTOP always executes
                 if name in ESTOP_TOOLS:
                     tr = await asyncio.to_thread(self._execute_tool, name, args)
@@ -751,8 +697,6 @@ class AgentHarness:
                     tools_called.append(record)
                     for hook in self.hooks:
                         await hook.on_tool_call(call, tr)
-                    if tool_span_ctx and self.span_tracer:
-                        self.span_tracer.end_span(tool_span_ctx, status="ok")
                     continue
 
                 # P66: physical tools require consent and control scope
@@ -769,8 +713,6 @@ class AgentHarness:
                         )
                         tools_called.append(record)
                         logger.info("P66: blocked physical tool '%s' (consent not granted)", name)
-                        if tool_span_ctx and self.span_tracer:
-                            self.span_tracer.end_span(tool_span_ctx, status="ok")
                         # Return consent-request thought
                         consent_thought = _Thought(
                             raw_text=(
@@ -780,31 +722,6 @@ class AgentHarness:
                             provider="harness",
                         )
                         return consent_thought, tools_called, iteration + 1
-
-                    # ── Rollback: capture state before physical tool ──────────
-                    if self.rollback is not None:
-                        try:
-                            _state = getattr(ctx, "mission_state", {}) or {}
-                            self.rollback.capture(run_id or ctx.session_id, _state)
-                        except Exception as _rb_exc:
-                            logger.debug("Rollback capture failed (non-fatal): %s", _rb_exc)
-
-                # ── Circuit Breaker: check before tool execution ─────────────
-                _skill_id = name  # use tool name as skill_id proxy
-                if self.circuit_breaker is not None and self.circuit_breaker.is_open(_skill_id):
-                    logger.warning("CircuitBreaker: skill=%s is open, skipping", _skill_id)
-                    if tool_span_ctx and self.span_tracer:
-                        self.span_tracer.end_span(
-                            tool_span_ctx, status="error", error="circuit_open"
-                        )
-                    messages.append(
-                        {
-                            "role": "tool",
-                            "name": name,
-                            "content": f"Error: skill {name!r} is temporarily disabled (circuit open).",
-                        }
-                    )
-                    continue
 
                 # Execute non-blocked tool
                 tr = await asyncio.to_thread(self._execute_tool, name, args)
@@ -819,26 +736,8 @@ class AgentHarness:
                     error=tr.error,
                 )
                 tools_called.append(record)
-
-                # ── Circuit Breaker: record result ───────────────────────────
-                if self.circuit_breaker is not None:
-                    if tr.ok:
-                        self.circuit_breaker.record_success(_skill_id)
-                    else:
-                        self.circuit_breaker.record_failure(_skill_id)
-
                 for hook in self.hooks:
-                    if self.span_tracer and root_span:
-                        with self.span_tracer.span(
-                            f"hook.tool_call.{type(hook).__name__}", parent=root_span
-                        ):
-                            await hook.on_tool_call(call, tr)
-                    else:
-                        await hook.on_tool_call(call, tr)
-
-                if tool_span_ctx and self.span_tracer:
-                    _ts = "ok" if tr.ok else "error"
-                    self.span_tracer.end_span(tool_span_ctx, status=_ts, error=tr.error)
+                    await hook.on_tool_call(call, tr)
 
                 # Append tool result to messages for next iteration
                 messages.append(

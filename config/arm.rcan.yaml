@@ -164,3 +164,42 @@ cloud:
   credentials: /home/craigm26/.config/opencastor/firebase-sa-key.json
   telemetry_interval_s: 30
   poll_interval_s: 5
+
+# ── Production-grade harness components (all opt-in) ──────────────────────────
+
+circuit_breaker:
+  enabled: true
+  failure_threshold: 3
+  cooldown_s: 300
+  half_open_probe: true
+
+rollback:
+  enabled: true
+
+dlq:
+  enabled: true
+
+prompt_guard:
+  enabled: true
+  block_threshold: 0.5
+
+context_compressor:
+  enabled: false  # enable when history gets long
+  trigger_at: 0.8
+  summary_model: gemma3:1b
+  keep_recent: 5
+
+working_memory:
+  enabled: true
+  max_keys: 50
+  log_to_trajectory: true
+
+span_tracer:
+  enabled: true
+  max_trace_age_days: 7
+
+cost_meter:
+  enabled: true
+  budget_usd: 0.05
+  alert_at: 0.8
+  model: gemini-2.0-flash

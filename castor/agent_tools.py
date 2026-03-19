@@ -576,3 +576,58 @@ def share_config_with_peer(
         "message": f"Failed to reach peer {peer_rrn}: {result.get('error', 'unknown error')}",
         "peer_rrn": peer_rrn,
     }
+
+
+
+# ── Working Memory tools ───────────────────────────────────────────────────────
+
+
+def register_working_memory_tools(registry: "ToolRegistry", memory: "Any") -> None:
+    """Register set_memory / get_memory / list_memory tools backed by ``memory``."""
+    import json as _json
+
+    def set_memory(key: str, value: str) -> str:
+        """Store a value in the working memory scratchpad."""
+        try:
+            memory.set(key, value)
+            return "Stored."
+        except MemoryError as exc:
+            return f"Error: {exc}"
+
+    def get_memory(key: str) -> str:
+        """Retrieve a value from the working memory scratchpad."""
+        val = memory.get(key)
+        if val is None:
+            return "Not found."
+        return str(val)
+
+    def list_memory() -> str:
+        """List all keys in the working memory scratchpad."""
+        return _json.dumps(list(memory.all().keys()))
+
+    registry.register(
+        name="set_memory",
+        fn=set_memory,
+        description="Store a value in the ephemeral working memory scratchpad for this run.",
+        parameters={
+            "key": {"type": "string", "description": "Memory key", "required": True},
+            "value": {"type": "string", "description": "Value to store", "required": True},
+        },
+        returns="string",
+    )
+    registry.register(
+        name="get_memory",
+        fn=get_memory,
+        description="Retrieve a value from the ephemeral working memory scratchpad.",
+        parameters={
+            "key": {"type": "string", "description": "Memory key", "required": True},
+        },
+        returns="string",
+    )
+    registry.register(
+        name="list_memory",
+        fn=list_memory,
+        description="List all keys in the working memory scratchpad as JSON array.",
+        parameters={},
+        returns="string",
+    )
