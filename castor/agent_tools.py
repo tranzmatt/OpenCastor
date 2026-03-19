@@ -25,7 +25,7 @@ import os
 import time
 import urllib.parse
 import urllib.request
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from castor.tools import ToolRegistry
@@ -582,7 +582,7 @@ def share_config_with_peer(
 # ── Working Memory tools ───────────────────────────────────────────────────────
 
 
-def register_working_memory_tools(registry: "ToolRegistry", memory: "Any") -> None:
+def register_working_memory_tools(registry: ToolRegistry, memory: Any) -> None:
     """Register set_memory / get_memory / list_memory tools backed by ``memory``."""
     import json as _json
 
