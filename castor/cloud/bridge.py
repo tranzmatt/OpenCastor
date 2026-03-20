@@ -934,6 +934,15 @@ class CastorBridge:
             except Exception:
                 pass
 
+            # Fetch contribution status for Flutter client
+            try:
+                with httpx.Client(timeout=5.0) as client:
+                    cr = client.get(f"{self.gateway_url}/api/contribute", headers=headers)
+                if cr.status_code == 200:
+                    telemetry["contribute"] = cr.json()
+            except Exception:
+                pass
+
             # Normalise: ensure opencastor_version is always set at both
             # telemetry.opencastor_version AND top-level opencastor_version so
             # all app screens (fleet card reads telemetry.version, detail page
