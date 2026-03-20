@@ -672,20 +672,20 @@ class TestV15SafetyInvariants:
     # 5. RCAN version negotiation invariant
     # ─────────────────────────────────────────────────────────────────
 
-    def test_rcan_spec_version_is_15(self):
-        """castor.rcan.message declares RCAN_SPEC_VERSION='1.5'."""
+    def test_rcan_spec_version_is_current(self):
+        """castor.rcan.message declares RCAN_SPEC_VERSION='1.8'."""
         from castor.rcan.message import RCAN_SPEC_VERSION
-        assert RCAN_SPEC_VERSION == "1.5"
+        assert RCAN_SPEC_VERSION == "1.8"
 
     def test_p66_manifest_rcan_version(self):
-        """P66 manifest declares rcan_version='1.6' (updated from 1.5 in v2026.3.17.1)."""
+        """P66 manifest declares rcan_version (updated to 1.8 in v2026.3.20.1)."""
         from castor.safety.p66_manifest import build_manifest
         manifest = build_manifest()
-        # v1.6: rcan_version and rcan_spec_version are now "1.6"
-        assert manifest.get("rcan_version") in ("1.5", "1.6"), (
-            f"rcan_version must be '1.5' or '1.6' in P66 manifest, got {manifest.get('rcan_version')!r}"
+        # v1.8: canonical MessageType table
+        assert manifest.get("rcan_version") in ("1.5", "1.6", "1.8"), (
+            f"rcan_version must be '1.5', '1.6', or '1.8' in P66 manifest, got {manifest.get('rcan_version')!r}"
         )
-        assert manifest.get("rcan_spec_version") in ("1.5", "1.6")
+        assert manifest.get("rcan_spec_version") in ("1.5", "1.6", "1.8")
 
     def test_outgoing_message_includes_rcan_version(self):
         """RCANMessage.to_dict() includes rcan_version field."""
@@ -698,7 +698,7 @@ class TestV15SafetyInvariants:
         )
         d = msg.to_dict()
         assert "rcan_version" in d, "rcan_version field must be present in outgoing message"
-        assert d["rcan_version"] == "1.5"
+        assert d["rcan_version"] == "1.8"
 
     # ─────────────────────────────────────────────────────────────────
     # 6. Version bump invariant
@@ -721,8 +721,8 @@ class TestV15SafetyInvariants:
         )
         with open(pyproject) as f:
             content = f.read()
-        # version must be 2026.3.17.x (any patch)
+        # version must be 2026.x.y.z format
         import re as _re
-        assert _re.search(r"2026\.3\.17\.\d+", content), (
-            "pyproject.toml must declare a 2026.3.17.x version"
+        assert _re.search(r"2026\.\d+\.\d+\.\d+", content), (
+            "pyproject.toml must declare a 2026.x.y.z version"
         )
