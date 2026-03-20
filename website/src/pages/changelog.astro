@@ -41,6 +41,30 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           </div>
         </div>
 
+        <!-- v2026.3.20.2 -->
+        <div class="changelog-release reveal" id="v2026.3.20.2">
+          <div class="release-header">
+            <span class="release-version">v2026.3.20.2</span>
+            <span class="release-badge badge-feature">RCAN v1.8</span>
+            <span class="release-date">March 20, 2026</span>
+          </div>
+          <div class="release-body">
+            <h3>RCAN v1.8 — Canonical MessageType &amp; Idle Compute Contribution</h3>
+            <ul>
+              <li><strong>RCAN v1.8 canonical MessageType table</strong> — 36 message types with fixed integer assignments. Single source of truth across spec, rcan-py, and rcan-ts. Zero drift.</li>
+              <li><strong>castor contribute</strong> — donate idle NPU/GPU/CPU compute to distributed science. BOINC coordinator, NPU-optimized runner (Hailo-8L), fleet coordination, thermal throttling, P66 preemption.</li>
+              <li><strong>CLI</strong>: <code>castor contribute start/stop/status/history</code>, <code>castor peer-test</code> with transport comparison</li>
+              <li><strong>API</strong>: <code>/api/contribute/start</code>, <code>/api/contribute/stop</code>, <code>/api/contribute/history</code></li>
+              <li><strong>RCAN-MQTT transport</strong> wired into runtime — <code>rcan/&#123;rrn&#125;/in</code>, <code>rcan/&#123;rrn&#125;/out</code>, <code>rcan/estop</code> topics</li>
+              <li><strong>Software attestation</strong> — pip RECORD hash check, config SHA256 baseline, git cleanliness; systemd service template</li>
+              <li><strong>Security fixes</strong> — RCAN-Signature bypass, None-principal scope skip, WebSocket JWT bypass, SSRF, LoA default hardening</li>
+              <li>rcan-py v0.7.0 (609 tests), rcan-ts v0.7.0 (447 tests), opencastor-client v1.1.0+2</li>
+              <li>Fleet contribution dashboard, history timeline, project selection UI in Flutter client</li>
+              <li>Blog: <a href="/blog/contribute-to-science">"From Robot Runtime to Climate Sensor"</a></li>
+            </ul>
+          </div>
+        </div>
+
         <!-- v2026.3.17.1 -->
         <div class="changelog-release reveal" id="v2026.3.17.1">
           <div class="release-header">
