@@ -4,7 +4,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
 <BaseLayout
   title="From Robot Runtime to Climate Sensor — OpenCastor Blog"
-  description="How the OpenCastor runtime layer turns any idle robot into a distributed science node. What RCAN is, why a robot registry matters, and how castor contribute works."
+  description="How the OpenCastor runtime layer turns any idle robot into a distributed science node — and how contributor fleets tune the optimal agent harness for every hardware profile."
   ogUrl="https://opencastor.com/blog/contribute-to-science"
 >
 
@@ -255,6 +255,95 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         </table>
       </div>
 
+      <!-- Hardware-specific harness optimization -->
+      <h2 class="reveal" style="font-size:1.75rem;margin-top:64px;margin-bottom:16px">What's next: community-tuned harness configs</h2>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        The second act of <code>castor contribute</code> is more personal. Every robot already broadcasts its
+        <code>hardware_tier</code> &mdash; <code>pi5-hailo</code>, <code>pi4-8gb</code>, <code>server</code>,
+        and so on. That metadata is the missing ingredient for something genuinely useful: <strong>community-tuned
+        agent harness configurations, optimized per hardware profile</strong>.
+      </p>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        Here's the idea. When your Pi 5 + Hailo-8L robot idles, instead of (or alongside) donating to a
+        science work unit, it runs harness evaluation scenarios tuned to its exact hardware combo. How aggressive
+        should <code>thinking_budget</code> be when the NPU is handling inference? What <code>context_budget</code>
+        saturates the memory bandwidth? What retry policy actually improves outcomes on a robot with 100ms camera
+        latency? These questions have hardware-specific answers, and only a fleet of real robots can answer them.
+      </p>
+
+      <!-- Manufactured combos table -->
+      <div class="reveal" style="margin:32px 0;overflow-x:auto">
+        <table class="arch-table">
+          <thead>
+            <tr>
+              <th>Hardware profile</th>
+              <th>Key tunables explored</th>
+              <th>What contributors unlock</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Pi 5 + Hailo-8L NPU</strong></td>
+              <td><code>nexa_enabled</code>, <code>thinking_budget</code>, NPU model routing</td>
+              <td>Optimal on-device inference split between NPU and cloud</td>
+            </tr>
+            <tr>
+              <td><strong>Pi 5 · 8 GB (no NPU)</strong></td>
+              <td><code>context_budget</code>, <code>fast_model</code> selection</td>
+              <td>Best local model for each task class without NPU offload</td>
+            </tr>
+            <tr>
+              <td><strong>Pi 4 · 4 GB</strong></td>
+              <td><code>cost_gate_usd</code>, aggressive <code>thinking_budget</code> floor</td>
+              <td>Minimal-cloud config that still produces reliable behavior</td>
+            </tr>
+            <tr>
+              <td><strong>Waveshare ALPHA</strong></td>
+              <td>Arm-manipulation HITL thresholds, retry policy</td>
+              <td>Consent + safety gates tuned to physical manipulation latency</td>
+            </tr>
+            <tr>
+              <td><strong>Unitree Go2</strong></td>
+              <td>Gait-aware drift detection, parallel fork config</td>
+              <td>Navigation harness that doesn't fight the onboard locomotion stack</td>
+            </tr>
+            <tr>
+              <td><strong>Server-class (Jetson, x86)</strong></td>
+              <td>Higher <code>context_budget</code>, multi-model tiers, parallel branches</td>
+              <td>Full-power harness that saturates available VRAM without waste</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        The results aggregate nightly via the autoresearch pipeline. When enough contributors with a given
+        hardware profile have submitted evaluation data, the pipeline's ranker finds the winning config and
+        pushes it directly to the profile's champion file in the ecosystem. <strong>Robots with that hardware
+        tier automatically receive the update at next sync.</strong> No manual tuning. No one-size-fits-all
+        compromise.
+      </p>
+
+      <div class="wizard-tip reveal" style="margin:32px 0">
+        <strong>How it will work:</strong>
+        <ol style="margin:12px 0 0 0;padding-left:20px;line-height:2">
+          <li>Enable <code>castor contribute</code> (opt-in, one line)</li>
+          <li>Your robot's idle cycles run harness eval scenarios matched to its <code>hardware_tier</code></li>
+          <li>Results feed the nightly aggregation pipeline alongside other contributors with the same hardware</li>
+          <li>The winning harness config for your hardware profile propagates back to your robot automatically</li>
+          <li>Your contribution stats show which harness improvements your robot helped discover</li>
+        </ol>
+      </div>
+
+      <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
+        This is the flywheel. More contributors → more hardware-specific data → better harness configs for
+        everyone with that hardware → easier to get good results out of the box → more people adopt
+        OpenCastor → more contributors. The research pipeline was always going to improve the default harness.
+        The fleet makes it specific.
+      </p>
+
       <!-- Closing -->
       <h2 class="reveal" style="font-size:1.75rem;margin-top:48px;margin-bottom:16px">The infrastructure already exists</h2>
 
@@ -267,7 +356,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
       <p class="reveal" style="font-size:1.0625rem;line-height:1.8;color:var(--text-secondary)">
         It's opt-in, it's safe, it's preemptible, and it's open source. Your robot was going to idle anyway.
-        Might as well cure something.
+        Might as well cure something &mdash; and tune your harness while you're at it.
       </p>
 
       <!-- CTA -->
