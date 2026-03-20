@@ -941,6 +941,16 @@ class CastorBridge:
             oc_version: str = telemetry.get("version", "unknown")
             telemetry.setdefault("opencastor_version", oc_version)
 
+            # RCAN v1.5/v1.6 capability fields (read by Flutter client)
+            capabilities = telemetry.get("capabilities", [])
+            if isinstance(capabilities, list):
+                telemetry.setdefault(
+                    "rcan_capabilities",
+                    [c for c in capabilities if isinstance(c, str)],
+                )
+            telemetry.setdefault("rcan_max_payload_bytes", 65536)
+            telemetry.setdefault("rcan_transport_supported", ["http", "compact", "minimal"])
+
             self._robot_ref().set(
                 {
                     "telemetry": {

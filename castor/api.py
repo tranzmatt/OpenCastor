@@ -1366,6 +1366,12 @@ _BUILTIN_CLI_COMMANDS: list[dict] = [
         "scope": "status",
         "instant": True,
     },
+    {
+        "cmd": "/peer-test",
+        "description": "Test direct RCAN communication with discovered peers",
+        "scope": "status",
+        "instant": True,
+    },
 ]
 
 
