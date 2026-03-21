@@ -6330,10 +6330,7 @@ def main() -> None:
         "season",
         help="Show current season overview and class standings",
         epilog=(
-            "Examples:\n"
-            "  castor season\n"
-            "  castor season --list\n"
-            "  castor season --class medium\n"
+            "Examples:\n  castor season\n  castor season --list\n  castor season --class medium\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
