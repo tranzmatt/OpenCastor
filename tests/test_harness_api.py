@@ -57,7 +57,7 @@ _MINIMAL_CONFIG = {
         "fast_provider": "ollama",
         "fast_model": "gemma3:1b",
         "slow_provider": "google",
-        "slow_model": "gemini-2.0-flash",
+        "slow_model": "gemini-2.5-flash",
         "confidence_threshold": 0.7,
     },
 }
@@ -196,7 +196,7 @@ class TestGetHarness:
     def test_defaults_used_when_fields_missing(self, client, api_mod):
         """Minimal config with no harness section falls back to defaults."""
         api_mod.state.config = {
-            "agent": {"model": "gemini-2.0-flash"},
+            "agent": {"model": "gemini-2.5-flash"},
         }
         resp = client.get("/api/harness")
         assert resp.status_code == 200

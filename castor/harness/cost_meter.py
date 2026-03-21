@@ -10,7 +10,7 @@ RCAN config::
       enabled: true
       budget_usd: 0.05          # per-run budget cap (USD)
       alert_at: 0.8             # warn at 80% of budget
-      model: gemini-2.0-flash   # used for pricing lookup
+      model: gemini-2.5-flash   # used for pricing lookup
 """
 
 from __future__ import annotations
@@ -27,6 +27,10 @@ logger = logging.getLogger("OpenCastor.CostMeter")
 # Approximate pricing per 1 000 tokens (USD).
 # Configurable: users can override via config['pricing'].
 PRICE_PER_1K: dict[str, dict[str, float]] = {
+    "gemini-2.5-flash": {"input": 0.00015, "output": 0.0006},
+    "gemini-2.5-pro": {"input": 0.00125, "output": 0.010},
+    "gemini-2.5-flash-lite": {"input": 0.000075, "output": 0.0003},
+    # Legacy aliases (kept for backward compat with old RCAN configs)
     "gemini-2.0-flash": {"input": 0.00015, "output": 0.0006},
     "gemini-1.5-flash": {"input": 0.000075, "output": 0.0003},
     "gemini-1.5-pro": {"input": 0.00125, "output": 0.005},

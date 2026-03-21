@@ -15,7 +15,7 @@ metadata:
 
 agent:
   provider: google
-  model: gemini-2.0-flash
+  model: gemini-2.5-flash
   use_oauth: true
   vision_enabled: true
   safety_stop: true
@@ -45,7 +45,7 @@ tiered_brain:
   fast_provider: ollama
   fast_model: gemma3:1b
   slow_provider: google
-  slow_model: gemini-2.0-flash
+  slow_model: gemini-2.5-flash
   planner_interval: 10
   _note: "Fast tier handles quick status/nav. Slow tier handles complex reasoning and vision."
 
@@ -56,7 +56,7 @@ agent_roster:
     scope: nav
   - id: arm_specialist
     provider: google
-    model: gemini-2.0-flash
+    model: gemini-2.5-flash
     scope: control
 
 geofence:
@@ -224,4 +224,4 @@ cost_meter:
   enabled: true
   budget_usd: 0.05
   alert_at: 0.8
-  model: gemini-2.0-flash
+  model: gemini-2.5-flash

@@ -2139,7 +2139,7 @@ def cmd_setup(args) -> None:
 
     provider_map = {"1": "google", "2": "anthropic", "3": "openai", "4": "none"}
     model_map = {
-        "google": "gemini-2.0-flash",
+        "google": "gemini-2.5-flash",
         "anthropic": "claude-3-5-haiku-20241022",
         "openai": "gpt-4o-mini",
         "none": "",

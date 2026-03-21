@@ -1162,7 +1162,7 @@ def _build_harness_response() -> dict:
             "fast_provider": model_tiers.get("fast_provider", "ollama"),
             "fast_model": model_tiers.get("fast_model", "gemma3:1b"),
             "slow_provider": model_tiers.get("slow_provider", "google"),
-            "slow_model": model_tiers.get("slow_model", agent.get("model", "gemini-2.0-flash")),
+            "slow_model": model_tiers.get("slow_model", agent.get("model", "gemini-2.5-flash")),
             "confidence_threshold": model_tiers.get("confidence_threshold", 0.7),
         },
         "trajectory": {

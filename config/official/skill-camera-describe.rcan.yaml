@@ -24,7 +24,7 @@ _note: >
 
 agent:
   provider: google
-  model: gemini-2.0-flash
+  model: gemini-2.5-flash
   vision_enabled: true
   safety_stop: true
   system_prompt: >

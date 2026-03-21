@@ -27,7 +27,7 @@ from typing import Optional
 # ---------------------------------------------------------------------------
 
 PROVIDER_MODELS: dict[str, str] = {
-    "google": "gemini-2.0-flash",
+    "google": "gemini-2.5-flash",
     "anthropic": "claude-3-5-haiku-20241022",
     "openai": "gpt-4o-mini",
     "local": "llama3.2:3b",
@@ -109,7 +109,7 @@ def generate_wizard_config(
     rrn = f"RRN-{rrn_suffix}"
     ruri = _generate_ruri(robot_name, robot_uuid)
     api_token = secrets.token_hex(32)  # 64 hex chars
-    model = PROVIDER_MODELS.get(provider, "gemini-2.0-flash")
+    model = PROVIDER_MODELS.get(provider, "gemini-2.5-flash")
     firebase_enabled = bool(firebase_project and firebase_project.strip() != "opencastor")
 
     # Agent block — include API key inline only if provided

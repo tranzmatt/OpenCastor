@@ -96,7 +96,7 @@ def test_api_token_is_64_char_hex():
 def test_provider_default_google():
     config, _, _ = generate_wizard_config(robot_name="r", provider="google")
     assert config["agent"]["model"] == PROVIDER_MODELS["google"]
-    assert config["agent"]["model"] == "gemini-2.0-flash"
+    assert config["agent"]["model"] == "gemini-2.5-flash"
 
 
 def test_provider_default_anthropic():
