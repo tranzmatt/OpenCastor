@@ -214,3 +214,122 @@ class ThresholdEntry:
             submitted_at=int(data.get("submitted_at", time.time())),
             verification_status=VerificationStatus(data.get("verification_status", "pending")),
         )
+
+
+# ---------------------------------------------------------------------------
+# Bracket Season models (#737)
+# ---------------------------------------------------------------------------
+
+#: Supported hardware_tier × model_id class configurations for bracket seasons.
+INITIAL_CLASSES: list[dict] = [
+    {"hardware_tier": "pi5-hailo8l", "model_id": "gemini-2.5-flash"},
+    {"hardware_tier": "pi5-hailo8l", "model_id": "claude-sonnet"},
+    {"hardware_tier": "pi5-8gb", "model_id": "gemini-2.5-flash"},
+    {"hardware_tier": "pi5-8gb", "model_id": "llama-local"},
+    {"hardware_tier": "server", "model_id": "gemini-2.5-pro"},
+]
+
+
+@dataclass
+class BracketClass:
+    """One competition class within a bracket season (hardware_tier × model_id)."""
+
+    class_id: str  # e.g. 'pi5-hailo8l__gemini-2.5-flash'
+    hardware_tier: str
+    model_id: str
+    season_id: str
+    scenario_pack_id: str = "default"
+
+    def to_dict(self) -> dict:
+        return {
+            "class_id": self.class_id,
+            "hardware_tier": self.hardware_tier,
+            "model_id": self.model_id,
+            "season_id": self.season_id,
+            "scenario_pack_id": self.scenario_pack_id,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> BracketClass:
+        return cls(
+            class_id=data["class_id"],
+            hardware_tier=data["hardware_tier"],
+            model_id=data["model_id"],
+            season_id=data["season_id"],
+            scenario_pack_id=data.get("scenario_pack_id", "default"),
+        )
+
+
+@dataclass
+class BracketSeason:
+    """A monthly bracket season containing one BracketClass per INITIAL_CLASSES entry."""
+
+    season_id: str  # e.g. '2026-04'
+    starts_at: datetime
+    ends_at: datetime
+    classes: list[BracketClass] = field(default_factory=list)
+    status: str = "UPCOMING"  # UPCOMING | ACTIVE | COMPLETED
+
+    def to_dict(self) -> dict:
+        return {
+            "season_id": self.season_id,
+            "starts_at": self.starts_at.isoformat(),
+            "ends_at": self.ends_at.isoformat(),
+            "classes": [c.to_dict() for c in self.classes],
+            "status": self.status,
+        }
+
+
+@dataclass
+class BracketEntry:
+    """A robot's best score submission within a bracket class."""
+
+    season_id: str
+    class_id: str
+    rrn: str
+    best_score: float
+    submitted_at: int  # unix timestamp
+    rank: Optional[int] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "season_id": self.season_id,
+            "class_id": self.class_id,
+            "rrn": self.rrn,
+            "best_score": self.best_score,
+            "submitted_at": self.submitted_at,
+            "rank": self.rank,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict, doc_id: str = "") -> BracketEntry:
+        return cls(
+            season_id=data.get("season_id", ""),
+            class_id=data.get("class_id", ""),
+            rrn=data.get("rrn", doc_id),
+            best_score=float(data.get("best_score", 0.0)),
+            submitted_at=int(data.get("submitted_at", 0)),
+            rank=data.get("rank"),
+        )
+
+
+@dataclass
+class SeasonChampion:
+    """Champion record written to Firestore after a season is finalized."""
+
+    season_id: str
+    class_id: str
+    rrn: str
+    score: float
+    credits_awarded: int
+    is_grand_champion: bool = False
+
+    def to_dict(self) -> dict:
+        return {
+            "season_id": self.season_id,
+            "class_id": self.class_id,
+            "rrn": self.rrn,
+            "score": self.score,
+            "credits_awarded": self.credits_awarded,
+            "is_grand_champion": self.is_grand_champion,
+        }

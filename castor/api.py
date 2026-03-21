@@ -9051,3 +9051,68 @@ async def create_sprint_endpoint(request: Request, body: CreateSprintRequest):
         return comp.to_dict()
     except Exception as exc:
         return {"error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# Bracket Season endpoints (#737)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/seasons/current", dependencies=[Depends(verify_token)])
+async def get_current_season_endpoint():
+    """GET /api/seasons/current — Return current ACTIVE or most recent UPCOMING bracket season."""
+    try:
+        from castor.competitions.bracket_season import BracketSeasonManager
+
+        mgr = BracketSeasonManager()
+        season = mgr.get_current_season()
+        if season is None:
+            return {"season": None}
+        return {"season": season.to_dict()}
+    except Exception as exc:
+        return {"season": None, "error": str(exc)}
+
+
+@app.get(
+    "/api/seasons/{season_id}/classes/{class_id}/leaderboard",
+    dependencies=[Depends(verify_token)],
+)
+async def get_bracket_class_leaderboard_endpoint(season_id: str, class_id: str):
+    """GET /api/seasons/{season_id}/classes/{class_id}/leaderboard — Ranked class leaderboard."""
+    try:
+        from castor.competitions.bracket_season import BracketSeasonManager
+
+        mgr = BracketSeasonManager()
+        entries = mgr.get_class_leaderboard(season_id, class_id)
+        return {
+            "season_id": season_id,
+            "class_id": class_id,
+            "leaderboard": [e.to_dict() for e in entries],
+        }
+    except Exception as exc:
+        return {
+            "season_id": season_id,
+            "class_id": class_id,
+            "leaderboard": [],
+            "error": str(exc),
+        }
+
+
+@app.get("/api/seasons/{season_id}/champions", dependencies=[Depends(verify_token)])
+async def get_season_champions_endpoint(season_id: str):
+    """GET /api/seasons/{season_id}/champions — Return finalized champions for a season."""
+    try:
+        from castor.contribute.harness_eval import _get_firestore_client
+
+        db = _get_firestore_client()
+        if db is None:
+            return {"season_id": season_id, "champions": [], "error": "offline"}
+        champ_docs = list(
+            db.collection("seasons").document(season_id).collection("champions").stream()
+        )
+        return {
+            "season_id": season_id,
+            "champions": [doc.to_dict() for doc in champ_docs],
+        }
+    except Exception as exc:
+        return {"season_id": season_id, "champions": [], "error": str(exc)}
