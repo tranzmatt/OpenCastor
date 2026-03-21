@@ -454,6 +454,34 @@ def cmd_contribute_cli(args) -> None:
         print(f"\n  Error: {exc}\n  Is the gateway running? (castor run)")
 
 
+def cmd_leaderboard(args) -> None:
+    """Print fleet leaderboard table."""
+    from castor.commands.leaderboard import cmd_leaderboard as _cmd
+
+    _cmd(args)
+
+
+def cmd_compete(args) -> None:
+    """Manage competition entry and status."""
+    from castor.commands.compete import cmd_compete as _cmd
+
+    _cmd(args)
+
+
+def cmd_season(args) -> None:
+    """Display season overview and class standings."""
+    from castor.commands.season import cmd_season as _cmd
+
+    _cmd(args)
+
+
+def cmd_research(args) -> None:
+    """Manage the harness research pipeline."""
+    from castor.commands.research import cmd_research as _cmd
+
+    _cmd(args)
+
+
 def cmd_provider(args) -> None:
     """Manage gated model providers — test auth, list models, show status."""
     provider_action = getattr(args, "provider_action", "list")
@@ -6247,6 +6275,104 @@ def main() -> None:
         "--unschedule", action="store_true", help="Remove the optimizer cron job"
     )
 
+    # castor leaderboard
+    p_leaderboard = sub.add_parser(
+        "leaderboard",
+        help="Print fleet leaderboard",
+        epilog=(
+            "Examples:\n"
+            "  castor leaderboard\n"
+            "  castor leaderboard --tier medium --top 20\n"
+            "  castor leaderboard --season 2026-spring --json\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_leaderboard.add_argument(
+        "--tier", default=None, help="Hardware tier filter (default: auto-detect from config)"
+    )
+    p_leaderboard.add_argument("--season", default=None, help="Season ID to filter by")
+    p_leaderboard.add_argument(
+        "--top", type=int, default=10, metavar="N", help="Number of entries to show (default: 10)"
+    )
+    p_leaderboard.add_argument(
+        "--json", action="store_true", dest="output_json", help="Output raw JSON"
+    )
+    p_leaderboard.add_argument("--config", default=None, help="RCAN config for tier auto-detect")
+
+    # castor compete
+    p_compete = sub.add_parser(
+        "compete",
+        help="Manage competition entry and status",
+        epilog=(
+            "Examples:\n"
+            "  castor compete list\n"
+            "  castor compete enter sprint-2026-q1\n"
+            "  castor compete status sprint-2026-q1\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_compete.add_argument(
+        "compete_action",
+        nargs="?",
+        choices=["list", "enter", "status"],
+        default="list",
+        help="Compete sub-command (default: list)",
+    )
+    p_compete.add_argument(
+        "competition_id",
+        nargs="?",
+        default=None,
+        help="Competition ID (required for enter/status)",
+    )
+
+    # castor season
+    p_season = sub.add_parser(
+        "season",
+        help="Show current season overview and class standings",
+        epilog=(
+            "Examples:\n"
+            "  castor season\n"
+            "  castor season --list\n"
+            "  castor season --class medium\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_season.add_argument(
+        "--list",
+        action="store_true",
+        dest="list_seasons",
+        help="List all seasons with status",
+    )
+    p_season.add_argument(
+        "--class",
+        dest="class_id",
+        default=None,
+        metavar="CLASS_ID",
+        help="Filter to one class and show its full leaderboard",
+    )
+
+    # castor research
+    p_research = sub.add_parser(
+        "research",
+        help="Manage the harness research pipeline",
+        epilog=(
+            "Examples:\n"
+            "  castor research\n"
+            "  castor research history\n"
+            "  castor research champion\n"
+            "  castor research queue\n"
+            "  castor research dashboard\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_research.add_argument(
+        "research_action",
+        nargs="?",
+        choices=["status", "history", "champion", "queue", "dashboard"],
+        default="status",
+        help="Research sub-command (default: status)",
+    )
+
     args = parser.parse_args()
 
     commands = {
@@ -6352,6 +6478,11 @@ def main() -> None:
         "skills": _cmd_skills,
         "optimize": _cmd_optimize,
         "provider": cmd_provider,
+        # Issue #740 — leaderboard/compete/season/research
+        "leaderboard": cmd_leaderboard,
+        "compete": cmd_compete,
+        "season": cmd_season,
+        "research": cmd_research,
     }
 
     # castor eval — skill evaluation harness
