@@ -206,10 +206,7 @@ def run_harness_eval_unit(
     latency_score = max(0.0, 0.5 - (max_iter / 24.0))
 
     composite_score = (
-        success_rate * 0.50
-        + p66_rate * 0.25
-        + token_efficiency * 0.15
-        + latency_score * 0.10
+        success_rate * 0.50 + p66_rate * 0.25 + token_efficiency * 0.15 + latency_score * 0.10
     )
 
     rrn = get_robot_rrn()

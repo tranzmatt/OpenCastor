@@ -8780,9 +8780,7 @@ async def get_contribute_leaderboard_endpoint(request: Request, tier: str | None
         robots = []
         updated_at = ""
         for t in tiers_to_query:
-            robots_ref = (
-                db.collection("harness_leaderboard").document(t).collection("robots")
-            )
+            robots_ref = db.collection("harness_leaderboard").document(t).collection("robots")
             for rdoc in robots_ref.stream():
                 data = rdoc.to_dict() or {}
                 robots.append(

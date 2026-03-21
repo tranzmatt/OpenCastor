@@ -176,16 +176,10 @@ class SimulatedCoordinator(Coordinator):
 def reclaim_stale_claims(db, tier: str) -> None:
     """Reset candidates stuck in 'assigned' state for > 30 min back to pending."""
     cutoff = int(time.time()) - 1800
-    queue_ref = (
-        db.collection("harness_eval_queue")
-        .document(tier)
-        .collection("candidates")
-    )
+    queue_ref = db.collection("harness_eval_queue").document(tier).collection("candidates")
     try:
         stale = list(
-            queue_ref.where("status", "==", "assigned")
-            .where("assigned_at", "<", cutoff)
-            .stream()
+            queue_ref.where("status", "==", "assigned").where("assigned_at", "<", cutoff).stream()
         )
         for doc in stale:
             doc.reference.update({"status": "pending", "assigned_to": None, "assigned_at": None})
@@ -249,9 +243,7 @@ class HarnessEvalCoordinator(Coordinator):
             db = self._get_firestore_client()
             reclaim_stale_claims(db, hardware_tier)
             queue_ref = (
-                db.collection("harness_eval_queue")
-                .document(hardware_tier)
-                .collection("candidates")
+                db.collection("harness_eval_queue").document(hardware_tier).collection("candidates")
             )
 
             claimed_doc = None
@@ -274,11 +266,14 @@ class HarnessEvalCoordinator(Coordinator):
                         d = snap.to_dict() or {}
                         if d.get("status") != "pending":
                             raise ValueError("conflict: already claimed")
-                        transaction.update(ref, {
-                            "status": "assigned",
-                            "assigned_to": _rrn,
-                            "assigned_at": int(time.time()),
-                        })
+                        transaction.update(
+                            ref,
+                            {
+                                "status": "assigned",
+                                "assigned_to": _rrn,
+                                "assigned_at": int(time.time()),
+                            },
+                        )
                         return d
 
                     claimed_data = _claim(transaction)
@@ -305,7 +300,9 @@ class HarnessEvalCoordinator(Coordinator):
                     hardware_tier=hardware_tier,
                 )
             # Queue empty — use synthetic fallback
-            log.debug("Harness eval queue empty for tier %s — using synthetic candidate", hardware_tier)
+            log.debug(
+                "Harness eval queue empty for tier %s — using synthetic candidate", hardware_tier
+            )
         except Exception as exc:
             log.debug("Firestore unavailable for harness eval: %s — using synthetic candidate", exc)
 
@@ -381,9 +378,7 @@ class HarnessEvalCoordinator(Coordinator):
                             robot_doc = robot_ref.get()
                             current_flags = 0
                             if robot_doc.exists:
-                                current_flags = int(
-                                    (robot_doc.to_dict() or {}).get("flags", 0)
-                                )
+                                current_flags = int((robot_doc.to_dict() or {}).get("flags", 0))
                             new_flags = current_flags + 1
                             robot_ref.set(
                                 {
@@ -425,36 +420,84 @@ class HarnessEvalCoordinator(Coordinator):
         """Return a random synthetic candidate for offline/fallback use."""
         _tier_configs: dict[str, list[dict]] = {
             "pi5-hailo8l": [
-                {"max_iterations": 5, "thinking_budget": 512, "context_budget": 8192,
-                 "p66_consent_threshold": "physical", "retry_on_error": True,
-                 "drift_detection": True, "cost_gate_usd": 0.005},
-                {"max_iterations": 4, "thinking_budget": 768, "context_budget": 8192,
-                 "p66_consent_threshold": "verbal", "retry_on_error": True,
-                 "drift_detection": True, "cost_gate_usd": 0.01},
+                {
+                    "max_iterations": 5,
+                    "thinking_budget": 512,
+                    "context_budget": 8192,
+                    "p66_consent_threshold": "physical",
+                    "retry_on_error": True,
+                    "drift_detection": True,
+                    "cost_gate_usd": 0.005,
+                },
+                {
+                    "max_iterations": 4,
+                    "thinking_budget": 768,
+                    "context_budget": 8192,
+                    "p66_consent_threshold": "verbal",
+                    "retry_on_error": True,
+                    "drift_detection": True,
+                    "cost_gate_usd": 0.01,
+                },
             ],
             "pi5-8gb": [
-                {"max_iterations": 6, "thinking_budget": 1024, "context_budget": 8192,
-                 "p66_consent_threshold": "physical", "retry_on_error": True,
-                 "drift_detection": True, "cost_gate_usd": 0.02},
-                {"max_iterations": 8, "thinking_budget": 2048, "context_budget": 12288,
-                 "p66_consent_threshold": "verbal", "retry_on_error": False,
-                 "drift_detection": True, "cost_gate_usd": 0.03},
+                {
+                    "max_iterations": 6,
+                    "thinking_budget": 1024,
+                    "context_budget": 8192,
+                    "p66_consent_threshold": "physical",
+                    "retry_on_error": True,
+                    "drift_detection": True,
+                    "cost_gate_usd": 0.02,
+                },
+                {
+                    "max_iterations": 8,
+                    "thinking_budget": 2048,
+                    "context_budget": 12288,
+                    "p66_consent_threshold": "verbal",
+                    "retry_on_error": False,
+                    "drift_detection": True,
+                    "cost_gate_usd": 0.03,
+                },
             ],
             "pi4-8gb": [
-                {"max_iterations": 4, "thinking_budget": 512, "context_budget": 4096,
-                 "p66_consent_threshold": "physical", "retry_on_error": True,
-                 "drift_detection": False, "cost_gate_usd": 0.01},
-                {"max_iterations": 3, "thinking_budget": 768, "context_budget": 4096,
-                 "p66_consent_threshold": "physical", "retry_on_error": True,
-                 "drift_detection": True, "cost_gate_usd": 0.015},
+                {
+                    "max_iterations": 4,
+                    "thinking_budget": 512,
+                    "context_budget": 4096,
+                    "p66_consent_threshold": "physical",
+                    "retry_on_error": True,
+                    "drift_detection": False,
+                    "cost_gate_usd": 0.01,
+                },
+                {
+                    "max_iterations": 3,
+                    "thinking_budget": 768,
+                    "context_budget": 4096,
+                    "p66_consent_threshold": "physical",
+                    "retry_on_error": True,
+                    "drift_detection": True,
+                    "cost_gate_usd": 0.015,
+                },
             ],
             "server": [
-                {"max_iterations": 10, "thinking_budget": 4096, "context_budget": 32768,
-                 "p66_consent_threshold": "physical", "retry_on_error": True,
-                 "drift_detection": True, "cost_gate_usd": 0.05},
-                {"max_iterations": 8, "thinking_budget": 2048, "context_budget": 16384,
-                 "p66_consent_threshold": "verbal", "retry_on_error": True,
-                 "drift_detection": True, "cost_gate_usd": 0.03},
+                {
+                    "max_iterations": 10,
+                    "thinking_budget": 4096,
+                    "context_budget": 32768,
+                    "p66_consent_threshold": "physical",
+                    "retry_on_error": True,
+                    "drift_detection": True,
+                    "cost_gate_usd": 0.05,
+                },
+                {
+                    "max_iterations": 8,
+                    "thinking_budget": 2048,
+                    "context_budget": 16384,
+                    "p66_consent_threshold": "verbal",
+                    "retry_on_error": True,
+                    "drift_detection": True,
+                    "cost_gate_usd": 0.03,
+                },
             ],
         }
         configs = _tier_configs.get(hardware_tier, _tier_configs["pi5-8gb"])
