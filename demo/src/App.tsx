@@ -4,6 +4,7 @@ import { HowItWorks } from './components/HowItWorks'
 import { CompetitionFormats } from './components/CompetitionFormats'
 import { OptimizationGuide } from './components/OptimizationGuide'
 import { BenchmarkTransparency } from './components/BenchmarkTransparency'
+import { ConfigLibrary } from './components/ConfigLibrary'
 
 const DOMAIN_LABELS: Record<Domain, string> = { general: '⚙️ General', home: '🏠 Home', industrial: '🏭 Industrial' }
 
@@ -390,6 +391,8 @@ export default function App() {
             <a href="https://opencastor.com/docs/contribute" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--cyan)' }}>Contribute your robot →</a>
           </div>
         </div>
+
+        <ConfigLibrary />
 
         <CompetitionFormats />
 
