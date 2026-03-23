@@ -18,14 +18,21 @@ def generate_assets(source_img_path, output_dir):
         print(f"Created {out_path}")
 
     # 2. Apple and Android specific
-    img.resize((180, 180), Image.Resampling.LANCZOS).save(os.path.join(output_dir, "apple-touch-icon.png"))
-    img.resize((192, 192), Image.Resampling.LANCZOS).save(os.path.join(output_dir, "android-chrome-192.png"))
-    img.resize((512, 512), Image.Resampling.LANCZOS).save(os.path.join(output_dir, "android-chrome-512.png"))
+    img.resize((180, 180), Image.Resampling.LANCZOS).save(
+        os.path.join(output_dir, "apple-touch-icon.png")
+    )
+    img.resize((192, 192), Image.Resampling.LANCZOS).save(
+        os.path.join(output_dir, "android-chrome-192.png")
+    )
+    img.resize((512, 512), Image.Resampling.LANCZOS).save(
+        os.path.join(output_dir, "android-chrome-512.png")
+    )
 
     # 3. Favicon (multi-size ICO)
-    icon_sizes = [(16,16), (32,32), (48,48), (64,64)]
-    img.save(os.path.join(output_dir, "favicon.ico"), format='ICO', sizes=icon_sizes)
+    icon_sizes = [(16, 16), (32, 32), (48, 48), (64, 64)]
+    img.save(os.path.join(output_dir, "favicon.ico"), format="ICO", sizes=icon_sizes)
     print("Created favicon.ico")
+
 
 if __name__ == "__main__":
     brain_dir = r"C:\Users\CraigM\.gemini\antigravity\brain\68da367e-3972-4069-98bc-0c41c0a9f68a"
@@ -45,13 +52,14 @@ if __name__ == "__main__":
     # However we did create icon.svg using base64 wrapper earlier for the main logo.
     # Let's create an icon-inverse.svg wrapping the inverse PNG so the website can use it easily if needed.
     import base64
+
     def create_svg_wrapper(png_path, svg_path):
         with open(png_path, "rb") as f:
-            b64_data = base64.b64encode(f.read()).decode('utf-8')
+            b64_data = base64.b64encode(f.read()).decode("utf-8")
 
-        svg_content = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+        svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <image href="data:image/png;base64,{b64_data}" x="0" y="0" width="1024" height="1024" />
-</svg>'''
+</svg>"""
         with open(svg_path, "w", encoding="utf-8") as f:
             f.write(svg_content)
         print(f"Created {svg_path}")
