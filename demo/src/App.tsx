@@ -3,6 +3,7 @@ import { TIERS, SYNTHESIS_INSIGHTS, TOTAL_RUNS, TOTAL_ROBOTS, SEARCH_SPACE_EXPLO
 import { HowItWorks } from './components/HowItWorks'
 import { CompetitionFormats } from './components/CompetitionFormats'
 import { OptimizationGuide } from './components/OptimizationGuide'
+import { BenchmarkTransparency } from './components/BenchmarkTransparency'
 
 const DOMAIN_LABELS: Record<Domain, string> = { general: '⚙️ General', home: '🏠 Home', industrial: '🏭 Industrial' }
 
@@ -395,6 +396,8 @@ export default function App() {
         <HowItWorks />
 
         <OptimizationGuide />
+
+        <BenchmarkTransparency />
 
         <ResearchSynthesis />
 
