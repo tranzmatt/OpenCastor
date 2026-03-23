@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { TIERS, SYNTHESIS_INSIGHTS, TOTAL_RUNS, TOTAL_ROBOTS, SEARCH_SPACE_EXPLORED, CHAMPION_SCORE, type Domain, type LeaderboardEntry } from './data/demo_data'
 import { HowItWorks } from './components/HowItWorks'
+import { CompetitionFormats } from './components/CompetitionFormats'
+import { OptimizationGuide } from './components/OptimizationGuide'
 
 const DOMAIN_LABELS: Record<Domain, string> = { general: '⚙️ General', home: '🏠 Home', industrial: '🏭 Industrial' }
 
@@ -388,7 +390,11 @@ export default function App() {
           </div>
         </div>
 
+        <CompetitionFormats />
+
         <HowItWorks />
+
+        <OptimizationGuide />
 
         <ResearchSynthesis />
 
