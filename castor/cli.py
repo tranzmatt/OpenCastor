@@ -6359,15 +6359,44 @@ def main() -> None:
             "  castor research champion\n"
             "  castor research queue\n"
             "  castor research dashboard\n"
+            "  castor research recommend\n"
+            "  castor research recommend --hardware pi5_4gb --domain home --explain\n"
+            "  castor research recommend --list-findings\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_research.add_argument(
         "research_action",
         nargs="?",
-        choices=["status", "history", "champion", "queue", "dashboard"],
+        choices=["status", "history", "champion", "queue", "dashboard", "recommend"],
         default="status",
         help="Research sub-command (default: status)",
+    )
+    p_research.add_argument(
+        "--hardware",
+        dest="hardware",
+        metavar="HW",
+        help="Hardware tier (pi5_4gb, pi5_8gb, pi5_hailo, jetson, server, waveshare)",
+    )
+    p_research.add_argument(
+        "--domain",
+        dest="domain",
+        metavar="DOMAIN",
+        help="Task domain (home, industrial, general)",
+    )
+    p_research.add_argument(
+        "--explain",
+        dest="explain",
+        action="store_true",
+        default=False,
+        help="Show synthesis findings that back the recommendation",
+    )
+    p_research.add_argument(
+        "--list-findings",
+        dest="list_findings",
+        action="store_true",
+        default=False,
+        help="List all synthesis signals from the autoresearch fleet",
     )
 
     args = parser.parse_args()

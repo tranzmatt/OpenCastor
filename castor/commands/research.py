@@ -217,5 +217,9 @@ def cmd_research(args) -> None:
         _cmd_research_queue()
     elif action == "dashboard":
         _cmd_research_dashboard()
+    elif action == "recommend":
+        from castor.commands.recommend import cmd_recommend  # noqa: PLC0415
+
+        cmd_recommend(args)
     else:
         print(f"\n  Unknown research action: {action}\n")
