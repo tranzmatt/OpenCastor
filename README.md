@@ -15,6 +15,7 @@
   <a href="https://github.com/craigm26/OpenCastor/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License"></a>
   <a href="https://github.com/craigm26/OpenCastor/actions"><img src="https://img.shields.io/github/actions/workflow/status/craigm26/OpenCastor/ci.yml?label=CI" alt="CI"></a>
   <a href="https://app.opencastor.com"><img src="https://img.shields.io/badge/Fleet%20UI-app.opencastor.com-orange" alt="Fleet UI"></a>
+  <a href="https://docs.opencastor.com"><img src="https://img.shields.io/badge/Docs-docs.opencastor.com-00bcd4" alt="Docs"></a>
   <a href="https://discord.gg/jMjA8B26Bq"><img src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
@@ -158,7 +159,7 @@ docker run -it \
 | `castor fleet` | Discover and monitor all robots on the local network |
 | `castor upgrade` | Pull latest version + pip install + service restart |
 
-Full reference: [`docs/claude/cli-reference.md`](docs/claude/cli-reference.md)
+Full reference: [docs.opencastor.com/runtime/cli](https://docs.opencastor.com/runtime/cli/)
 
 ## Configuration
 
