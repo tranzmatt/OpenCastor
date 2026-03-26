@@ -181,13 +181,8 @@ class MessageSigner:
 
             msg_copy = dict(message)
             # Canonical payload: sorted JSON without signature fields
-            payload = {
-                k: v for k, v in msg_copy.items()
-                if k not in ("signature", "pq_sig")
-            }
-            payload_bytes = json.dumps(
-                payload, sort_keys=True, separators=(",", ":")
-            ).encode()
+            payload = {k: v for k, v in msg_copy.items() if k not in ("signature", "pq_sig")}
+            payload_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
 
             with self._lock:
                 # Ed25519 signature (always)

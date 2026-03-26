@@ -3244,6 +3244,67 @@ def cmd_diff(args) -> None:
     print_diff(diffs, config_a, config_b)
 
 
+def cmd_keygen(args) -> None:
+    """castor keygen — generate Ed25519 and/or ML-DSA-65 signing key pairs."""
+    import os
+    from pathlib import Path as _Path
+
+    do_ed = not args.pq or args.both
+    do_pq = args.pq or args.both
+
+    # Ed25519
+    if do_ed:
+        key_path = (
+            _Path(args.out)
+            if (args.out and not args.pq)
+            else _Path.home() / ".opencastor" / "signing_key.pem"
+        )
+        if key_path.exists() and not args.force:
+            print(f"  Ed25519 key already exists: {key_path}  (use --force to overwrite)")
+        else:
+            try:
+                from rcan.signing import KeyPair
+
+                kp = KeyPair.generate()
+                kp.save_private(str(key_path))
+                pub_path = key_path.with_suffix(".pub.pem")
+                kp.save_public(str(pub_path))
+                print("✓ Ed25519 key generated")
+                print(f"  private: {key_path}")
+                print(f"  public:  {pub_path}")
+                print(f"  key_id:  {kp.key_id}")
+            except ImportError:
+                print("✗ Ed25519 keygen requires: pip install rcan[crypto]")
+
+    # ML-DSA-65
+    if do_pq:
+        pq_out = os.environ.get("OPENCASTOR_PQ_KEY_PATH")
+        if args.out and args.pq:
+            pq_key_path = _Path(args.out)
+        elif pq_out:
+            pq_key_path = _Path(pq_out)
+        else:
+            pq_key_path = _Path.home() / ".opencastor" / "pq_signing.key"
+
+        if pq_key_path.exists() and not args.force:
+            print(f"  ML-DSA-65 key already exists: {pq_key_path}  (use --force to overwrite)")
+        else:
+            try:
+                from rcan.signing import MLDSAKeyPair
+
+                pq_kp = MLDSAKeyPair.generate()
+                pq_kp.save(str(pq_key_path))
+                pub_path = pq_key_path.with_suffix(".pub")
+                pq_kp.save_public(str(pub_path))
+                print("✓ ML-DSA-65 key generated (FIPS 204, RCAN v2.2)")
+                print(f"  private: {pq_key_path}  ({len(pq_kp._secret_key or b'')} bytes)")
+                print(f"  public:  {pub_path}  ({len(pq_kp.public_key)} bytes)")
+                print(f"  key_id:  {pq_kp.key_id}")
+                print("  ⚠  Store this key securely — it will sign firmware manifests")
+            except ImportError:
+                print("✗ ML-DSA keygen requires: pip install dilithium-py")
+
+
 def cmd_doctor(args) -> None:
     """castor doctor — run system health checks."""
     from castor.doctor import print_report, run_all_checks
@@ -4847,6 +4908,40 @@ def main() -> None:
         "--auto-fix",
         action="store_true",
         help="Attempt to auto-fix common issues (e.g. missing .env, large memory DB)",
+    )
+
+    # castor keygen
+    p_keygen = sub.add_parser(
+        "keygen",
+        help="Generate cryptographic key pairs (Ed25519 and/or ML-DSA-65)",
+        epilog=(
+            "Examples:\n"
+            "  castor keygen                 # generate Ed25519 signing key\n"
+            "  castor keygen --pq            # generate ML-DSA-65 PQ key (FIPS 204)\n"
+            "  castor keygen --both          # generate both Ed25519 + ML-DSA-65\n"
+            "  castor keygen --pq --out /path/to/pq.key"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_keygen.add_argument(
+        "--pq",
+        action="store_true",
+        help="Generate ML-DSA-65 key (RCAN v2.2 post-quantum, FIPS 204)",
+    )
+    p_keygen.add_argument(
+        "--both",
+        action="store_true",
+        help="Generate both Ed25519 and ML-DSA-65 keys",
+    )
+    p_keygen.add_argument(
+        "--out",
+        default=None,
+        help="Output path for the key (default: ~/.opencastor/[pq_]signing_key.pem/.key)",
+    )
+    p_keygen.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing key files",
     )
 
     # castor compliance
@@ -6518,6 +6613,7 @@ def main() -> None:
         "fleet": cmd_fleet,
         "logs": cmd_logs,
         "streaming": cmd_streaming,
+        "keygen": cmd_keygen,
         "doctor": cmd_doctor,
         "update": cmd_update,
         "node": cmd_node,

@@ -137,6 +137,26 @@ def _check_signing_key() -> CheckResult:
     )
 
 
+def _check_pq_signing_key() -> CheckResult:
+    """RCAN v2.2 — ML-DSA-65 post-quantum signing key (FIPS 204)."""
+    import os
+
+    pq_path = os.environ.get("OPENCASTOR_PQ_KEY_PATH") or str(
+        Path.home() / ".opencastor" / "pq_signing.key"
+    )
+    if Path(pq_path).exists():
+        return CheckResult("ML-DSA-65 PQ signing key (v2.2)", "ok", pq_path)
+    return CheckResult(
+        "ML-DSA-65 PQ signing key (v2.2)",
+        "warn",
+        "not generated — run `castor keygen --pq` to create",
+        fix=(
+            "castor keygen --pq  (generates ~/.opencastor/pq_signing.key). "
+            "Q-Day 2029: all firmware/RCAN messages should carry ML-DSA-65 signature."
+        ),
+    )
+
+
 def _check_env_var(var: str, sensitive: bool = True) -> CheckResult:
     val = os.environ.get(var)
     if val:
@@ -222,6 +242,7 @@ def run_doctor(full: bool = False) -> DoctorReport:
     add(_check_config())
     add(_check_opencastor_dir())
     add(_check_signing_key())
+    add(_check_pq_signing_key())
 
     # Core deps
     for pkg in ["anthropic", "openai", "httpx", "yaml", "rich", "zeroconf"]:
