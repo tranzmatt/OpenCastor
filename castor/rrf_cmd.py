@@ -9,6 +9,7 @@ Commands:
   castor rrf status       — show full provenance chain
   castor rrf wipe         — (dev) delete this robot's records from RRF
 """
+
 from __future__ import annotations
 
 import base64
@@ -21,6 +22,7 @@ RRF_BASE = "https://robot-registry-foundation.pages.dev"
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _load_config(config_path: str | None) -> tuple[dict, Path]:
     from pathlib import Path
@@ -52,6 +54,7 @@ def _post(path: str, body: dict, token: str | None = None) -> dict:
     import os
     import subprocess
     import tempfile
+
     url = f"{RRF_BASE}{path}"
     # Write body to temp file to avoid shell quoting issues
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -59,10 +62,17 @@ def _post(path: str, body: dict, token: str | None = None) -> dict:
         tmp = f.name
     try:
         cmd = [
-            "curl", "-s", "-X", "POST", url,
-            "-H", "Content-Type: application/json",
-            "-H", "User-Agent: OpenCastor/2026.3.27.1 castor-cli/rrf",
-            "--data", f"@{tmp}",
+            "curl",
+            "-s",
+            "-X",
+            "POST",
+            url,
+            "-H",
+            "Content-Type: application/json",
+            "-H",
+            "User-Agent: OpenCastor/2026.3.27.1 castor-cli/rrf",
+            "--data",
+            f"@{tmp}",
         ]
         if token:
             cmd += ["-H", f"Authorization: Bearer {token}"]
@@ -71,7 +81,13 @@ def _post(path: str, body: dict, token: str | None = None) -> dict:
             print(f"❌ curl failed: {result.stderr}", file=sys.stderr)
             sys.exit(1)
         data = json.loads(result.stdout)
-        if "error" in data and "rrn" not in data and "rcn" not in data and "rmn" not in data and "rhn" not in data:
+        if (
+            "error" in data
+            and "rrn" not in data
+            and "rcn" not in data
+            and "rmn" not in data
+            and "rhn" not in data
+        ):
             print(f"❌ RRF error from {path}: {data['error']}", file=sys.stderr)
             sys.exit(1)
         return data
@@ -82,10 +98,13 @@ def _post(path: str, body: dict, token: str | None = None) -> dict:
 def _get(path: str) -> dict:
     """GET via curl subprocess — avoids CF bot protection."""
     import subprocess
+
     url = f"{RRF_BASE}{path}"
     result = subprocess.run(
         ["curl", "-s", "-H", "User-Agent: OpenCastor/2026.3.27.1 castor-cli/rrf", url],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     if result.returncode != 0 or not result.stdout.strip():
         return {"error": "curl_failed"}
@@ -121,6 +140,7 @@ def _load_token(token_path: str | None = None) -> str | None:
 
 
 # ── sub-commands ──────────────────────────────────────────────────────────────
+
 
 def cmd_rrf_register(args) -> None:
     """Register this robot with the RRF and receive/confirm an RRN."""
@@ -276,35 +296,39 @@ def cmd_rrf_models(args) -> None:
     models_to_register: list[dict[str, Any]] = []
 
     # LeWorldModel (world model — used for scene understanding)
-    models_to_register.append({
-        "name": "LeWorldModel",
-        "version": "v0.1.0",
-        "model_family": "world_model",
-        "architecture": "jepa",
-        "parameter_count_b": 0.015,
-        "license": "apache-2.0",
-        "provider": "local",
-        "provider_model_id": "huggingface/lerobot/le_world_model",
-        "repo_url": "https://github.com/huggingface/lerobot",
-        "rcan_compatible": True,
-        "description": "LeRobot world model — jepa-based scene prediction for reactive control",
-    })
+    models_to_register.append(
+        {
+            "name": "LeWorldModel",
+            "version": "v0.1.0",
+            "model_family": "world_model",
+            "architecture": "jepa",
+            "parameter_count_b": 0.015,
+            "license": "apache-2.0",
+            "provider": "local",
+            "provider_model_id": "huggingface/lerobot/le_world_model",
+            "repo_url": "https://github.com/huggingface/lerobot",
+            "rcan_compatible": True,
+            "description": "LeRobot world model — jepa-based scene prediction for reactive control",
+        }
+    )
 
     # OpenVLA (VLA reactive brain)
     vla_model = brain.get("model", "openvla/openvla-7b")
-    models_to_register.append({
-        "name": "OpenVLA",
-        "version": "7b-1.0",
-        "model_family": "vla",
-        "architecture": "transformer",
-        "parameter_count_b": 7.0,
-        "license": "apache-2.0",
-        "provider": "local",
-        "provider_model_id": vla_model,
-        "repo_url": "https://github.com/openvla/openvla",
-        "rcan_compatible": True,
-        "description": "Vision-Language-Action model — reactive perception-to-action at ~10Hz on Hailo-8 NPU",
-    })
+    models_to_register.append(
+        {
+            "name": "OpenVLA",
+            "version": "7b-1.0",
+            "model_family": "vla",
+            "architecture": "transformer",
+            "parameter_count_b": 7.0,
+            "license": "apache-2.0",
+            "provider": "local",
+            "provider_model_id": vla_model,
+            "repo_url": "https://github.com/openvla/openvla",
+            "rcan_compatible": True,
+            "description": "Vision-Language-Action model — reactive perception-to-action at ~10Hz on Hailo-8 NPU",
+        }
+    )
 
     # Claude claude-opus-4-6 (planning brain)
     planning_model = "claude-opus-4-6"
@@ -314,19 +338,21 @@ def cmd_rrf_models(args) -> None:
             if "/" in m:
                 planning_model = m.split("/")[-1]
 
-    models_to_register.append({
-        "name": "Claude",
-        "version": planning_model,
-        "model_family": "language",
-        "architecture": "transformer",
-        "parameter_count_b": None,   # not disclosed
-        "license": "proprietary",
-        "provider": "anthropic",
-        "provider_model_id": f"anthropic/{planning_model}",
-        "repo_url": "https://anthropic.com",
-        "rcan_compatible": True,
-        "description": "Anthropic Claude — planning brain for high-level task decomposition, safety review, low-confidence escalation",
-    })
+    models_to_register.append(
+        {
+            "name": "Claude",
+            "version": planning_model,
+            "model_family": "language",
+            "architecture": "transformer",
+            "parameter_count_b": None,  # not disclosed
+            "license": "proprietary",
+            "provider": "anthropic",
+            "provider_model_id": f"anthropic/{planning_model}",
+            "repo_url": "https://anthropic.com",
+            "rcan_compatible": True,
+            "description": "Anthropic Claude — planning brain for high-level task decomposition, safety review, low-confidence escalation",
+        }
+    )
 
     print(f"\n🧠  Registering {len(models_to_register)} AI model(s) to RRF...\n")
     rmns = []
@@ -337,6 +363,7 @@ def cmd_rrf_models(args) -> None:
             print(f"       {desc}")
         body = {k: v for k, v in m.items() if v is not None}
         import time
+
         # Retry with backoff to handle CF KV eventual consistency (counter may lag)
         for _attempt in range(3):
             result = _post("/v2/models/register", body, token)
@@ -415,8 +442,12 @@ def cmd_rrf_status(args) -> None:
     counts = registry.get("entity_types_count", {})
 
     # Print in provenance order: RRN → RCN → RMN → RHN
-    labels = [("robot", "🤖 Robot (RRN)"), ("component", "🔌 Components (RCN)"),
-               ("model", "🧠 AI Models (RMN)"), ("harness", "⚙️  AI Harness (RHN)")]
+    labels = [
+        ("robot", "🤖 Robot (RRN)"),
+        ("component", "🔌 Components (RCN)"),
+        ("model", "🧠 AI Models (RMN)"),
+        ("harness", "⚙️  AI Harness (RHN)"),
+    ]
 
     for etype, label in labels:
         elist = [e for e in entries if e["entity_type"] == etype]
@@ -437,12 +468,15 @@ def cmd_rrf_status(args) -> None:
 def cmd_rrf_wipe(args) -> None:
     """(dev) Wipe all RRF KV records via admin endpoint."""
     import subprocess
+
     secret = getattr(args, "secret", "clawd-wipe-2026")
     url = f"{RRF_BASE}/admin/wipe?secret={secret}"
     print("🗑️   Wiping all RRF KV records via admin endpoint...")
     result = subprocess.run(
         ["curl", "-s", "-H", "User-Agent: OpenCastor/2026.3.27.1 castor-cli/rrf", url],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     if result.returncode != 0:
         print(f"❌  curl failed: {result.stderr}", file=sys.stderr)
@@ -461,12 +495,12 @@ def cmd_rrf(args) -> None:
     """castor rrf — Robot Registry Foundation v2 commands."""
     sub = getattr(args, "rrf_cmd", None) or "status"
     dispatch = {
-        "register":   cmd_rrf_register,
+        "register": cmd_rrf_register,
         "components": cmd_rrf_components,
-        "models":     cmd_rrf_models,
-        "harness":    cmd_rrf_harness,
-        "status":     cmd_rrf_status,
-        "wipe":       cmd_rrf_wipe,
+        "models": cmd_rrf_models,
+        "harness": cmd_rrf_harness,
+        "status": cmd_rrf_status,
+        "wipe": cmd_rrf_wipe,
     }
     fn = dispatch.get(sub)
     if fn:
