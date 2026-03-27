@@ -597,6 +597,15 @@ async def get_status(request: Request):
         getattr(_cam_obj, "composite_mode", "primary_only") if _cam_obj else "primary_only"
     )
 
+    # Hardware + model runtime info (non-blocking — errors return empty dicts)
+    try:
+        from castor.system_info import get_system_info, get_model_runtime_info
+        payload["system"] = get_system_info()
+        payload["model_runtime"] = get_model_runtime_info(state)
+    except Exception as _si_exc:
+        payload["system"] = {}
+        payload["model_runtime"] = {}
+
     return _maybe_wrap_rcan(payload, request)
 
 
