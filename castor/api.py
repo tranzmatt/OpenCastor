@@ -9517,3 +9517,159 @@ async def get_season_champions_endpoint(season_id: str):
         }
     except Exception as exc:
         return {"season_id": season_id, "champions": [], "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# RCAN v2.2 — Attestation, SBOM, and Conformance endpoints (closes #764 #765)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/attest", dependencies=[Depends(verify_token)])
+async def api_get_attestation() -> dict:
+    """Return the current firmware attestation (ML-DSA-65 signature + manifest hash).
+
+    RCAN v2.2 §11 — firmware attestation gateway endpoint.
+    Closes #764.
+    """
+    import json
+    from pathlib import Path
+
+    manifest_paths = [
+        Path("/tmp/opencastor-firmware-manifest.json"),
+        Path("/run/opencastor/rcan-firmware-manifest.json"),
+    ]
+    for p in manifest_paths:
+        if p.exists():
+            try:
+                manifest = json.loads(p.read_text())
+                return {
+                    "ok": True,
+                    "rrn": manifest.get("rrn", ""),
+                    "firmware_version": manifest.get("firmware_version", ""),
+                    "build_hash": manifest.get("build_hash", ""),
+                    "signed_at": manifest.get("signed_at", ""),
+                    "pq_alg": manifest.get("pq_alg", "ml-dsa-65"),
+                    "signature_prefix": (manifest.get("signature", "")[:32] + "..."),
+                    "manifest_path": str(p),
+                }
+            except Exception as e:
+                return {"ok": False, "error": str(e)}
+    return {"ok": False, "error": "No firmware manifest found. Run: castor attest generate && castor attest sign"}
+
+
+@app.post("/api/attest/verify", dependencies=[Depends(verify_token)])
+async def api_post_attest_verify() -> dict:
+    """Verify the current firmware manifest ML-DSA-65 signature.
+
+    RCAN v2.2 §11 — live verify endpoint.
+    Closes #764.
+    """
+    import json
+    from pathlib import Path
+
+    manifest_path = Path("/tmp/opencastor-firmware-manifest.json")
+    if not manifest_path.exists():
+        manifest_path = Path("/run/opencastor/rcan-firmware-manifest.json")
+    if not manifest_path.exists():
+        return {"ok": False, "verified": False, "error": "No firmware manifest found"}
+
+    try:
+        from castor.firmware import FirmwareManifest, verify_manifest
+
+        manifest = FirmwareManifest(**json.loads(manifest_path.read_text()))
+        verify_manifest(manifest)
+        return {
+            "ok": True,
+            "verified": True,
+            "alg": "ml-dsa-65",
+            "rrn": manifest.rrn,
+            "firmware_version": manifest.firmware_version,
+            "signed_at": manifest.signed_at,
+        }
+    except Exception as e:
+        return {"ok": False, "verified": False, "error": str(e)}
+
+
+@app.get("/api/sbom", dependencies=[Depends(verify_token)])
+async def api_get_sbom() -> dict:
+    """Return SBOM metadata (not the full SBOM — use /api/sbom/download for that).
+
+    RCAN v2.2 §12 — SBOM gateway endpoint.
+    Closes #764.
+    """
+    import json
+    from pathlib import Path
+
+    sbom_path = Path("/tmp/opencastor-rcan-sbom.json")
+    if not sbom_path.exists():
+        return {"ok": False, "error": "No SBOM found. Run: castor sbom generate"}
+
+    try:
+        sbom = json.loads(sbom_path.read_text())
+        xrcan = sbom.get("x-rcan", {})
+        meta = sbom.get("metadata", {})
+        return {
+            "ok": True,
+            "rrn": xrcan.get("rrn", ""),
+            "spec_version": xrcan.get("spec_version", ""),
+            "serial_number": sbom.get("serialNumber", ""),
+            "component_count": len(sbom.get("components", [])),
+            "timestamp": meta.get("timestamp", ""),
+            "attestation_ref": xrcan.get("attestation_ref", ""),
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/sbom/download", dependencies=[Depends(verify_token)])
+async def api_download_sbom():
+    """Stream the full CycloneDX SBOM JSON file.
+
+    RCAN v2.2 §12 — full SBOM download.
+    Closes #764.
+    """
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+
+    sbom_path = Path("/tmp/opencastor-rcan-sbom.json")
+    if not sbom_path.exists():
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="No SBOM found. Run: castor sbom generate")
+    return FileResponse(
+        str(sbom_path),
+        media_type="application/json",
+        filename="opencastor-sbom.json",
+    )
+
+
+@app.get("/api/conformance", dependencies=[Depends(verify_token)])
+async def api_get_conformance() -> dict:
+    """Return RCAN v2.1/v2.2 L5 conformance/compliance report.
+
+    Calls ConformanceChecker.compliance_report() directly.
+    Closes #765.
+    """
+    import os
+
+    import yaml
+
+    config_path = os.path.expanduser("~/opencastor/bob.rcan.yaml")
+    if not os.path.exists(config_path):
+        return {"ok": False, "error": f"Config not found: {config_path}"}
+
+    try:
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f) or {}
+    except Exception as e:
+        return {"ok": False, "error": f"Config load error: {e}"}
+
+    try:
+        from castor.conformance import ConformanceChecker
+
+        checker = ConformanceChecker(cfg, config_path=config_path)
+        report = checker.compliance_report()
+        return {"ok": True, **report}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}

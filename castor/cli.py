@@ -1644,6 +1644,9 @@ def cmd_conformance(args) -> None:
     # ── RCAN v1.5 conformance checks ────────────────────────────────────────
     _run_v15_conformance_checks(config_path, manifest)
 
+    # ── RCAN v2.1/v2.2 L5 compliance checks (closes #763) ───────────────────
+    _run_v22_compliance_checks(config_path)
+
 
 def _run_v15_conformance_checks(config_path: str, manifest: dict) -> None:
     """Print RCAN v1.5 conformance checks appended to the conformance report.
@@ -1711,6 +1714,58 @@ def _run_v15_conformance_checks(config_path: str, manifest: dict) -> None:
     print(f"v1.5 score: {passed}/{len(checks)} checks passed")
     if passed < len(checks):
         print("  Run 'castor conformance' again after addressing warnings above.")
+    print()
+
+
+def _run_v22_compliance_checks(config_path: str) -> None:
+    """Print RCAN v2.1/v2.2 L5 compliance checks from ConformanceChecker.compliance_report().
+
+    Closes #763.
+    """
+    import yaml
+
+    if not __import__("os").path.exists(config_path):
+        return
+
+    try:
+        with open(config_path) as _f:
+            cfg = yaml.safe_load(_f) or {}
+    except Exception as _e:
+        print(f"  WARN: could not load config for v2.2 checks: {_e}")
+        return
+
+    try:
+        from castor.conformance import ConformanceChecker
+
+        checker = ConformanceChecker(cfg, config_path=config_path)
+        report = checker.compliance_report()
+    except Exception as _e:
+        print(f"  WARN: compliance_report() failed: {_e}")
+        return
+
+    checks = report.get("checks", [])
+    if not checks:
+        return
+
+    print("RCAN v2.1/v2.2 L5 Checks")
+    print("─" * 40)
+
+    status_icons = {"pass": "✅", "warn": "⚠️ ", "fail": "❌"}
+    for c in checks:
+        icon = status_icons.get(c.get("status", ""), "❓")
+        cid = c.get("id", "?")
+        msg = c.get("message", "")
+        print(f"  {icon} {cid:<35} {msg}")
+
+    print()
+    overall = report.get("overall_status", "unknown")
+    passed = sum(1 for c in checks if c.get("status") == "pass")
+    failed = sum(1 for c in checks if c.get("status") == "fail")
+    warned = sum(1 for c in checks if c.get("status") == "warn")
+    display_score = max(0, 100 - failed * 10 - warned * 3)
+    print(
+        f"v2.2 score: {passed}/{len(checks)} checks pass — overall: {overall} ({display_score}/100)"
+    )
     print()
 
 
