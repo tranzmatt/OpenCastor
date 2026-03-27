@@ -5848,7 +5848,7 @@ async def on_startup():
 
     # Start mDNS (opt-in via rcan_protocol.enable_mdns)
     if state.config:
-        rcan_proto = state.config["rcan_protocol"]
+        rcan_proto = state.config.get("rcan_protocol", {})
         if rcan_proto.get("enable_mdns"):
             try:
                 from castor.rcan.mdns import RCANServiceBroadcaster, RCANServiceBrowser
