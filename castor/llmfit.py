@@ -14,7 +14,6 @@ References:
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -80,9 +79,12 @@ _MODEL_ARCH: dict[str, tuple[int, int, int, int]] = {
     "smollm2:1.7b": (24, 2048, 8, 64),
 }
 
+
 # Bytes per token per layer (full-precision bf16/fp16 KV)
 # = 2 (K+V) * num_kv_heads * head_dim * 2 bytes (fp16)
-_BYTES_PER_TOKEN_PER_LAYER_BF16 = lambda nkv, hdim: 2 * nkv * hdim * 2
+def _BYTES_PER_TOKEN_PER_LAYER_BF16(nkv: int, hdim: int) -> int:  # noqa: N802
+    return 2 * nkv * hdim * 2
+
 
 # TurboQuant KV bytes per token (3-bit keys, 2-bit values via group quant)
 # Measured: 198 bytes/token on Qwen3.5 full-attention layers (vs 512 bf16)
@@ -218,10 +220,10 @@ def check_fit(
     # Architecture
     arch = _MODEL_ARCH.get(mid)
     if arch:
-        num_layers, hidden_dim, num_kv_heads, head_dim = arch
+        num_layers, _hidden_dim, num_kv_heads, head_dim = arch
     else:
         # Estimate from name
-        num_layers, hidden_dim, num_kv_heads, head_dim = 32, 4096, 8, 128
+        num_layers, _hidden_dim, num_kv_heads, head_dim = 32, 4096, 8, 128
 
     # Full-attention fraction (for MoE models)
     full_attn_frac = _TQ_FULL_ATTN_FRACTION.get(mid, 1.0)

@@ -1575,7 +1575,6 @@ def cmd_llmfit(args) -> None:
     import json as _json
     from castor.llmfit import (
         check_fit,
-        get_device_ram_gb,
         get_total_ram_gb,
         turboquant_ecosystem_status,
         _MODEL_WEIGHT_GB,
