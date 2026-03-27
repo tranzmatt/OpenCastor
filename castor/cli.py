@@ -1439,6 +1439,7 @@ def cmd_loa(args) -> None:
       disable             Disable LoA enforcement (log-only mode)
     """
     import sys
+
     from castor.loa import (
         get_config_path,
         get_loa_status,
@@ -1463,7 +1464,9 @@ def cmd_loa(args) -> None:
         status = get_loa_status(cfg)
         rrn = cfg.get("metadata", {}).get("rrn", "unknown")
         emoji = "✅" if status["loa_enforcement"] else "⚠️ "
-        print(f"\n{emoji}  LoA Enforcement: {'ON' if status['loa_enforcement'] else 'OFF (log-only)'}")
+        print(
+            f"\n{emoji}  LoA Enforcement: {'ON' if status['loa_enforcement'] else 'OFF (log-only)'}"
+        )
         print(f"   Min LoA for control: {status['min_loa_for_control']}")
         print(f"   RCAN version:        {status['rcan_version']}")
         print(f"   RRN:                 {rrn}")
@@ -1473,7 +1476,9 @@ def cmd_loa(args) -> None:
 
     enabled = sub == "enable"
     status = set_loa_enforcement(config_path, enabled=enabled, min_loa=min_loa)
-    print(f"{'✅' if enabled else '🔓'}  LoA enforcement {'enabled' if enabled else 'disabled'} in {config_path}")
+    print(
+        f"{'✅' if enabled else '🔓'}  LoA enforcement {'enabled' if enabled else 'disabled'} in {config_path}"
+    )
 
     # Hot-reload the running gateway
     if do_reload:
@@ -1482,7 +1487,7 @@ def cmd_loa(args) -> None:
         if reloaded:
             print(f"🔄  Gateway reloaded ({gateway_url})")
         else:
-            print(f"⚠️   Gateway unreachable — restart manually: castor run")
+            print("⚠️   Gateway unreachable — restart manually: castor run")
 
     # Sync to Firestore
     if do_firestore:
@@ -1504,11 +1509,12 @@ def cmd_components(args) -> None:
       list                List components from config file
       register            Detect + write components to Firestore (for Fleet UI)
     """
-    import sys
     import json
+    import sys
+
     from castor.components import (
-        detect_components,
         components_from_config,
+        detect_components,
         merge_components,
         register_components_to_firestore,
     )
@@ -1543,11 +1549,13 @@ def cmd_components(args) -> None:
         components = components_from_config(cfg)
         if not components:
             print("⚠️   No components: section found in config.")
-            print(f"     Run:  castor components detect  to auto-detect")
+            print("     Run:  castor components detect  to auto-detect")
         else:
             print(f"\n📋  {len(components)} component(s) in {config_path}:\n")
             for c in components:
-                print(f"  [{c.get('id', '?')}] {c.get('type', '?').upper()} — {c.get('model', '?')}")
+                print(
+                    f"  [{c.get('id', '?')}] {c.get('type', '?').upper()} — {c.get('model', '?')}"
+                )
         return
 
     if sub == "register":
@@ -6149,12 +6157,31 @@ def main() -> None:
     )
     loa_sub = p_loa.add_subparsers(dest="loa_cmd")
     for _loa_name in ("status", "enable", "disable"):
-        _p = loa_sub.add_parser(_loa_name, help=f"{'Show' if _loa_name == 'status' else _loa_name.capitalize()} LoA enforcement")
+        _p = loa_sub.add_parser(
+            _loa_name,
+            help=f"{'Show' if _loa_name == 'status' else _loa_name.capitalize()} LoA enforcement",
+        )
         _p.add_argument("--config", default=None, help="RCAN config file path")
-        _p.add_argument("--min-loa", dest="min_loa", type=int, default=None, help="Minimum LoA level for control scope (default: keep current)")
-        _p.add_argument("--no-reload", dest="reload", action="store_false", default=True, help="Skip gateway hot-reload")
-        _p.add_argument("--no-firestore", action="store_true", default=False, help="Skip Firestore sync")
-        _p.add_argument("--gateway-url", default="http://localhost:8001", help="Gateway base URL for hot-reload")
+        _p.add_argument(
+            "--min-loa",
+            dest="min_loa",
+            type=int,
+            default=None,
+            help="Minimum LoA level for control scope (default: keep current)",
+        )
+        _p.add_argument(
+            "--no-reload",
+            dest="reload",
+            action="store_false",
+            default=True,
+            help="Skip gateway hot-reload",
+        )
+        _p.add_argument(
+            "--no-firestore", action="store_true", default=False, help="Skip Firestore sync"
+        )
+        _p.add_argument(
+            "--gateway-url", default="http://localhost:8001", help="Gateway base URL for hot-reload"
+        )
     p_loa.set_defaults(loa_cmd="status")
 
     # castor components
@@ -6171,9 +6198,14 @@ def main() -> None:
     )
     comps_sub = p_comps.add_subparsers(dest="components_cmd")
     for _cn in ("detect", "list", "register"):
-        _cp = comps_sub.add_parser(_cn, help=f"{'Detect attached hardware' if _cn == 'detect' else 'List config components' if _cn == 'list' else 'Register components to Firestore'}")
+        _cp = comps_sub.add_parser(
+            _cn,
+            help=f"{'Detect attached hardware' if _cn == 'detect' else 'List config components' if _cn == 'list' else 'Register components to Firestore'}",
+        )
         _cp.add_argument("--config", default=None, help="RCAN config file path")
-        _cp.add_argument("--format", choices=["table", "json"], default="table", help="Output format")
+        _cp.add_argument(
+            "--format", choices=["table", "json"], default="table", help="Output format"
+        )
     p_comps.set_defaults(components_cmd="detect")
 
     # castor privacy

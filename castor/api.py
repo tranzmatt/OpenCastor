@@ -9739,6 +9739,7 @@ async def api_get_conformance() -> dict:
 
 # ── LoA enforcement API ───────────────────────────────────────────────────────
 
+
 class _LoaRequest(BaseModel):
     enabled: bool
     min_loa: Optional[int] = None
@@ -9748,6 +9749,7 @@ class _LoaRequest(BaseModel):
 async def api_loa_status(request: Request) -> dict:
     """GET /api/loa — Return current LoA enforcement state."""
     from castor.loa import get_config_path, get_loa_status, load_config
+
     config_path = get_config_path(os.getenv("OPENCASTOR_CONFIG"))
     if not config_path.exists():
         return {"ok": False, "error": f"Config not found: {config_path}"}
@@ -9766,14 +9768,17 @@ async def api_loa_patch(body: _LoaRequest, request: Request) -> dict:
     """
     _check_min_role(request, "admin")
     from castor.loa import (
-        get_config_path, get_loa_status, load_config, save_config,
+        get_config_path,
+        get_loa_status,
+        load_config,
         push_loa_to_firestore,
+        save_config,
     )
+
     config_path = get_config_path(os.getenv("OPENCASTOR_CONFIG"))
     if not config_path.exists():
         raise HTTPException(status_code=404, detail=f"Config not found: {config_path}")
 
-    import yaml
     cfg = load_config(config_path)
     cfg["loa_enforcement"] = body.enabled
     if body.min_loa is not None:
@@ -9803,21 +9808,25 @@ async def api_loa_patch(body: _LoaRequest, request: Request) -> dict:
 
 # ── Components API ────────────────────────────────────────────────────────────
 
+
 @app.get("/api/components", dependencies=[Depends(verify_token)])
 async def api_components_list(request: Request) -> dict:
     """GET /api/components — Return registered hardware components for this robot."""
     try:
+        from pathlib import Path as _P
+
         from google.cloud import firestore as _fs
         from google.oauth2 import service_account
-        from pathlib import Path as _P
 
         sa_path = _P.home() / ".config" / "opencastor" / "firebase-sa-key.json"
         creds = service_account.Credentials.from_service_account_file(
-            str(sa_path), scopes=["https://www.googleapis.com/auth/datastore"],
+            str(sa_path),
+            scopes=["https://www.googleapis.com/auth/datastore"],
         )
         db = _fs.Client(project="opencastor", credentials=creds)
 
         from castor.loa import get_config_path, load_config
+
         cfg = load_config(get_config_path(os.getenv("OPENCASTOR_CONFIG")))
         rrn = cfg.get("metadata", {}).get("rrn", "")
         if not rrn:
