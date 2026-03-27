@@ -1430,6 +1430,12 @@ def cmd_plugins(args) -> None:
     print_plugins(plugins)
 
 
+def cmd_rrf(args) -> None:
+    """castor rrf — Robot Registry Foundation v2 commands (register, components, models, harness, status)."""
+    from castor.rrf_cmd import cmd_rrf as _cmd_rrf
+    _cmd_rrf(args)
+
+
 def cmd_loa(args) -> None:
     """castor loa — manage Level of Assurance enforcement (GAP-16).
 
@@ -6208,6 +6214,38 @@ def main() -> None:
         )
     p_comps.set_defaults(components_cmd="detect")
 
+    # castor rrf
+    p_rrf = sub.add_parser(
+        "rrf",
+        help="Robot Registry Foundation v2 — register and query RRN/RCN/RMN/RHN",
+        epilog=(
+            "Examples:\n"
+            "  castor rrf status                  # show full provenance chain\n"
+            "  castor rrf register                # register robot (receive RRN)\n"
+            "  castor rrf components              # register hardware components (RCN)\n"
+            "  castor rrf models                  # register AI models (RMN)\n"
+            "  castor rrf harness                 # register AI harness (RHN)\n"
+            "  castor rrf wipe --secret <s>       # (dev) clear all KV records\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    rrf_sub = p_rrf.add_subparsers(dest="rrf_cmd")
+    for _rrf_name, _rrf_help in [
+        ("register",   "Register this robot with RRF — receive an RRN"),
+        ("components", "Register hardware components from config — receive RCNs"),
+        ("models",     "Register AI models used by this robot — receive RMNs"),
+        ("harness",    "Register the AI harness (dual-brain) — receive an RHN"),
+        ("status",     "Show full RRF provenance chain for this robot"),
+        ("wipe",       "(dev) Delete all RRF KV records via admin endpoint"),
+    ]:
+        _rp = rrf_sub.add_parser(_rrf_name, help=_rrf_help)
+        _rp.add_argument("--config", default=None, help="RCAN config file path")
+        _rp.add_argument("--token", default=None, help="RRF bearer token (default: ~/.config/opencastor/bob-rrf-token.txt)")
+        _rp.add_argument("--force", action="store_true", default=False, help="Force re-registration even if already registered")
+        if _rrf_name == "wipe":
+            _rp.add_argument("--secret", default="clawd-wipe-2026", help="Admin wipe secret")
+    p_rrf.set_defaults(rrf_cmd="status")
+
     # castor privacy
     p_priv = sub.add_parser(
         "privacy",
@@ -7219,6 +7257,7 @@ def main() -> None:
         "network": cmd_network,
         "loa": cmd_loa,
         "components": cmd_components,
+        "rrf": cmd_rrf,
         "privacy": cmd_privacy,
         # Batch 5 (polish & quality-of-life)
         "update-check": cmd_update_check,
