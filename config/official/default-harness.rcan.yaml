@@ -1,4 +1,4 @@
-rcan_version: "1.9"
+rcan_version: "2.2"
 
 metadata:
   robot_name: opencastor-default
@@ -8,9 +8,10 @@ metadata:
   description: >
     The default OpenCastor agent harness. Shows the full Tiered Brain
     (fast local + slow cloud), 5 harness skill layers, memory
-    consolidation, and RCAN v1.9 safety invariants. Fork this as your
-    starting point. The code-reviewer skill is registered via the skill
-    registry, not as a harness layer.
+    consolidation, and RCAN v2.2 safety invariants. Includes ML-DSA-65
+    PQ signing, EU AI Act compliance, and dual-brain architecture.
+    Fork this as your starting point. The code-reviewer skill is registered
+    via the skill registry, not as a harness layer.
   tags:
     - official
     - harness

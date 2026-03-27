@@ -25,6 +25,11 @@ ACCEPTED_RCAN_VERSIONS = {
     "1.6",
     "1.6.0",
     "1.6.1",
+    "1.9",  # transitional version used in official harness templates
+    "2.1",  # RCAN v2.1 — EU AI Act compliance, SBOM attestation
+    "2.1.0",
+    "2.2",  # RCAN v2.2 — ML-DSA-65 primary, dual-brain, fleet scope
+    "2.2.0",
 }
 
 

@@ -24,6 +24,7 @@ metadata:
   manufacturer: craigm26
   model: opencastor-rpi5-hailo
   version: '2026.3.27.1'
+  robot_uuid: '1c8977ac-7883-45f7-8be7-650accec1d7b'
   rrn: RRN-000000000001
   rrn_uri: rrn://craigm26/robot/opencastor-rpi5-hailo/bob-001
 
