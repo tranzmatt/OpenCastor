@@ -199,7 +199,14 @@ def canonical_manifest_json(m: FirmwareManifest) -> bytes:
     obj = {
         "build_hash": m.build_hash,
         "components": sorted(
-            [{"hash": c.hash, "name": c.name, "version": c.version} for c in m.components],
+            [
+                {
+                    "hash": c["hash"] if isinstance(c, dict) else c.hash,
+                    "name": c["name"] if isinstance(c, dict) else c.name,
+                    "version": c["version"] if isinstance(c, dict) else c.version,
+                }
+                for c in m.components
+            ],
             key=lambda c: c["name"].lower(),
         ),
         "firmware_version": m.firmware_version,
