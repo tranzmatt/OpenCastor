@@ -218,7 +218,9 @@ def test_drift_detection_docstring_says_jaccard():
 def test_editor_rcan_version_current(editor_cfg):
     """Editor defaults RCAN version should match current project version."""
     version = editor_cfg["rcan_version"]
-    assert version.startswith("1.9"), f"Editor defaults RCAN version is {version}, expected 1.9.x"
+    assert version in ("2.2", "2.2.0", "2.1", "2.1.0"), (
+        f"Editor defaults RCAN version is {version!r}, expected 2.2 (RCAN v2.2 current spec)"
+    )
 
 
 def test_editor_no_duplicate_note(editor_cfg):
