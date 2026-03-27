@@ -9554,7 +9554,10 @@ async def api_get_attestation() -> dict:
                 }
             except Exception as e:
                 return {"ok": False, "error": str(e)}
-    return {"ok": False, "error": "No firmware manifest found. Run: castor attest generate && castor attest sign"}
+    return {
+        "ok": False,
+        "error": "No firmware manifest found. Run: castor attest generate && castor attest sign",
+    }
 
 
 @app.post("/api/attest/verify", dependencies=[Depends(verify_token)])
