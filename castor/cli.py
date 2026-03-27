@@ -1430,6 +1430,140 @@ def cmd_plugins(args) -> None:
     print_plugins(plugins)
 
 
+def cmd_loa(args) -> None:
+    """castor loa — manage Level of Assurance enforcement (GAP-16).
+
+    Sub-commands:
+      status              Show current LoA enforcement state
+      enable              Enable LoA enforcement (patches config + hot-reloads)
+      disable             Disable LoA enforcement (log-only mode)
+    """
+    import sys
+    from castor.loa import (
+        get_config_path,
+        get_loa_status,
+        load_config,
+        push_loa_to_firestore,
+        reload_gateway,
+        set_loa_enforcement,
+    )
+
+    sub = getattr(args, "loa_cmd", None) or "status"
+    config_path = get_config_path(getattr(args, "config", None))
+    min_loa = getattr(args, "min_loa", None)
+    do_reload = getattr(args, "reload", True)
+    do_firestore = getattr(args, "no_firestore", False) is False
+
+    if not config_path.exists():
+        print(f"❌  Config not found: {config_path}", file=sys.stderr)
+        sys.exit(1)
+
+    if sub == "status":
+        cfg = load_config(config_path)
+        status = get_loa_status(cfg)
+        rrn = cfg.get("metadata", {}).get("rrn", "unknown")
+        emoji = "✅" if status["loa_enforcement"] else "⚠️ "
+        print(f"\n{emoji}  LoA Enforcement: {'ON' if status['loa_enforcement'] else 'OFF (log-only)'}")
+        print(f"   Min LoA for control: {status['min_loa_for_control']}")
+        print(f"   RCAN version:        {status['rcan_version']}")
+        print(f"   RRN:                 {rrn}")
+        if not status["loa_enforcement"]:
+            print("\n   To enable:  castor loa enable")
+        return
+
+    enabled = sub == "enable"
+    status = set_loa_enforcement(config_path, enabled=enabled, min_loa=min_loa)
+    print(f"{'✅' if enabled else '🔓'}  LoA enforcement {'enabled' if enabled else 'disabled'} in {config_path}")
+
+    # Hot-reload the running gateway
+    if do_reload:
+        gateway_url = getattr(args, "gateway_url", None) or "http://localhost:8001"
+        reloaded = reload_gateway(gateway_url)
+        if reloaded:
+            print(f"🔄  Gateway reloaded ({gateway_url})")
+        else:
+            print(f"⚠️   Gateway unreachable — restart manually: castor run")
+
+    # Sync to Firestore
+    if do_firestore:
+        cfg = load_config(config_path)
+        rrn = cfg.get("metadata", {}).get("rrn", "")
+        if rrn and rrn != "RRN-UNKNOWN":
+            synced = push_loa_to_firestore(rrn, enabled, status["min_loa_for_control"])
+            if synced:
+                print(f"☁️   Firestore updated for {rrn}")
+            else:
+                print("⚠️   Firestore update skipped (no credentials or unreachable)")
+
+
+def cmd_components(args) -> None:
+    """castor components — manage hardware component registration.
+
+    Sub-commands:
+      detect              Auto-detect attached hardware components
+      list                List components from config file
+      register            Detect + write components to Firestore (for Fleet UI)
+    """
+    import sys
+    import json
+    from castor.components import (
+        detect_components,
+        components_from_config,
+        merge_components,
+        register_components_to_firestore,
+    )
+    from castor.loa import get_config_path, load_config
+
+    sub = getattr(args, "components_cmd", None) or "detect"
+    config_path = get_config_path(getattr(args, "config", None))
+    fmt = getattr(args, "format", "table")
+
+    cfg: dict = {}
+    rrn = "RRN-UNKNOWN"
+    if config_path.exists():
+        cfg = load_config(config_path)
+        rrn = cfg.get("metadata", {}).get("rrn", "RRN-UNKNOWN")
+
+    if sub == "detect":
+        components = detect_components(rrn)
+        print(f"\n🔍  Detected {len(components)} hardware component(s) for {rrn}:\n")
+        for c in components:
+            status = c.get("status", "?")
+            icon = "✅" if status == "active" else "🔌"
+            caps = ", ".join(c.get("capabilities", []))
+            caps_str = f"  [{caps}]" if caps else ""
+            print(f"  {icon}  [{c['id']}] {c['type'].upper()} — {c['model']}{caps_str}")
+            print(f"       Manufacturer: {c.get('manufacturer', 'unknown')}")
+            print(f"       Firmware:     {c.get('firmware_version', 'unknown')}")
+        if fmt == "json":
+            print(json.dumps(components, indent=2))
+        return
+
+    if sub == "list":
+        components = components_from_config(cfg)
+        if not components:
+            print("⚠️   No components: section found in config.")
+            print(f"     Run:  castor components detect  to auto-detect")
+        else:
+            print(f"\n📋  {len(components)} component(s) in {config_path}:\n")
+            for c in components:
+                print(f"  [{c.get('id', '?')}] {c.get('type', '?').upper()} — {c.get('model', '?')}")
+        return
+
+    if sub == "register":
+        print(f"🔍  Detecting hardware for {rrn}…")
+        detected = detect_components(rrn)
+        configured = components_from_config(cfg)
+        merged = merge_components(detected, configured)
+        print(f"📤  Registering {len(merged)} component(s) to Firestore…")
+        ok, errors = register_components_to_firestore(rrn, merged)
+        print(f"✅  {ok} component(s) registered.")
+        for err in errors:
+            print(f"  ❌  {err}", file=sys.stderr)
+        if errors:
+            sys.exit(1)
+
+
 def cmd_privacy(args) -> None:
     """castor privacy — display the data privacy policy for this robot config."""
     from castor.privacy import print_privacy_policy
@@ -6000,6 +6134,48 @@ def main() -> None:
     p_net.add_argument("--port", type=int, default=8000, help="Gateway port")
     p_net.add_argument("--config", default=None, help="RCAN config file (optional)")
 
+    # castor loa
+    p_loa = sub.add_parser(
+        "loa",
+        help="Manage Level of Assurance enforcement (GAP-16)",
+        epilog=(
+            "Examples:\n"
+            "  castor loa status\n"
+            "  castor loa enable\n"
+            "  castor loa enable --min-loa 2\n"
+            "  castor loa disable\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    loa_sub = p_loa.add_subparsers(dest="loa_cmd")
+    for _loa_name in ("status", "enable", "disable"):
+        _p = loa_sub.add_parser(_loa_name, help=f"{'Show' if _loa_name == 'status' else _loa_name.capitalize()} LoA enforcement")
+        _p.add_argument("--config", default=None, help="RCAN config file path")
+        _p.add_argument("--min-loa", dest="min_loa", type=int, default=None, help="Minimum LoA level for control scope (default: keep current)")
+        _p.add_argument("--no-reload", dest="reload", action="store_false", default=True, help="Skip gateway hot-reload")
+        _p.add_argument("--no-firestore", action="store_true", default=False, help="Skip Firestore sync")
+        _p.add_argument("--gateway-url", default="http://localhost:8001", help="Gateway base URL for hot-reload")
+    p_loa.set_defaults(loa_cmd="status")
+
+    # castor components
+    p_comps = sub.add_parser(
+        "components",
+        help="Manage hardware component registration",
+        epilog=(
+            "Examples:\n"
+            "  castor components detect\n"
+            "  castor components register\n"
+            "  castor components list\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    comps_sub = p_comps.add_subparsers(dest="components_cmd")
+    for _cn in ("detect", "list", "register"):
+        _cp = comps_sub.add_parser(_cn, help=f"{'Detect attached hardware' if _cn == 'detect' else 'List config components' if _cn == 'list' else 'Register components to Firestore'}")
+        _cp.add_argument("--config", default=None, help="RCAN config file path")
+        _cp.add_argument("--format", choices=["table", "json"], default="table", help="Output format")
+    p_comps.set_defaults(components_cmd="detect")
+
     # castor privacy
     p_priv = sub.add_parser(
         "privacy",
@@ -7009,6 +7185,8 @@ def main() -> None:
         "configure": cmd_configure,
         "search": cmd_search,
         "network": cmd_network,
+        "loa": cmd_loa,
+        "components": cmd_components,
         "privacy": cmd_privacy,
         # Batch 5 (polish & quality-of-life)
         "update-check": cmd_update_check,

@@ -2472,8 +2472,8 @@ async def rcan_receive_message(request: Request):
         # v2.2 DISCOVER fields
         response_payload["supported_transports"] = ["http", "compact"]
         response_payload["rcan_version"] = "2.2"
-        response_payload["loa_enforcement"] = False
-        response_payload["min_loa_for_control"] = 1
+        response_payload["loa_enforcement"] = cfg.get("loa_enforcement", True)
+        response_payload["min_loa_for_control"] = cfg.get("min_loa_for_control", 1)
         response_payload["federation_enabled"] = False
         response_payload["signing_alg"] = "ml-dsa-65"
         response_payload["pq_signing_required"] = cfg.get("pq_signing_required", True)
@@ -9735,3 +9735,119 @@ async def api_get_conformance() -> dict:
         return {"ok": True, **report}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+# ── LoA enforcement API ───────────────────────────────────────────────────────
+
+class _LoaRequest(BaseModel):
+    enabled: bool
+    min_loa: Optional[int] = None
+
+
+@app.get("/api/loa", dependencies=[Depends(verify_token)])
+async def api_loa_status(request: Request) -> dict:
+    """GET /api/loa — Return current LoA enforcement state."""
+    from castor.loa import get_config_path, get_loa_status, load_config
+    config_path = get_config_path(os.getenv("OPENCASTOR_CONFIG"))
+    if not config_path.exists():
+        return {"ok": False, "error": f"Config not found: {config_path}"}
+    cfg = load_config(config_path)
+    rrn = cfg.get("metadata", {}).get("rrn", "unknown")
+    status = get_loa_status(cfg)
+    return {"ok": True, "rrn": rrn, **status}
+
+
+@app.patch("/api/loa", dependencies=[Depends(verify_token)])
+async def api_loa_patch(body: _LoaRequest, request: Request) -> dict:
+    """PATCH /api/loa — Enable or disable LoA enforcement.
+
+    Patches the config file, hot-reloads in-memory state, and syncs to Firestore.
+    Requires admin role.
+    """
+    _check_min_role(request, "admin")
+    from castor.loa import (
+        get_config_path, get_loa_status, load_config, save_config,
+        push_loa_to_firestore,
+    )
+    config_path = get_config_path(os.getenv("OPENCASTOR_CONFIG"))
+    if not config_path.exists():
+        raise HTTPException(status_code=404, detail=f"Config not found: {config_path}")
+
+    import yaml
+    cfg = load_config(config_path)
+    cfg["loa_enforcement"] = body.enabled
+    if body.min_loa is not None:
+        cfg["min_loa_for_control"] = body.min_loa
+    save_config(cfg, config_path)
+
+    # Hot-apply to the running state
+    state.config = cfg
+    # Also propagate to bridge if loaded
+    if hasattr(state, "bridge") and state.bridge is not None:
+        try:
+            state.bridge.loa_enforcement = body.enabled
+            if body.min_loa is not None:
+                state.bridge.min_loa_for_control = body.min_loa
+        except Exception:
+            pass
+
+    rrn = cfg.get("metadata", {}).get("rrn", "")
+    firestore_ok = False
+    if rrn:
+        firestore_ok = push_loa_to_firestore(rrn, body.enabled, cfg.get("min_loa_for_control", 1))
+
+    status = get_loa_status(cfg)
+    logger.info("LoA enforcement set to %s by API", body.enabled)
+    return {"ok": True, "rrn": rrn, "firestore_synced": firestore_ok, **status}
+
+
+# ── Components API ────────────────────────────────────────────────────────────
+
+@app.get("/api/components", dependencies=[Depends(verify_token)])
+async def api_components_list(request: Request) -> dict:
+    """GET /api/components — Return registered hardware components for this robot."""
+    try:
+        from google.cloud import firestore as _fs
+        from google.oauth2 import service_account
+        from pathlib import Path as _P
+
+        sa_path = _P.home() / ".config" / "opencastor" / "firebase-sa-key.json"
+        creds = service_account.Credentials.from_service_account_file(
+            str(sa_path), scopes=["https://www.googleapis.com/auth/datastore"],
+        )
+        db = _fs.Client(project="opencastor", credentials=creds)
+
+        from castor.loa import get_config_path, load_config
+        cfg = load_config(get_config_path(os.getenv("OPENCASTOR_CONFIG")))
+        rrn = cfg.get("metadata", {}).get("rrn", "")
+        if not rrn:
+            return {"ok": False, "error": "No RRN found in config"}
+
+        docs = db.collection("robots").document(rrn).collection("components").stream()
+        components = [{"id": d.id, **d.to_dict()} for d in docs]
+        return {"ok": True, "rrn": rrn, "components": components, "count": len(components)}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "components": []}
+
+
+@app.post("/api/components/detect", dependencies=[Depends(verify_token)])
+async def api_components_detect(request: Request) -> dict:
+    """POST /api/components/detect — Auto-detect hardware and register to Firestore."""
+    _check_min_role(request, "admin")
+    from castor.components import detect_components, register_components_to_firestore
+    from castor.loa import get_config_path, load_config
+
+    cfg = load_config(get_config_path(os.getenv("OPENCASTOR_CONFIG")))
+    rrn = cfg.get("metadata", {}).get("rrn", "RRN-UNKNOWN")
+
+    components = detect_components(rrn)
+    ok_count, errors = register_components_to_firestore(rrn, components)
+    logger.info("Component detection: %d registered, %d errors", ok_count, len(errors))
+    return {
+        "ok": len(errors) == 0,
+        "rrn": rrn,
+        "detected": len(components),
+        "registered": ok_count,
+        "errors": errors,
+        "components": components,
+    }
