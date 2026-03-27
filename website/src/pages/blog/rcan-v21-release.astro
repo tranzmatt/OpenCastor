@@ -52,7 +52,7 @@ castor sbom publish --token &lt;rrf-token&gt;</code></pre>
     M2M_TRUSTED (role level 6) solves this: the Robot Registry Foundation issues short-lived JWTs that name an explicit <code>fleet_rrns</code> list. Each token requires <strong>multi-owner consent</strong> — every robot's CREATOR must agree before a token is issued. Any CREATOR can revoke at any time. Robots poll the RRF revocation list every ≤ 60 seconds; revoked sessions are terminated within that window.
   </p>
   <pre style="background:var(--bg-alt);border-radius:8px;padding:1rem;font-size:0.8rem;overflow-x:auto"><code>// M2M_TRUSTED JWT claims
-{
+&#123;
   "sub":         "orchestrator:my-fleet-brain",
   "iss":         "rrf.rcan.dev",
   "rcan_role":   "m2m_trusted",
@@ -60,7 +60,7 @@ castor sbom publish --token &lt;rrf-token&gt;</code></pre>
   "fleet_rrns":  ["RRN-000000000001", "RRN-000000000005"],
   "exp":         86400,
   "rrf_sig":     "&lt;Ed25519 base64url&gt;"
-}</code></pre>
+&#125;</code></pre>
 
   <h3>4. Authority Access — EU AI Act Art. 16(j) (§13)</h3>
   <p>

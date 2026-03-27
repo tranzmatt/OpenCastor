@@ -24,7 +24,7 @@ def test_parse_inbound_spec_format():
     from castor.rcan.sdk_bridge import parse_inbound
 
     body = {
-        "rcan": "1.2",
+        "rcan": "2.2",
         "cmd": "status",
         "target": "rcan://registry.rcan.dev/acme/arm/v1/unit-001",
         "sender": "rcan://registry.rcan.dev/ops/console/v1/cli-001",
@@ -59,7 +59,7 @@ def test_parse_inbound_spec_returns_spec_object():
     from castor.rcan.sdk_bridge import parse_inbound
 
     body = {
-        "rcan": "1.2",
+        "rcan": "2.2",
         "cmd": "arm_pose",
         "target": "rcan://registry.rcan.dev/acme/arm/v1/unit-001",
         "sender": "rcan://registry.rcan.dev/ops/console/v1/cli-001",
@@ -133,7 +133,7 @@ def test_send_message_success():
     mock_resp.read.return_value = mock_response_data
 
     with patch("urllib.request.urlopen", return_value=mock_resp):
-        result = send_message("robot.local", {"cmd": "status", "rcan": "1.2"})
+        result = send_message("robot.local", {"cmd": "status", "rcan": "2.2"})
 
     assert result is not None
     assert result["status"] == "ok"

@@ -74,7 +74,7 @@ def test_parse_inbound_spec_format():
     from castor.rcan.sdk_bridge import parse_inbound
 
     body = {
-        "rcan": "1.2",
+        "rcan": "2.2",
         "cmd": "move_forward",
         "target": "rcan://registry.rcan.dev/acme/arm/v2/unit-001",
         "params": {"distance_m": 1.0},

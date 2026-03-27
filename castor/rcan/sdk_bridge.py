@@ -2,7 +2,7 @@
 RCAN SDK Bridge — OpenCastor ↔ rcan-py interoperability.
 
 This module bridges OpenCastor's internal RCAN implementation with the
-official ``rcan`` Python SDK (rcan-py), ensuring full RCAN v1.2 spec
+official ``rcan`` Python SDK (rcan-py), ensuring full RCAN v2.2 spec
 compliance at the protocol boundary.
 
 Key responsibilities:
@@ -119,7 +119,7 @@ def spec_message_to_opencastor(spec_msg: Any) -> Any:
     Convert a spec-compliant :class:`rcan.RCANMessage` into an OpenCastor
     :class:`~castor.rcan.message.RCANMessage` envelope for routing.
 
-    This allows external clients using the rcan-py SDK to send RCAN v1.2
+    This allows external clients using the rcan-py SDK to send RCAN v2.2
     messages to OpenCastor's ``/rcan`` endpoint.
 
     Args:
@@ -154,7 +154,7 @@ def parse_inbound(body: dict) -> Any:
     Detect and parse an inbound RCAN message body.
 
     Accepts both formats:
-      - Spec v1.2 format: ``{"rcan": "1.2", "cmd": ..., "target": "rcan://...", ...}``
+      - Spec v2.2 format: ``{"rcan": "2.2", "cmd": ..., "target": "rcan://...", ...}``
       - OpenCastor internal format: ``{"msg_type": 3, "source": ..., ...}``
 
     Returns the appropriate message object:
@@ -170,7 +170,7 @@ def parse_inbound(body: dict) -> Any:
             from rcan import RCANMessage as SpecMsg
 
             spec = SpecMsg.from_dict(body)
-            logger.debug("Parsed inbound message as RCAN v1.2 spec format: cmd=%s", spec.cmd)
+            logger.debug("Parsed inbound message as RCAN v2.x spec format: cmd=%s", spec.cmd)
             return spec
         except Exception as e:
             logger.warning("Failed to parse as spec message: %s", e)
