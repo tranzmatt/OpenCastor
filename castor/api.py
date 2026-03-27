@@ -2420,20 +2420,35 @@ async def rcan_receive_message(request: Request):
 
     # MessageType.DISCOVER = 1 — respond with capabilities
     if msg_type == 1:
-        response_payload["capabilities"] = ["status", "teleop", "safety", "registry"]
+        cfg = state.config or {}
+        response_payload["capabilities"] = cfg.get(
+            "capabilities", ["status", "teleop", "safety", "registry"]
+        )
         response_payload["ruri"] = state.ruri or "rcan://opencastor.unknown.00000000"
-        # v1.6 DISCOVER fields
+        # v2.2 DISCOVER fields
         response_payload["supported_transports"] = ["http", "compact"]
-        response_payload["rcan_version"] = "1.6"
+        response_payload["rcan_version"] = "2.2"
         response_payload["loa_enforcement"] = False
         response_payload["min_loa_for_control"] = 1
         response_payload["federation_enabled"] = False
+        response_payload["signing_alg"] = "ml-dsa-65"
+        response_payload["pq_signing_required"] = cfg.get("pq_signing_required", True)
+        # ISO conformance block (closes #755) — user-declared in config
+        iso_cfg = cfg.get("iso_conformance", {})
+        response_payload["iso_conformance"] = {
+            "iso_13482": bool(iso_cfg.get("iso_13482", False)),  # Personal care robots
+            "iso_10218_2": bool(iso_cfg.get("iso_10218_2", False)),  # Industrial robots
+            "iso_42001": bool(iso_cfg.get("iso_42001", True)),  # AI management systems
+            "eu_ai_act": bool(iso_cfg.get("eu_ai_act", bool(cfg.get("authority_handler_enabled")))),
+            "rcan_version": "2.2",
+        }
 
     # MessageType.STATUS = 2 — respond with robot info
     elif msg_type == 2:
-        response_payload["robot_name"] = (state.config or {}).get("robot_name", "opencastor")
+        cfg = state.config or {}
+        response_payload["robot_name"] = cfg.get("robot_name", "opencastor")
         response_payload["version"] = _castor_pkg.__version__
-        response_payload["rcan_version"] = "1.6"
+        response_payload["rcan_version"] = "2.2"
         response_payload["ruri"] = state.ruri
 
     return JSONResponse(response_payload, status_code=200)

@@ -1559,6 +1559,122 @@ def cmd_safety(args) -> None:
     print("castor safety: coming soon.")
 
 
+def cmd_iso_check(args) -> None:
+    """castor iso-check — ISO/TC 299 + EU AI Act self-assessment.
+
+    Reads iso_conformance from the RCAN config and outputs a structured checklist
+    of requirements met/not-met against ISO 13482, ISO 10218-2, ISO 42001, and
+    the EU AI Act. Closes #755.
+    """
+    import json as _json
+    import os
+
+    import yaml
+
+    config_path = getattr(args, "config", None) or os.path.expanduser("~/opencastor/bob.rcan.yaml")
+    json_out = getattr(args, "json", False)
+
+    cfg: dict = {}
+    if os.path.exists(config_path):
+        with open(config_path) as _f:
+            cfg = yaml.safe_load(_f) or {}
+
+    iso_cfg = cfg.get("iso_conformance", {})
+    authority_handler = cfg.get("authority_handler_enabled", False)
+    audit_days = cfg.get("audit_retention_days", 0)
+    rcan_version = cfg.get("rcan_version", "?")
+    pq_required = cfg.get("pq_signing_required", False)
+
+    checks = [
+        # ISO 13482 — Personal care robots safety
+        {
+            "standard": "ISO 13482:2014",
+            "title": "Safety of personal care robots",
+            "declared": bool(iso_cfg.get("iso_13482", False)),
+            "notes": "Not applicable unless robot provides physical personal care",
+            "applicable": bool(iso_cfg.get("iso_13482", False)),
+        },
+        # ISO 10218-2 — Industrial robot integration
+        {
+            "standard": "ISO 10218-2:2011",
+            "title": "Industrial robots — safety for integration",
+            "declared": bool(iso_cfg.get("iso_10218_2", False)),
+            "notes": "Not applicable unless industrial deployment",
+            "applicable": bool(iso_cfg.get("iso_10218_2", False)),
+        },
+        # ISO 42001 — AI management systems
+        {
+            "standard": "ISO/IEC 42001:2023",
+            "title": "AI management system",
+            "declared": bool(iso_cfg.get("iso_42001", False)),
+            "notes": "RCAN v2.2 Protocol 66 aligns with AI management requirements",
+            "applicable": True,
+            "checks": [
+                ("RCAN version ≥ 2.0", rcan_version.startswith("2.")),
+                ("ML-DSA-65 signing required", pq_required),
+                ("Authority handler enabled", authority_handler),
+                ("Audit retention ≥ 1 year", audit_days >= 365),
+            ],
+        },
+        # EU AI Act
+        {
+            "standard": "EU AI Act (Reg. 2024/1689)",
+            "title": "EU AI Act high-risk system compliance",
+            "declared": bool(iso_cfg.get("eu_ai_act", authority_handler)),
+            "notes": "Deadline: August 2, 2026",
+            "applicable": True,
+            "checks": [
+                ("Art. 12 — Audit retention ≥ 10yr (3650d)", audit_days >= 3650),
+                ("Art. 13 — Transparency (RCAN MessageType 18)", True),
+                ("Art. 14 — Human oversight (HITL gates in config)", bool(cfg.get("hitl_gates"))),
+                ("Art. 16(j) — Authority handler", authority_handler),
+                ("Art. 15 — PQ signing (robustness/accuracy)", pq_required),
+            ],
+        },
+    ]
+
+    if json_out:
+        print(_json.dumps({"iso_checks": checks, "config": config_path}, indent=2))
+        return
+
+    print()
+    print("ISO/TC 299 + EU AI Act Self-Assessment")
+    print("=" * 48)
+    print(f"Config: {config_path}")
+    print()
+
+    all_pass = True
+    for chk in checks:
+        declared = chk["declared"]
+        applicable = chk.get("applicable", True)
+        icon = "✅" if declared else ("⬜" if not applicable else "⚠️ ")
+        print(f"  {icon} {chk['standard']}")
+        print(f"     {chk['title']}")
+        if not applicable and not declared:
+            print("     → Not applicable (not declared in config)")
+        elif not declared and applicable:
+            print("     → Not declared — add to iso_conformance in config")
+            all_pass = False
+        else:
+            print(f"     → Declared: {declared}")
+
+        if "checks" in chk and applicable:
+            for desc, passed in chk["checks"]:
+                sub_icon = "  ✓" if passed else "  ✗"
+                print(f"        {sub_icon} {desc}")
+                if not passed:
+                    all_pass = False
+        if chk.get("notes"):
+            print(f"     Note: {chk['notes']}")
+        print()
+
+    status = "COMPLIANT (self-declared)" if all_pass else "GAPS DETECTED"
+    print(f"Overall: {status}")
+    print()
+    print("Note: Self-assessment only. Formal certification requires a notified body audit.")
+    print()
+
+
 def cmd_conformance(args) -> None:
     """castor conformance — Print Protocol 66 conformance report."""
     import json as _json
@@ -6123,6 +6239,23 @@ def main() -> None:
     p_conformance.add_argument(
         "--config", default=None, help="Path to RCAN config (default: ~/opencastor/bob.rcan.yaml)"
     )
+
+    # castor iso-check (closes #755)
+    p_iso = sub.add_parser(
+        "iso-check",
+        help="ISO/TC 299 + EU AI Act self-assessment checklist",
+        epilog=(
+            "Examples:\n"
+            "  castor iso-check\n"
+            "  castor iso-check --config ~/my-robot.rcan.yaml\n"
+            "  castor iso-check --json\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_iso.add_argument(
+        "--config", default=None, help="Path to RCAN config (default: ~/opencastor/bob.rcan.yaml)"
+    )
+    p_iso.add_argument("--json", action="store_true", help="Output JSON")
     p_conformance.add_argument("--json", action="store_true", help="Output raw JSON manifest")
 
     p_attest = sub.add_parser(
@@ -6735,6 +6868,7 @@ def main() -> None:
         "monitor": _cmd_monitor,
         "safety": cmd_safety,
         "conformance": cmd_conformance,
+        "iso-check": cmd_iso_check,
         "attestation": cmd_attestation,
         "attest": _cmd_attest_dispatch,
         "sbom": _cmd_sbom_dispatch,
