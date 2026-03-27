@@ -598,10 +598,13 @@ class CastorBridge:
         if self.loa_enforcement:
             try:
                 from rcan.identity import Role as _Role
+
                 _loa_val = _Role(loa) if isinstance(loa, int) else loa
             except Exception:
                 _loa_val = loa
-            ok = _validate_loa_for_scope(loa=_loa_val, scope=scope, min_loa_overrides={scope: required})
+            ok = _validate_loa_for_scope(
+                loa=_loa_val, scope=scope, min_loa_overrides={scope: required}
+            )
             if not ok:
                 log.warning(
                     "LoA enforcement: REJECTED cmd_id=%s scope=%s loa=%d required=%d",
