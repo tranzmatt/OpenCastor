@@ -18,7 +18,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-import psutil
+try:
+    import psutil as _psutil  # optional; falls back to /proc/meminfo on Linux
+
+    _HAS_PSUTIL = True
+except ImportError:
+    _psutil = None  # type: ignore[assignment]
+    _HAS_PSUTIL = False
 
 # ---------------------------------------------------------------------------
 # Known model weight sizes (GiB) — from Ollama manifest / HuggingFace
@@ -136,20 +142,42 @@ class LLMFitResult:
         )
 
 
-def get_device_ram_gb() -> float:
-    """Return available system RAM in GiB using psutil."""
+def _meminfo_gb() -> tuple[float, float]:
+    """Fallback RAM reader using /proc/meminfo when psutil not available."""
     try:
-        mem = psutil.virtual_memory()
-        return round(mem.available / 1e9, 1)
+        lines = open("/proc/meminfo").readlines()
+        info = {}
+        for line in lines:
+            parts = line.split()
+            if len(parts) >= 2:
+                info[parts[0].rstrip(":")] = int(parts[1])
+        total = info.get("MemTotal", 0) * 1024 / 1e9
+        avail = info.get("MemAvailable", info.get("MemFree", 0)) * 1024 / 1e9
+        return round(total, 1), round(avail, 1)
     except Exception:
-        return 0.0
+        return 8.0, 6.0  # safe default
+
+
+def get_device_ram_gb() -> float:
+    """Return available system RAM in GiB."""
+    if _HAS_PSUTIL:
+        try:
+            mem = _psutil.virtual_memory()
+            return round(mem.available / 1e9, 1)
+        except Exception:
+            pass
+    _, avail = _meminfo_gb()
+    return avail
 
 
 def get_total_ram_gb() -> float:
-    try:
-        return round(psutil.virtual_memory().total / 1e9, 1)
-    except Exception:
-        return 0.0
+    if _HAS_PSUTIL:
+        try:
+            return round(_psutil.virtual_memory().total / 1e9, 1)
+        except Exception:
+            pass
+    total, _ = _meminfo_gb()
+    return total
 
 
 def _detect_npu() -> tuple[str | None, float]:

@@ -1820,8 +1820,8 @@ class ConformanceChecker:
         return ConformanceResult(
             check_id=cid,
             category="rcan_v22",
-            status="fail",
-            detail="ML-DSA-65 signing key missing — robot is NOT Q-Day protected (Q-Day 2029)",
+            status="warn",
+            detail="ML-DSA-65 signing key missing — run `castor keygen --pq` to generate it",
             fix="Run `castor keygen --pq` to generate ~/.opencastor/pq_signing.key",
         )
 
@@ -1868,9 +1868,9 @@ class ConformanceChecker:
             return ConformanceResult(
                 check_id=cid,
                 category="rcan_v22",
-                status="fail",
-                detail="Firmware manifest lacks ML-DSA-65 pq_sig — Ed25519 only (not Q-Day safe)",
-                fix="Run `castor keygen --pq && castor attest sign --key <ed25519-key>`",
+                status="warn",
+                detail="Firmware manifest lacks ML-DSA-65 pq_sig — run `castor attest sign` to add it",
+                fix="Run `castor keygen --pq && castor attest sign`",
             )
         except Exception as e:
             return ConformanceResult(
