@@ -599,7 +599,8 @@ async def get_status(request: Request):
 
     # Hardware + model runtime info (non-blocking — errors return empty dicts)
     try:
-        from castor.system_info import get_system_info, get_model_runtime_info
+        from castor.system_info import get_model_runtime_info, get_system_info
+
         payload["system"] = get_system_info()
         payload["model_runtime"] = get_model_runtime_info(state)
     except Exception as _si_exc:
