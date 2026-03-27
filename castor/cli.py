@@ -1433,6 +1433,7 @@ def cmd_plugins(args) -> None:
 def cmd_rrf(args) -> None:
     """castor rrf — Robot Registry Foundation v2 commands (register, components, models, harness, status)."""
     from castor.rrf_cmd import cmd_rrf as _cmd_rrf
+
     _cmd_rrf(args)
 
 
@@ -6231,17 +6232,26 @@ def main() -> None:
     )
     rrf_sub = p_rrf.add_subparsers(dest="rrf_cmd")
     for _rrf_name, _rrf_help in [
-        ("register",   "Register this robot with RRF — receive an RRN"),
+        ("register", "Register this robot with RRF — receive an RRN"),
         ("components", "Register hardware components from config — receive RCNs"),
-        ("models",     "Register AI models used by this robot — receive RMNs"),
-        ("harness",    "Register the AI harness (dual-brain) — receive an RHN"),
-        ("status",     "Show full RRF provenance chain for this robot"),
-        ("wipe",       "(dev) Delete all RRF KV records via admin endpoint"),
+        ("models", "Register AI models used by this robot — receive RMNs"),
+        ("harness", "Register the AI harness (dual-brain) — receive an RHN"),
+        ("status", "Show full RRF provenance chain for this robot"),
+        ("wipe", "(dev) Delete all RRF KV records via admin endpoint"),
     ]:
         _rp = rrf_sub.add_parser(_rrf_name, help=_rrf_help)
         _rp.add_argument("--config", default=None, help="RCAN config file path")
-        _rp.add_argument("--token", default=None, help="RRF bearer token (default: ~/.config/opencastor/bob-rrf-token.txt)")
-        _rp.add_argument("--force", action="store_true", default=False, help="Force re-registration even if already registered")
+        _rp.add_argument(
+            "--token",
+            default=None,
+            help="RRF bearer token (default: ~/.config/opencastor/bob-rrf-token.txt)",
+        )
+        _rp.add_argument(
+            "--force",
+            action="store_true",
+            default=False,
+            help="Force re-registration even if already registered",
+        )
         if _rrf_name == "wipe":
             _rp.add_argument("--secret", default="clawd-wipe-2026", help="Admin wipe secret")
     p_rrf.set_defaults(rrf_cmd="status")
