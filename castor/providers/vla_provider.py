@@ -119,16 +119,26 @@ class VLAProvider(BaseProvider):
                     raw = "VLA arm command blocked by SafetyLayer"
                     logger.warning(raw)
                     return Thought(raw_text=raw, action={"type": "blocked"})
-                raw = f"VLA action ({latency_ms} ms): " + ", ".join(
-                    f"{k}={v:.3f}" for k, v in action.items() if k != "type"
+                # Real inference: high confidence (model output is deterministic)
+                action["confidence"] = 0.85
+                action["brain"] = "vla_openvla"
+                raw = f"VLA action ({latency_ms} ms, conf=0.85): " + ", ".join(
+                    f"{k}={v:.3f}" for k, v in action.items() if k not in ("type", "brain")
                 )
                 return Thought(raw_text=raw, action=action)
             except Exception as exc:
                 logger.error("VLA think error: %s", exc)
 
-        # Mock: return a simple forward-stop action
-        action = {"type": "move", "linear": 0.3, "angular": 0.0}
-        raw = f"VLA mock action: linear=0.3 angular=0.0 (model={self._model_id})"
+        # CPU fallback / mock: return a simple forward-stop action with confidence
+        # confidence < 0.60 will trigger escalation to the planning brain (Claude)
+        action = {
+            "type": "move",
+            "linear": 0.3,
+            "angular": 0.0,
+            "confidence": 0.55,  # below gate → escalates to planning brain in dual-brain mode
+            "brain": "vla_mock",
+        }
+        raw = f"VLA mock action: linear=0.3 angular=0.0 confidence=0.55 (model={self._model_id})"
         return Thought(raw_text=raw, action=action)
 
     def think_stream(
