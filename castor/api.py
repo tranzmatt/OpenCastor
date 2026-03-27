@@ -862,7 +862,6 @@ async def system_upgrade(request: Request):
     Poll GET /api/status for the updated version after ~30s.
     """
     import subprocess
-    import sys
 
     _check_min_role(request, "admin")
 
