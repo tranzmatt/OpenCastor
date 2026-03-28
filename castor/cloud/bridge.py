@@ -1001,6 +1001,7 @@ class CastorBridge:
             # when on the same LAN (avoids Cloud Function relay latency).
             try:
                 import socket as _socket
+
                 # Use UDP trick: connect to a public IP (no data sent) to
                 # force OS to select the LAN-facing network interface.
                 _s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)

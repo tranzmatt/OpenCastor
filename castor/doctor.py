@@ -233,7 +233,6 @@ def _check_commitments() -> CheckResult:
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 
-
 def _check_llmfit() -> CheckResult:
     """Check if the active model fits in device RAM (LLMFit)."""
     try:
@@ -247,16 +246,11 @@ def _check_llmfit() -> CheckResult:
 
         if status == "ok":
             detail = (
-                f"Model '{model}' fits — "
-                f"{headroom:.1f} GB headroom, "
-                f"max ctx {max_ctx:,} tokens"
+                f"Model '{model}' fits — {headroom:.1f} GB headroom, max ctx {max_ctx:,} tokens"
             )
             return CheckResult(status="ok", name="LLMFit", detail=detail)
         elif status == "oom":
-            detail = (
-                f"Model '{model}' may OOM — "
-                f"headroom: {headroom:.1f} GB"
-            )
+            detail = f"Model '{model}' may OOM — headroom: {headroom:.1f} GB"
             return CheckResult(status="warn", name="LLMFit", detail=detail)
         else:
             return CheckResult(status="skip", name="LLMFit", detail=f"Status: {status}")
