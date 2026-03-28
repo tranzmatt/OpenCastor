@@ -997,6 +997,30 @@ class CastorBridge:
             oc_version: str = telemetry.get("version", "unknown")
             telemetry.setdefault("opencastor_version", oc_version)
 
+            # Advertise local WebSocket endpoint so Flutter app can connect
+            # when on the same LAN (avoids Cloud Function relay latency).
+            try:
+                import socket as _socket
+                # Use UDP trick: connect to a public IP (no data sent) to
+                # force OS to select the LAN-facing network interface.
+                _s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+                _s.connect(("8.8.8.8", 80))
+                _local_ip = _s.getsockname()[0]
+                _s.close()
+                telemetry.setdefault("local_ip", _local_ip)
+                # Build WS URL using the LAN IP + gateway port
+                _gw_port = self.gateway_url.split(":")[-1].split("/")[0]
+                telemetry.setdefault(
+                    "ws_telemetry_url",
+                    f"ws://{_local_ip}:{_gw_port}/ws/telemetry",
+                )
+                telemetry.setdefault(
+                    "ws_safety_url",
+                    f"ws://{_local_ip}:{_gw_port}/ws/safety",
+                )
+            except Exception:
+                pass
+
             # RCAN v1.5/v1.6 capability fields (read by Flutter client)
             capabilities = telemetry.get("capabilities", [])
             if isinstance(capabilities, list):
