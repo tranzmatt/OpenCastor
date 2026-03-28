@@ -894,7 +894,9 @@ class CastorBridge:
                 "rrn": self.rrn,
                 "name": self.robot_name,
                 "owner": self.owner,
-                "firebase_uid": self.firebase_uid,
+                # Only write firebase_uid if configured — avoids overwriting
+                # the value set during initial Firestore provisioning.
+                **({"firebase_uid": self.firebase_uid} if self.firebase_uid else {}),
                 "ruri": self.ruri,
                 "capabilities": self.capabilities,
                 "version": self.version,
@@ -905,14 +907,24 @@ class CastorBridge:
                     "online": True,
                     "last_seen": datetime.now(timezone.utc).isoformat(),
                 },
-                # RCAN v1.5/v1.6 fields (safe defaults)
+                # RCAN v1.5/v1.6 fields — read from config where available
                 "revocation_status": "active",
                 "supports_qos_2": True,
                 "supports_delegation": True,
-                "offline_capable": True,
-                "supported_transports": ["http", "compact", "minimal"],
-                "min_loa_for_control": 2,
-                "loa_enforcement": False,
+                "offline_capable": (self.config or {}).get("offline_capable", False),
+                "supported_transports": (self.config or {})
+                .get("agent", {})
+                .get(
+                    "supported_transports",
+                    ["http", "compact", "minimal", "websocket"],
+                ),
+                "min_loa_for_control": (self.config or {})
+                .get("iso_conformance", {})
+                .get(
+                    "min_loa_for_control",
+                    (self.config or {}).get("min_loa_for_control", 1),
+                ),
+                "loa_enforcement": (self.config or {}).get("loa_enforcement", True),
                 "multimodal_enabled": True,
                 "registry_tier": "community",
                 # RCAN v2.1/v2.2 fields
