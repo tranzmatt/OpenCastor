@@ -537,7 +537,8 @@ async def get_status(request: Request):
         "version": _castor_pkg.__version__,
         "providers": list_available_providers(),
         "channels_available": list_available_channels(),
-        "channels_active": list(state.channels.keys()),
+        "channels_active": list(state.channels.keys())
+        or (state.config or {}).get("agent", {}).get("channels", []),
         "last_thought": state.last_thought,
         "audit_log_path": str(DEFAULT_AUDIT_LOG_PATH.expanduser()),
         "brain_primary": _brain_primary,
