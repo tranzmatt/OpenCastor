@@ -209,24 +209,35 @@ class TestLoaEnforcement:
 # ---------------------------------------------------------------------------
 
 class TestToolRegistration:
-    def test_all_expected_tools_registered(self):
-        from castor.mcp_server import mcp
+    def _get_tool_names(self):
+        """Return set of registered tool names, compatible with stub and real FastMCP."""
+        from castor.mcp_server import mcp, _MCP_AVAILABLE
 
-        # FastMCP exposes registered tools
-        tool_names = {t.name for t in mcp._tools.values()} if hasattr(mcp, "_tools") else set()
+        if not _MCP_AVAILABLE:
+            # Stub: _tools dict maps name → function
+            return set(mcp._tools.keys())
 
-        # Fall back: introspect via list_tools if _tools not public
-        if not tool_names:
-            import asyncio
+        # Real FastMCP v1.x: tools live in _tool_manager._tools
+        mgr = getattr(mcp, "_tool_manager", None)
+        if mgr is not None and hasattr(mgr, "_tools"):
+            return set(mgr._tools.keys())
 
-            async def _get_tools():
-                return await mcp.list_tools()
+        # Fallback: async list_tools
+        import asyncio
 
+        async def _get():
             try:
-                tools = asyncio.run(_get_tools())
-                tool_names = {t.name for t in tools}
+                tools = await mcp._mcp_server.list_tools()
+                return {t.name for t in tools.tools}
             except Exception:
-                pytest.skip("Cannot introspect tools in this MCP version")
+                return set()
+
+        return asyncio.run(_get())
+
+    def test_all_expected_tools_registered(self):
+        tool_names = self._get_tool_names()
+        if not tool_names:
+            pytest.skip("Cannot introspect tools in this MCP version")
 
         expected = {
             "robot_status",
@@ -246,20 +257,10 @@ class TestToolRegistration:
 
     def test_tool_count_is_twelve(self):
         """Exactly 12 tools — 4 read, 5 operate, 3 admin."""
-        from castor.mcp_server import mcp
-        import asyncio
-
-        async def _count():
-            try:
-                tools = await mcp.list_tools()
-                return len(tools)
-            except Exception:
-                return -1
-
-        count = asyncio.run(_count())
-        if count == -1:
+        tool_names = self._get_tool_names()
+        if not tool_names:
             pytest.skip("Cannot count tools in this MCP version")
-        assert count == 12
+        assert len(tool_names) == 12
 
 
 # ---------------------------------------------------------------------------
