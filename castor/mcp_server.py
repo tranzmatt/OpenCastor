@@ -513,6 +513,72 @@ def loa_enable(min_loa: int = 1, rrn: str = "") -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Additional Tier 0 tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def robot_ping(rrn: str = "") -> dict[str, Any]:
+    """Quick health check — confirms the robot gateway is reachable and responsive.
+
+    Returns latency, uptime, and bridge status. Use this before issuing commands
+    to verify connectivity.
+
+    Args:
+        rrn: Robot Registry Number. Defaults to local robot.
+    """
+    _check_loa(0)
+    rrn = rrn or _default_rrn()
+    import time
+
+    t0 = time.monotonic()
+    try:
+        resp = httpx.get(f"{_gateway_url()}/health", headers=_headers(), timeout=5)
+        latency_ms = round((time.monotonic() - t0) * 1000)
+        data = (
+            resp.json()
+            if resp.status_code == 200
+            else {"status": "error", "code": resp.status_code}
+        )
+    except Exception as exc:
+        latency_ms = round((time.monotonic() - t0) * 1000)
+        data = {"status": "unreachable", "error": str(exc)}
+    return {
+        "rrn": rrn,
+        "reachable": data.get("status") != "unreachable",
+        "latency_ms": latency_ms,
+        "gateway": data,
+    }
+
+
+@mcp.tool()
+def compliance_report(rrn: str = "") -> dict[str, Any]:
+    """Get the EU AI Act Article 11 compliance report for a robot.
+
+    Returns compliance status across all Art. 11 requirements:
+    system identity, hardware provenance, model provenance, safety controls
+    (LoA enforcement), and post-market monitoring (BigQuery telemetry).
+
+    This is the programmatic equivalent of `castor audit --art11`.
+
+    Args:
+        rrn: Robot Registry Number. Defaults to local robot.
+    """
+    _check_loa(0)
+    rrn = rrn or _default_rrn()
+    try:
+        resp = httpx.get(
+            f"{_gateway_url()}/api/audit",
+            headers=_headers(),
+            timeout=15,
+        )
+        data = resp.json() if resp.status_code == 200 else {"error": resp.text}
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"rrn": rrn, "compliance": data}
+
+
+# ---------------------------------------------------------------------------
 # Server entrypoint
 # ---------------------------------------------------------------------------
 

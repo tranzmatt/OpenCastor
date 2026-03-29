@@ -180,6 +180,27 @@ def cmd_mcp(args) -> None:
         print("  ⚠️  Save this token now — it cannot be recovered.")
         return
 
+    if mcp_cmd == "install":
+        import shutil as _shutil
+
+        token = getattr(args, "token", "") or _os.environ.get("CASTOR_MCP_TOKEN", "")
+        client = getattr(args, "client", "claude")
+        castor_bin = _shutil.which("castor") or "castor"
+        if client == "claude":
+            cmd = f"claude mcp add castor -- {castor_bin} mcp"
+            if token:
+                cmd += f" --token {token}"
+            import subprocess as _sp
+
+            result = _sp.run(cmd, shell=True, capture_output=True, text=True)
+            if result.returncode == 0:
+                print("✓ OpenCastor registered as 'castor' in Claude Code MCP config")
+                print("  Restart Claude Code to activate.")
+            else:
+                print(f"✗ Failed: {result.stderr.strip()}")
+                print(f"  Manual: {cmd}")
+        return
+
     if mcp_cmd == "clients":
         from castor.mcp_auth import list_clients as _list
 
@@ -5345,6 +5366,13 @@ def main() -> None:
     p_mcp_tok.add_argument("--loa", type=int, default=1, help="LoA level 0–3 (default 1)")
     p_mcp_tok.add_argument("--config", default="", help="Path to RCAN yaml")
     p_mcp_sub.add_parser("clients", help="List authorised MCP clients")
+    p_mcp_inst = p_mcp_sub.add_parser(
+        "install", help="Register castor mcp with a local MCP client (Claude Code, etc.)"
+    )
+    p_mcp_inst.add_argument(
+        "--client", default="claude", choices=["claude"], help="MCP client to register with"
+    )
+    p_mcp_inst.add_argument("--token", default="", help="Token to embed (or set CASTOR_MCP_TOKEN)")
 
     # castor wizard
     p_wizard = sub.add_parser(

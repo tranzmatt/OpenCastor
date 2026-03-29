@@ -256,11 +256,11 @@ class TestToolRegistration:
         assert expected.issubset(tool_names), f"Missing tools: {expected - tool_names}"
 
     def test_tool_count_is_twelve(self):
-        """Exactly 12 tools — 4 read, 5 operate, 3 admin."""
+        """Exactly 14 tools — 6 read, 5 operate, 3 admin."""
         tool_names = self._get_tool_names()
         if not tool_names:
             pytest.skip("Cannot count tools in this MCP version")
-        assert len(tool_names) == 12
+        assert len(tool_names) == 14
 
 
 # ---------------------------------------------------------------------------
@@ -281,3 +281,34 @@ class TestConfigHelpers:
         from castor.mcp_server import _gateway_url
         with patch("castor.mcp_server._load_config", return_value={}):
             assert "8001" in _gateway_url() or "127.0.0.1" in _gateway_url()
+
+
+class TestAdditionalTools:
+    """Tests for robot_ping, compliance_report (added tools)."""
+
+    def test_robot_ping_blocked_below_loa0(self):
+        import castor.mcp_server as srv
+        original = srv._CLIENT_LOA
+        try:
+            srv._CLIENT_LOA = -1
+            with pytest.raises(PermissionError):
+                srv._check_loa(0)
+        finally:
+            srv._CLIENT_LOA = original
+
+    def test_additional_tools_registered(self):
+        """robot_ping and compliance_report must be in the tool registry."""
+        helper = TestToolRegistration()
+        names = helper._get_tool_names()
+        if not names:
+            pytest.skip("Cannot introspect tools")
+        assert "robot_ping" in names
+        assert "compliance_report" in names
+
+    def test_total_tool_count_is_fourteen(self):
+        """14 tools total: original 12 + robot_ping + compliance_report."""
+        helper = TestToolRegistration()
+        names = helper._get_tool_names()
+        if not names:
+            pytest.skip("Cannot count tools")
+        assert len(names) == 14
