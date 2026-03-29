@@ -152,7 +152,7 @@ class HuggingFaceProvider(BaseProvider):
             raise ImportError(
                 "GGUF models require Ollama or llama-cpp-python. "
                 "Install: pip install llama-cpp-python  OR  install Ollama from https://ollama.com"
-            )
+            ) from None
 
     def think(
         self,
