@@ -944,6 +944,12 @@ class CastorBridge:
                 # RCAN v2.1/v2.2 fields
                 "authority_handler_enabled": True,
                 "audit_retention_days": 3650,
+                # MCP server config — published for Flutter MCP screen
+                "mcp_clients": [
+                    {"name": name, "loa": int(cfg.get("loa", 0))}
+                    for name, cfg in (self._rcan_config or {}).get("mcp_clients", {}).items()
+                ],
+                "mcp_enabled": bool((self._rcan_config or {}).get("mcp_clients")),
             },
             merge=True,
         )
