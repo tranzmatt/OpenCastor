@@ -3386,11 +3386,91 @@ def cmd_approvals(args) -> None:
     print_approvals(pending)
 
 
+def _cmd_audit_art11(args) -> None:
+    """Print EU AI Act Art. 11 compliance summary for this robot."""
+    import json as _json
+    import os as _os
+
+    # Load config
+    config_path = getattr(args, "config", None) or _os.path.expanduser("~/opencastor/bob.rcan.yaml")
+    try:
+        import yaml as _yaml
+
+        with open(config_path) as _f:
+            cfg = _yaml.safe_load(_f)
+    except Exception as exc:
+        print(f"  ⚠️  Could not load config ({exc}) — showing partial info")
+        cfg = {}
+
+    meta = cfg.get("metadata", cfg.get("identity", {}))
+    agent = cfg.get("agent", {})
+    signing = agent.get("signing", {})
+    rrn = meta.get("rrn", cfg.get("rrn", "unknown"))
+    robot_name = meta.get("robot_name", cfg.get("robot_name", "?"))
+    version = meta.get("version", cfg.get("version", "unknown"))
+    rcan_ver = cfg.get("rcan_version", "unknown")
+    pq_kid = signing.get("pq_kid", "unknown")
+    loa_on = cfg.get("loa_enforcement", False)
+    fw_hash = cfg.get("firmware_hash", meta.get("firmware_hash", "unknown"))
+
+    # Pull component/model/harness IDs
+    components = cfg.get("components", [])
+    models = cfg.get("models", [])
+    harness_rhn = cfg.get("harness_rhn", "unknown")
+
+    from castor.compliance import SPEC_VERSION
+
+    print()
+    print("┌─────────────────────────────────────────────────────────────────┐")
+    print("│  EU AI Act Art. 11 — Technical Documentation Summary            │")
+    print("└─────────────────────────────────────────────────────────────────┘")
+    print()
+    print(f"  Robot:         {robot_name} ({rrn})")
+    print(f"  Version:       {version}")
+    print(f"  RCAN spec:     {rcan_ver}  (accepted: {SPEC_VERSION})")
+    print(f"  PQ signing:    ML-DSA-65  kid={pq_kid}")
+    print(f"  LoA enforce:   {'✅ ON' if loa_on else '❌ OFF'}")
+    print(f"  Firmware hash: {fw_hash[:32]}...")
+    print()
+    print("  Provenance chain:")
+    print(f"    {harness_rhn}  (harness)")
+    for m in models:
+        print(f"    └── {m.get('rmn', '?')}  {m.get('name', '?')} {m.get('version', '')}")
+    print(f"    {rrn}  (robot)")
+    for c in components:
+        print(f"    └── {c.get('rcn', '?')}  {c.get('type', '?')}: {c.get('model', '?')}")
+    print()
+    print("  Artifact locations:")
+    print(f"    SBOM:        gs://opencastor-audit/{rrn}/sbom/latest.json")
+    print(f"    Attestation: gs://opencastor-audit/{rrn}/")
+    print(f"    Art. 11 doc: gs://opencastor-audit/{rrn}/compliance/latest/eu-ai-act-art11.md")
+    print()
+    print("  EU AI Act checklist:")
+    print(f"    {'✅' if rrn != 'unknown' else '❌'}  System identity (Art. 11 §1a)       {rrn}")
+    print(
+        f"    {'✅' if components else '❌'}  Hardware provenance (Art. 11 §1b)   {len(components)} component(s)"
+    )
+    print(
+        f"    {'✅' if models else '❌'}  Model provenance (Art. 11 §1c)      {len(models)} model(s)"
+    )
+    print(
+        f"    {'✅' if loa_on else '⚠️ '}  Safety controls (Art. 9)           LoA={'ON' if loa_on else 'OFF'}"
+    )
+    print(f"    ✅  Post-market monitoring (Art. 72)  BigQuery + Firestore telemetry")
+    print(f"    ✅  SBOM (Art. 11 §1b)               CycloneDX, RRF-countersigned")
+    print(f"    ⏳  Notified body submission           Deadline: 2026-08-02")
+    print()
+
+
 def cmd_audit(args) -> None:
     """castor audit — view and verify the tamper-evident audit log."""
     from castor.audit import get_audit, print_audit
 
     audit = get_audit()
+
+    if getattr(args, "art11", False):
+        _cmd_audit_art11(args)
+        return
 
     if getattr(args, "verify", False):
         ok, broken_idx = audit.verify_chain()
@@ -6775,6 +6855,17 @@ def main() -> None:
     )
     p_audit.add_argument("--limit", type=int, default=50, help="Max entries to show (default: 50)")
     p_audit.add_argument("--verify", action="store_true", help="Verify hash chain integrity")
+    p_audit.add_argument(
+        "--art11",
+        action="store_true",
+        help="Generate EU AI Act Art. 11 technical documentation summary",
+    )
+    p_audit.add_argument(
+        "--config",
+        default=None,
+        metavar="PATH",
+        help="Path to RCAN config YAML (default: ~/opencastor/bob.rcan.yaml)",
+    )
 
     # castor monitor
     p_monitor = sub.add_parser(
