@@ -192,8 +192,8 @@ def get_system_info() -> dict[str, Any]:
         "disk_free_gb": disk_free,
         "disk_used_pct": disk_used_pct,
         "cpu_temp_c": _cpu_temp_c(),
-        "npu_detected": npu_name is not None,   # bool — True if NPU found
-        "npu_model": npu_name,                    # str | None — e.g. "hailo-8"
+        "npu_detected": npu_name is not None,  # bool — True if NPU found
+        "npu_model": npu_name,  # str | None — e.g. "hailo-8"
         "npu_tops": npu_tops if npu_name else None,
         "gpu_detected": _detect_gpu(),
     }
