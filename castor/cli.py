@@ -158,10 +158,68 @@ def cmd_gateway(args) -> None:
 
 
 def cmd_mcp(args) -> None:
-    """Start the MCP server."""
-    from castor.mcp_server import main as run_mcp
+    """Start the MCP server (stdio transport) or manage MCP clients."""
+    import os as _os
+    from pathlib import Path as _Path
 
-    run_mcp(host=args.host, port=args.port)
+    mcp_cmd = getattr(args, "mcp_cmd", None)
+
+    if mcp_cmd == "token":
+        from castor.mcp_auth import generate_token as _gen
+
+        config_path = _Path(
+            getattr(args, "config", None)
+            or _os.environ.get("CASTOR_CONFIG", _Path.home() / "opencastor/bob.rcan.yaml")
+        )
+        raw = _gen(name=args.name, loa=args.loa, config_path=config_path)
+        print(f"✓ Token generated for '{args.name}' (LoA {args.loa})")
+        print(f"\n  export CASTOR_MCP_TOKEN={raw}")
+        print("\n  Add to Claude Code:")
+        print(f"  claude mcp add castor -- castor mcp --token {raw}")
+        print(f"\n  Token hash stored in: {config_path}")
+        print("  ⚠️  Save this token now — it cannot be recovered.")
+        return
+
+    if mcp_cmd == "clients":
+        from castor.mcp_auth import list_clients as _list
+
+        config_path = _Path(
+            getattr(args, "config", None)
+            or _os.environ.get("CASTOR_CONFIG", _Path.home() / "opencastor/bob.rcan.yaml")
+        )
+        clients = _list(config_path)
+        if not clients:
+            print("No MCP clients registered. Run: castor mcp token --name NAME --loa N")
+            return
+        print(f"{'Name':<30} {'LoA':<5} {'Token hash (truncated)'}")
+        print("-" * 70)
+        for c in clients:
+            name = c.get("name", "?")
+            loa = c.get("loa", 0)
+            h = c.get("token_hash", "")[:32] + "…"
+            print(f"{name:<30} {loa:<5} {h}")
+        return
+
+    # Default: start the MCP server
+    from castor.mcp_server import run as _mcp_run
+
+    token = getattr(args, "token", "") or _os.environ.get("CASTOR_MCP_TOKEN", "")
+    if not token and _os.environ.get("CASTOR_MCP_DEV") != "1":
+        import sys as _sys
+
+        print(
+            "Error: provide --token TOKEN or set CASTOR_MCP_TOKEN.\n"
+            "For local dev: CASTOR_MCP_DEV=1 castor mcp",
+            file=_sys.stderr,
+        )
+        raise SystemExit(1)
+    if _os.environ.get("CASTOR_MCP_DEV") == "1" and not token:
+        token = "dev"
+    config_path = _Path(
+        getattr(args, "config", "")
+        or _os.environ.get("CASTOR_CONFIG", _Path.home() / "opencastor/bob.rcan.yaml")
+    )
+    _mcp_run(token=token, config_path=config_path)
 
 
 def cmd_wizard(args) -> None:
@@ -5263,15 +5321,30 @@ def main() -> None:
     p_gw.add_argument("--host", default="127.0.0.1", help="Bind address")
     p_gw.add_argument("--port", type=int, default=8000, help="Port number")
 
-    # castor mcp
+    # castor mcp — MCP server (Model Context Protocol)
     p_mcp = sub.add_parser(
         "mcp",
-        help="Start the MCP server for tool-based agent integration",
-        epilog="Example: castor mcp --host 127.0.0.1 --port 8765",
+        help="MCP server — expose robot tools to any AI agent (Claude Code, Codex, Cursor, …)",
+        epilog=(
+            "Examples:\n"
+            "  castor mcp --token $CASTOR_MCP_TOKEN   # start server (stdio)\n"
+            "  castor mcp token --name laptop --loa 3  # generate token\n"
+            "  castor mcp clients                       # list authorised clients\n"
+            "  CASTOR_MCP_DEV=1 castor mcp              # dev mode (LoA 3, no token)\n"
+            "\n"
+            "Add to Claude Code:\n"
+            "  claude mcp add castor -- castor mcp --token $CASTOR_MCP_TOKEN"
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p_mcp.add_argument("--host", default="127.0.0.1", help="Bind address")
-    p_mcp.add_argument("--port", type=int, default=8765, help="Port number")
+    p_mcp.add_argument("--token", default="", help="Bearer token (or set CASTOR_MCP_TOKEN)")
+    p_mcp.add_argument("--config", default="", help="Path to RCAN yaml")
+    p_mcp_sub = p_mcp.add_subparsers(dest="mcp_cmd")
+    p_mcp_tok = p_mcp_sub.add_parser("token", help="Generate a new MCP client token")
+    p_mcp_tok.add_argument("--name", required=True, help="Client name")
+    p_mcp_tok.add_argument("--loa", type=int, default=1, help="LoA level 0–3 (default 1)")
+    p_mcp_tok.add_argument("--config", default="", help="Path to RCAN yaml")
+    p_mcp_sub.add_parser("clients", help="List authorised MCP clients")
 
     # castor wizard
     p_wizard = sub.add_parser(
@@ -7440,6 +7513,23 @@ def main() -> None:
     p_traj_show.add_argument("id", metavar="RUN_ID")
     p_traj_sub.add_parser("export", help="Export all runs as JSONL")
     p_traj_sub.add_parser("stats", help="Show summary statistics")
+
+    # castor mcp — MCP server (Model Context Protocol)
+    p_mcp = sub.add_parser("mcp", help="MCP server — expose robot tools to any AI agent")
+    p_mcp.add_argument("--token", default="", help="Bearer token (or set CASTOR_MCP_TOKEN)")
+    p_mcp.add_argument(
+        "--config", default="", help="Path to RCAN yaml (default: ~/opencastor/bob.rcan.yaml)"
+    )
+    p_mcp_sub = p_mcp.add_subparsers(dest="mcp_cmd")
+
+    # castor mcp token
+    p_mcp_tok = p_mcp_sub.add_parser("token", help="Generate a new MCP client token")
+    p_mcp_tok.add_argument("--name", required=True, help="Client name (e.g. claude-code-laptop)")
+    p_mcp_tok.add_argument("--loa", type=int, default=1, help="LoA level 0–3 (default: 1)")
+    p_mcp_tok.add_argument("--config", default="", help="Path to RCAN yaml")
+
+    # castor mcp clients
+    p_mcp_sub.add_parser("clients", help="List authorised MCP clients")
 
     # Load plugins and merge any plugin-provided commands
     try:

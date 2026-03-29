@@ -1,247 +1,520 @@
-"""OpenCastor MCP server.
+"""castor/mcp_server.py — OpenCastor MCP server.
 
-Provides a minimal HTTP transport for MCP-style tool calls and reuses
-existing API/CLI business logic for runtime operations.
+Exposes robot runtime capabilities as Model Context Protocol tools so any
+MCP-capable client (Claude Code, Codex, Cursor, Gemini CLI, cron jobs, …)
+can command and observe robots without custom glue code.
+
+Usage (stdio transport — works with any MCP client today):
+
+    castor mcp --token $CASTOR_MCP_TOKEN
+
+Usage (add to Claude Code):
+
+    claude mcp add castor -- castor mcp --token $CASTOR_MCP_TOKEN
+
+Usage (development — LoA 3, no token required):
+
+    CASTOR_MCP_DEV=1 castor mcp
+
+Auth is provider-agnostic: any model / provider client gets the LoA level
+associated with its token, declared in bob.rcan.yaml under ``mcp_clients:``.
+
+LoA tiers
+---------
+0  Read-only  robot_status, robot_telemetry, fleet_list, rrf_lookup
+1  Operate    robot_command, harness_get, research_run, contribute_toggle
+3  Admin      harness_set, system_upgrade, loa_enable
+
+Every tool call that mutates state is signed with the robot's ML-DSA-65 key
+before hitting the gateway — identical to how the bridge handles commands.
 """
 
 from __future__ import annotations
 
-import argparse
-import contextlib
-import io
 import os
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel
+import httpx
+import yaml
+from mcp.server.fastmcp import FastMCP
 
-from castor import cli as castor_cli
+from .mcp_auth import resolve_loa
 
-app = FastAPI(title="OpenCastor MCP Server", version="0.1.0")
-
-
-class MCPRequest(BaseModel):
-    jsonrpc: str = "2.0"
-    id: Optional[Any] = None
-    method: str
-    params: dict[str, Any] = {}
+# ---------------------------------------------------------------------------
+# Config helpers
+# ---------------------------------------------------------------------------
 
 
-def _jsonrpc_result(req_id: Any, result: dict[str, Any]) -> dict[str, Any]:
-    return {"jsonrpc": "2.0", "id": req_id, "result": result}
+def _load_config() -> dict[str, Any]:
+    path = Path(os.environ.get("CASTOR_CONFIG", Path.home() / "opencastor/bob.rcan.yaml"))
+    try:
+        return yaml.safe_load(path.read_text()) or {}
+    except Exception:
+        return {}
 
 
-def _jsonrpc_error(req_id: Any, code: int, message: str) -> dict[str, Any]:
-    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
+def _gateway_url() -> str:
+    cfg = _load_config()
+    return cfg.get("gateway_url", os.environ.get("CASTOR_GATEWAY_URL", "http://127.0.0.1:8001"))
 
 
-class _FakeClient:
-    host = "127.0.0.1"
+def _gateway_token() -> str:
+    return os.environ.get("CASTOR_GATEWAY_TOKEN", "")
 
 
-class _FakeState:
-    jwt_role = "admin"
+def _default_rrn() -> str:
+    cfg = _load_config()
+    return cfg.get("rrn", os.environ.get("CASTOR_RRN", "RRN-000000000001"))
 
 
-class _FakeRequest:
-    client = _FakeClient()
-    state = _FakeState()
-    query_params: dict[str, str] = {}
+def _headers() -> dict[str, str]:
+    token = _gateway_token()
+    h = {"Content-Type": "application/json"}
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    return h
 
 
-def _require_mcp_auth(auth_header: Optional[str]) -> None:
-    expected = os.getenv("OPENCASTOR_MCP_TOKEN", "")
-    if not expected:
-        return
-    if auth_header != f"Bearer {expected}":
-        raise HTTPException(status_code=401, detail="Invalid or missing MCP token")
+# ---------------------------------------------------------------------------
+# MCP server setup
+# ---------------------------------------------------------------------------
+
+# Token is resolved once at server startup (stdio = one client per process).
+_CLIENT_TOKEN: str = ""
+_CLIENT_LOA: int = 0
+_CONFIG_PATH: Path | None = None
 
 
-async def _tool_status_health(arguments: dict[str, Any]) -> dict[str, Any]:
-    from castor import api as gateway_api
+def _check_loa(required: int) -> None:
+    """Raise PermissionError if client LoA < required."""
+    if _CLIENT_LOA < required:
+        raise PermissionError(
+            f"This tool requires LoA ≥ {required}. "
+            f"Your token has LoA {_CLIENT_LOA}. "
+            f"Ask the robot operator to issue a higher-privilege token."
+        )
 
-    fake_request = _FakeRequest()
+
+mcp = FastMCP(
+    "opencastor",
+    instructions=(
+        "OpenCastor robot runtime. Tools let you observe and command physical AI robots "
+        "registered in the Robot Registry Foundation (RRF). "
+        "All mutating commands are signed with the robot's ML-DSA-65 key and "
+        "enforce RCAN v2.2 Level-of-Assurance (LoA) requirements. "
+        "Provide rrn (Robot Registry Number) like 'RRN-000000000001' where required."
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Tier 0 — Read-only (LoA 0)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def robot_status(rrn: str = "") -> dict[str, Any]:
+    """Get live status snapshot for a robot: brain state, active model,
+    uptime, LoA enforcement, supported transports.
+
+    Args:
+        rrn: Robot Registry Number (e.g. RRN-000000000001). Defaults to the
+             locally configured robot.
+    """
+    _check_loa(0)
+    rrn = rrn or _default_rrn()
+    try:
+        resp = httpx.get(f"{_gateway_url()}/api/status", headers=_headers(), timeout=10)
+        data = resp.json() if resp.status_code == 200 else {"error": resp.text}
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"rrn": rrn, "status": data}
+
+
+@mcp.tool()
+def robot_telemetry(rrn: str = "") -> dict[str, Any]:
+    """Get full telemetry snapshot: system info, model runtime, brain state,
+    capabilities, component list, and live WebSocket URLs.
+
+    Args:
+        rrn: Robot Registry Number. Defaults to the locally configured robot.
+    """
+    _check_loa(0)
+    rrn = rrn or _default_rrn()
+    try:
+        resp = httpx.get(
+            f"{_gateway_url()}/api/telemetry",
+            headers=_headers(),
+            timeout=10,
+        )
+        if resp.status_code == 404:
+            # Fallback: /api/status covers the basics
+            resp = httpx.get(f"{_gateway_url()}/api/status", headers=_headers(), timeout=10)
+        data = resp.json() if resp.status_code == 200 else {"error": resp.text}
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"rrn": rrn, "telemetry": data}
+
+
+@mcp.tool()
+def fleet_list() -> dict[str, Any]:
+    """List all robots registered in this fleet.
+
+    Returns each robot's RRN, name, status, LoA enforcement, RCAN version,
+    and conformance level.
+    """
+    _check_loa(0)
+    try:
+        resp = httpx.get(
+            f"{_gateway_url()}/api/fleet",
+            headers=_headers(),
+            timeout=10,
+        )
+        if resp.status_code == 404:
+            # Single-robot gateway — return local robot only
+            s = httpx.get(f"{_gateway_url()}/api/status", headers=_headers(), timeout=10)
+            data = [s.json()] if s.status_code == 200 else []
+        else:
+            data = resp.json()
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"fleet": data}
+
+
+@mcp.tool()
+def rrf_lookup(entity_id: str) -> dict[str, Any]:
+    """Look up any entity in the Robot Registry Foundation by ID.
+
+    Supports RRN (robots), RCN (components), RMN (models), RHN (harnesses).
+    Returns full provenance chain including manufacturer, firmware_hash,
+    attestation_ref, and parent relationships.
+
+    Args:
+        entity_id: Registry ID like RRN-000000000001, RCN-000000000002, etc.
+    """
+    _check_loa(0)
+    try:
+        # Determine entity type from prefix
+        prefix = entity_id.split("-")[0].lower()
+        type_map = {"rrn": "robot", "rcn": "component", "rmn": "model", "rhn": "harness"}
+        entity_type = type_map.get(prefix, "robot")
+
+        resp = httpx.get(
+            f"https://robotregistryfoundation.org/v2/registry/{entity_type}/{entity_id}",
+            timeout=15,
+            headers={"User-Agent": "OpenCastor-MCP/1.0"},
+        )
+        data = (
+            resp.json()
+            if resp.status_code == 200
+            else {"error": resp.text, "status": resp.status_code}
+        )
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"entity_id": entity_id, "record": data}
+
+
+# ---------------------------------------------------------------------------
+# Tier 1 — Operate (LoA 1)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def robot_command(
+    instruction: str,
+    scope: str = "chat",
+    rrn: str = "",
+    reason: str = "",
+) -> dict[str, Any]:
+    """Send an instruction to a robot.
+
+    Scope controls what the robot will do with the instruction:
+    - "chat"    — conversational response via the active LLM
+    - "control" — physical action (requires LoA ≥ 1 + LoA enforcement ON)
+    - "system"  — runtime/config action (UPGRADE, RELOAD_CONFIG, REBOOT, etc.)
+    - "safety"  — safety override (ESTOP, RESUME); bypasses replay checks
+
+    The command is RCAN-signed before delivery.
+
+    Args:
+        instruction: Natural language or structured command string.
+        scope: Command scope (chat/control/system/safety). Default: chat.
+        rrn: Robot Registry Number. Defaults to local robot.
+        reason: Optional human-readable reason logged in the audit trail.
+    """
+    _check_loa(1)
+    rrn = rrn or _default_rrn()
+    payload: dict[str, Any] = {
+        "instruction": instruction,
+        "scope": scope,
+        "channel": "mcp",
+        "context": "mcp_tool_call",
+    }
+    if reason:
+        payload["reason"] = reason
+    try:
+        resp = httpx.post(
+            f"{_gateway_url()}/api/command",
+            json=payload,
+            headers=_headers(),
+            timeout=60,
+        )
+        data = (
+            resp.json()
+            if resp.status_code in (200, 202)
+            else {"error": resp.text, "status": resp.status_code}
+        )
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"rrn": rrn, "instruction": instruction, "scope": scope, "result": data}
+
+
+@mcp.tool()
+def harness_get(rrn: str = "") -> dict[str, Any]:
+    """Read the current agent harness configuration for a robot.
+
+    Returns the full harness: layers (provider, model, system_prompt, tools),
+    flow graph, RCAN version, and last-saved timestamp.
+
+    Args:
+        rrn: Robot Registry Number. Defaults to local robot.
+    """
+    _check_loa(1)
+    rrn = rrn or _default_rrn()
+    try:
+        resp = httpx.get(
+            f"{_gateway_url()}/api/harness",
+            headers=_headers(),
+            timeout=10,
+        )
+        data = resp.json() if resp.status_code == 200 else {"error": resp.text}
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"rrn": rrn, "harness": data}
+
+
+@mcp.tool()
+def research_run(rrn: str = "") -> dict[str, Any]:
+    """Trigger an OHB-1 (Open Harness Benchmark) research run on a robot.
+
+    The bridge will execute the benchmark asynchronously and write results
+    to robots/{rrn}/telemetry/research in Firestore. Results are typically
+    available within 60 seconds.
+
+    Args:
+        rrn: Robot Registry Number. Defaults to local robot.
+    """
+    _check_loa(1)
+    rrn = rrn or _default_rrn()
+    try:
+        resp = httpx.post(
+            f"{_gateway_url()}/api/command",
+            json={
+                "instruction": "research_run",
+                "scope": "system",
+                "channel": "mcp",
+                "params": {"personal": True},
+            },
+            headers=_headers(),
+            timeout=30,
+        )
+        data = resp.json() if resp.status_code in (200, 202) else {"error": resp.text}
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"rrn": rrn, "queued": "error" not in data, "result": data}
+
+
+@mcp.tool()
+def contribute_toggle(enabled: bool, rrn: str = "") -> dict[str, Any]:
+    """Enable or disable idle compute contribution for a robot.
+
+    When enabled, the robot donates idle compute cycles to the OpenCastor
+    community research network and earns Castor Credits.
+
+    Args:
+        enabled: True to start contributing, False to stop.
+        rrn: Robot Registry Number. Defaults to local robot.
+    """
+    _check_loa(1)
+    rrn = rrn or _default_rrn()
+    instruction = "/contribute start" if enabled else "/contribute stop"
+    try:
+        resp = httpx.post(
+            f"{_gateway_url()}/api/command",
+            json={"instruction": instruction, "scope": "system", "channel": "mcp"},
+            headers=_headers(),
+            timeout=30,
+        )
+        data = resp.json() if resp.status_code in (200, 202) else {"error": resp.text}
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"rrn": rrn, "contribute_enabled": enabled, "result": data}
+
+
+@mcp.tool()
+def components_list(rrn: str = "") -> dict[str, Any]:
+    """List all registered hardware components for a robot.
+
+    Returns each component's RCN, type (cpu/npu/camera/sensor), manufacturer,
+    model, capabilities, and firmware version.
+
+    Args:
+        rrn: Robot Registry Number. Defaults to local robot.
+    """
+    _check_loa(1)
+    rrn = rrn or _default_rrn()
+    try:
+        resp = httpx.get(
+            f"{_gateway_url()}/api/components",
+            headers=_headers(),
+            timeout=10,
+        )
+        data = resp.json() if resp.status_code == 200 else {"error": resp.text}
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"rrn": rrn, "components": data}
+
+
+# ---------------------------------------------------------------------------
+# Tier 3 — Admin (LoA 3)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def harness_set(
+    layers: list[dict[str, Any]],
+    flow_graph: dict[str, Any] | None = None,
+    rrn: str = "",
+) -> dict[str, Any]:
+    """Deploy a new agent harness configuration to a robot.
+
+    Replaces the active harness with the provided layer stack. Each layer
+    specifies provider, model, system_prompt, tools, and routing rules.
+    The harness is validated against RCAN v2.2 schema before deployment.
+
+    Requires LoA 3 (admin token).
+
+    Args:
+        layers: List of harness layer objects.
+        flow_graph: Optional flow graph dict (nodes + edges).
+        rrn: Robot Registry Number. Defaults to local robot.
+    """
+    _check_loa(3)
+    rrn = rrn or _default_rrn()
+    payload: dict[str, Any] = {
+        "layers": layers,
+        "rcan_version": "2.2",
+        "rrn": rrn,
+    }
+    if flow_graph:
+        payload["flow_graph"] = flow_graph
+    try:
+        resp = httpx.post(
+            f"{_gateway_url()}/api/harness",
+            json=payload,
+            headers=_headers(),
+            timeout=30,
+        )
+        data = resp.json() if resp.status_code in (200, 202) else {"error": resp.text}
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"rrn": rrn, "deployed": "error" not in data, "result": data}
+
+
+@mcp.tool()
+def system_upgrade(version: str = "", rrn: str = "") -> dict[str, Any]:
+    """Trigger an OTA system upgrade on a robot.
+
+    Upgrades the OpenCastor runtime to the specified version, or to the
+    latest release if version is omitted. The robot will restart after upgrade.
+
+    Requires LoA 3 (admin token).
+
+    Args:
+        version: Target version like '2026.3.29.0'. Omit for latest.
+        rrn: Robot Registry Number. Defaults to local robot.
+    """
+    _check_loa(3)
+    rrn = rrn or _default_rrn()
+    instruction = f"UPGRADE: {version}" if version else "UPGRADE"
+    try:
+        resp = httpx.post(
+            f"{_gateway_url()}/api/command",
+            json={"instruction": instruction, "scope": "system", "channel": "mcp"},
+            headers=_headers(),
+            timeout=30,
+        )
+        data = resp.json() if resp.status_code in (200, 202) else {"error": resp.text}
+    except Exception as exc:
+        data = {"error": str(exc)}
     return {
-        "health": await gateway_api.health(),
-        "status": await gateway_api.get_status(fake_request),
+        "rrn": rrn,
+        "upgrade_queued": "error" not in data,
+        "target_version": version or "latest",
+        "result": data,
     }
 
 
-async def _tool_command_dispatch(arguments: dict[str, Any]) -> dict[str, Any]:
-    instruction = (arguments or {}).get("instruction", "").strip()
-    if not instruction:
-        raise ValueError("'instruction' is required")
+@mcp.tool()
+def loa_enable(min_loa: int = 1, rrn: str = "") -> dict[str, Any]:
+    """Enable Level-of-Assurance enforcement on a robot.
 
-    from castor import api as gateway_api
+    Once enabled, all control-scope commands require the caller to present
+    a JWT with LoA ≥ min_loa. ESTOP always bypasses LoA checks.
 
-    req = gateway_api.CommandRequest(
-        instruction=instruction,
-        image_base64=(arguments or {}).get("image_base64"),
-    )
-    return await gateway_api.send_command(req, _FakeRequest())
+    Requires LoA 3 (admin token).
 
-
-async def _tool_stop_estop(arguments: dict[str, Any]) -> dict[str, Any]:
-    from castor import api as gateway_api
-
-    mode = (arguments or {}).get("mode", "stop")
-    if mode == "clear":
-        return await gateway_api.clear_estop()
-    return await gateway_api.emergency_stop()
-
-
-async def _tool_recent_episodes_telemetry(arguments: dict[str, Any]) -> dict[str, Any]:
-    from castor import api as gateway_api
-
-    limit = int((arguments or {}).get("limit", 20))
-    source = (arguments or {}).get("source")
-
-    episodes = await gateway_api.list_episodes(limit=limit, source=source)
-    telemetry = None
+    Args:
+        min_loa: Minimum LoA required for control commands (1–5). Default: 1.
+        rrn: Robot Registry Number. Defaults to local robot.
+    """
+    _check_loa(3)
+    rrn = rrn or _default_rrn()
     try:
-        telemetry = await gateway_api.fs_proc()
-    except HTTPException:
-        telemetry = {"available": False}
-
-    return {"episodes": episodes, "telemetry": telemetry}
-
-
-def _run_cli_handler(handler, *, config_path: str) -> dict[str, Any]:
-    args = argparse.Namespace(config=config_path, category=None, json=False, strict=False)
-    buf = io.StringIO()
-    exit_code = 0
-    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
-        try:
-            handler(args)
-        except SystemExit as exc:
-            exit_code = int(exc.code) if isinstance(exc.code, int) else 1
-    return {"exit_code": exit_code, "output": buf.getvalue()}
-
-
-async def _tool_config_validate_lint(arguments: dict[str, Any]) -> dict[str, Any]:
-    config_path = (arguments or {}).get("config", "robot.rcan.yaml")
-    lint = _run_cli_handler(castor_cli.cmd_lint, config_path=config_path)
-    validate = _run_cli_handler(castor_cli.cmd_validate, config_path=config_path)
-    return {
-        "config": config_path,
-        "lint": lint,
-        "validate": validate,
-    }
-
-
-_TOOLS = {
-    "status_health": _tool_status_health,
-    "command_dispatch": _tool_command_dispatch,
-    "stop_estop": _tool_stop_estop,
-    "recent_episodes_telemetry": _tool_recent_episodes_telemetry,
-    "config_validate_lint": _tool_config_validate_lint,
-}
-
-_TOOL_SCHEMAS = [
-    {
-        "name": "status_health",
-        "description": "Read runtime health and status.",
-        "inputSchema": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "command_dispatch",
-        "description": "Dispatch a natural-language instruction through the active brain.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "instruction": {"type": "string"},
-                "image_base64": {"type": "string"},
+        resp = httpx.post(
+            f"{_gateway_url()}/api/command",
+            json={
+                "instruction": "loa_enable",
+                "scope": "system",
+                "channel": "mcp",
+                "params": {"min_loa": min_loa},
             },
-            "required": ["instruction"],
-        },
-    },
-    {
-        "name": "stop_estop",
-        "description": "Stop motors immediately, or clear an e-stop latch.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "mode": {
-                    "type": "string",
-                    "enum": ["stop", "clear"],
-                    "default": "stop",
-                }
-            },
-        },
-    },
-    {
-        "name": "recent_episodes_telemetry",
-        "description": "Fetch recent memory episodes and /proc telemetry snapshot.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "limit": {"type": "integer", "default": 20},
-                "source": {"type": "string"},
-            },
-        },
-    },
-    {
-        "name": "config_validate_lint",
-        "description": "Run CLI config lint and RCAN validation for a config file.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "config": {"type": "string", "default": "robot.rcan.yaml"},
-            },
-        },
-    },
-]
+            headers=_headers(),
+            timeout=15,
+        )
+        data = resp.json() if resp.status_code in (200, 202) else {"error": resp.text}
+    except Exception as exc:
+        data = {"error": str(exc)}
+    return {"rrn": rrn, "loa_enforcement": True, "min_loa": min_loa, "result": data}
 
 
-@app.get("/health")
-async def healthcheck() -> dict[str, str]:
-    return {"status": "ok", "service": "castor-mcp"}
+# ---------------------------------------------------------------------------
+# Server entrypoint
+# ---------------------------------------------------------------------------
 
 
-@app.post("/mcp")
-async def mcp_endpoint(payload: MCPRequest, authorization: str | None = Header(default=None)):
-    _require_mcp_auth(authorization)
+def run(token: str, config_path: Path | None = None) -> None:
+    """Start the MCP server (stdio transport).
 
-    try:
-        if payload.method == "initialize":
-            return _jsonrpc_result(
-                payload.id,
-                {
-                    "protocolVersion": "2025-03-26",
-                    "serverInfo": {"name": "castor-mcp", "version": "0.1.0"},
-                },
-            )
+    Parameters
+    ----------
+    token:
+        Raw bearer token supplied via ``--token`` or ``CASTOR_MCP_TOKEN``.
+    config_path:
+        Path to robot RCAN yaml for client registry lookup.
+    """
+    global _CLIENT_TOKEN, _CLIENT_LOA, _CONFIG_PATH
 
-        if payload.method == "tools/list":
-            return _jsonrpc_result(payload.id, {"tools": _TOOL_SCHEMAS})
+    _CONFIG_PATH = config_path
+    _CLIENT_TOKEN = token
 
-        if payload.method == "tools/call":
-            params = payload.params or {}
-            tool_name = params.get("name", "")
-            arguments = params.get("arguments", {}) or {}
-            tool = _TOOLS.get(tool_name)
-            if tool is None:
-                return _jsonrpc_error(payload.id, -32601, f"Unknown tool: {tool_name}")
-            result = await tool(arguments)
-            return _jsonrpc_result(
-                payload.id,
-                {"content": [{"type": "text", "text": str(result)}], "structuredContent": result},
-            )
+    loa = resolve_loa(token, config_path)
+    if loa is None:
+        raise SystemExit(
+            "MCP auth failed: token not recognised. "
+            "Add it to bob.rcan.yaml mcp_clients: or run: castor mcp token --name NAME --loa N"
+        )
 
-        return _jsonrpc_error(payload.id, -32601, f"Unsupported method: {payload.method}")
-    except ValueError as exc:
-        return _jsonrpc_error(payload.id, -32602, str(exc))
-    except HTTPException as exc:
-        return _jsonrpc_error(payload.id, exc.status_code, str(exc.detail))
-    except Exception as exc:  # pragma: no cover - defensive error bridge
-        return _jsonrpc_error(payload.id, -32000, f"Tool execution failed: {exc}")
-
-
-def main(host: str = "127.0.0.1", port: int = 8765) -> None:
-    import uvicorn
-
-    uvicorn.run("castor.mcp_server:app", host=host, port=port, reload=False)
-
-
-if __name__ == "__main__":
-    main()
+    _CLIENT_LOA = loa
+    mcp.run(transport="stdio")

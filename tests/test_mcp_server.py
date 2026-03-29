@@ -1,46 +1,282 @@
-import asyncio
+"""tests/test_mcp_server.py — MCP server: auth, LoA gating, tool listing."""
+from __future__ import annotations
+
+import hashlib
+import secrets
+import textwrap
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
+import yaml
 
-from castor import mcp_server
-
-
-@pytest.fixture
-def client():
-    return TestClient(mcp_server.app)
-
-
-def test_tools_list_contains_expected_tools(client):
-    response = client.post(
-        "/mcp",
-        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
-    )
-    assert response.status_code == 200
-    body = response.json()
-    names = [t["name"] for t in body["result"]["tools"]]
-    assert "status_health" in names
-    assert "command_dispatch" in names
-    assert "stop_estop" in names
-    assert "recent_episodes_telemetry" in names
-    assert "config_validate_lint" in names
+from castor.mcp_auth import (
+    _hash_token,
+    generate_token,
+    list_clients,
+    resolve_loa,
+)
 
 
-def test_unknown_tool_returns_jsonrpc_error(client):
-    response = client.post(
-        "/mcp",
-        json={
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {"name": "does_not_exist", "arguments": {}},
-        },
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert body["error"]["code"] == -32601
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture()
+def rcan_yaml(tmp_path: Path) -> Path:
+    """Minimal RCAN yaml with one MCP client per LoA level."""
+    tokens = {
+        "read_only": secrets.token_urlsafe(32),
+        "operator": secrets.token_urlsafe(32),
+        "admin": secrets.token_urlsafe(32),
+    }
+    data = {
+        "rrn": "RRN-000000000001",
+        "rcan_version": "2.2",
+        "mcp_clients": [
+            {"name": "read-only-agent", "token_hash": _hash_token(tokens["read_only"]), "loa": 0},
+            {"name": "operator-agent", "token_hash": _hash_token(tokens["operator"]), "loa": 1},
+            {"name": "admin-agent", "token_hash": _hash_token(tokens["admin"]), "loa": 3},
+        ],
+    }
+    path = tmp_path / "bob.rcan.yaml"
+    path.write_text(yaml.dump(data))
+    return path, tokens
 
 
-def test_command_dispatch_requires_instruction():
-    with pytest.raises(ValueError):
-        asyncio.run(mcp_server._tool_command_dispatch({}))
+# ---------------------------------------------------------------------------
+# mcp_auth tests
+# ---------------------------------------------------------------------------
+
+class TestMcpAuth:
+    def test_resolve_loa_read_only(self, rcan_yaml):
+        path, tokens = rcan_yaml
+        assert resolve_loa(tokens["read_only"], path) == 0
+
+    def test_resolve_loa_operator(self, rcan_yaml):
+        path, tokens = rcan_yaml
+        assert resolve_loa(tokens["operator"], path) == 1
+
+    def test_resolve_loa_admin(self, rcan_yaml):
+        path, tokens = rcan_yaml
+        assert resolve_loa(tokens["admin"], path) == 3
+
+    def test_resolve_loa_unknown_token(self, rcan_yaml):
+        path, _ = rcan_yaml
+        assert resolve_loa("not-a-real-token", path) is None
+
+    def test_resolve_loa_empty_token(self, rcan_yaml):
+        path, _ = rcan_yaml
+        assert resolve_loa("", path) is None
+
+    def test_resolve_loa_missing_config(self, tmp_path):
+        assert resolve_loa("any-token", tmp_path / "missing.yaml") is None
+
+    def test_resolve_loa_no_mcp_clients_block(self, tmp_path):
+        path = tmp_path / "minimal.yaml"
+        path.write_text(yaml.dump({"rrn": "RRN-000000000001"}))
+        assert resolve_loa("any-token", path) is None
+
+    def test_hash_token_is_deterministic(self):
+        token = "hello-world"
+        assert _hash_token(token) == _hash_token(token)
+
+    def test_hash_token_prefix(self):
+        assert _hash_token("x").startswith("sha256:")
+
+    def test_generate_token_appends_to_yaml(self, tmp_path):
+        path = tmp_path / "bob.rcan.yaml"
+        path.write_text(yaml.dump({"rrn": "RRN-000000000001", "mcp_clients": []}))
+        raw = generate_token("new-agent", loa=1, config_path=path)
+        assert len(raw) > 20
+        reloaded = yaml.safe_load(path.read_text())
+        names = [c["name"] for c in reloaded["mcp_clients"]]
+        assert "new-agent" in names
+
+    def test_generate_token_replaces_existing_name(self, tmp_path):
+        path = tmp_path / "bob.rcan.yaml"
+        path.write_text(yaml.dump({"mcp_clients": [{"name": "dup", "token_hash": "x", "loa": 0}]}))
+        generate_token("dup", loa=1, config_path=path)
+        cfg = yaml.safe_load(path.read_text())
+        entries = [c for c in cfg["mcp_clients"] if c["name"] == "dup"]
+        assert len(entries) == 1
+        assert entries[0]["loa"] == 1
+
+    def test_generate_token_is_usable(self, tmp_path):
+        path = tmp_path / "bob.rcan.yaml"
+        path.write_text(yaml.dump({"mcp_clients": []}))
+        raw = generate_token("agent", loa=2, config_path=path)
+        assert resolve_loa(raw, path) == 2
+
+    def test_list_clients_returns_names(self, rcan_yaml):
+        path, _ = rcan_yaml
+        clients = list_clients(path)
+        names = [c["name"] for c in clients]
+        assert "read-only-agent" in names
+        assert "admin-agent" in names
+
+    def test_list_clients_no_raw_tokens(self, rcan_yaml):
+        """list_clients must never return raw token values."""
+        path, tokens = rcan_yaml
+        clients = list_clients(path)
+        for client in clients:
+            for raw in tokens.values():
+                assert raw not in str(client)
+
+    def test_list_clients_missing_file(self, tmp_path):
+        assert list_clients(tmp_path / "missing.yaml") == []
+
+    def test_dev_mode_token(self, monkeypatch):
+        monkeypatch.setenv("CASTOR_MCP_DEV", "1")
+        result = resolve_loa("dev", config_path=Path("/nonexistent/path.yaml"))
+        assert result == 3
+
+    def test_dev_mode_only_for_dev_token(self, monkeypatch):
+        monkeypatch.setenv("CASTOR_MCP_DEV", "1")
+        result = resolve_loa("not-dev", config_path=Path("/nonexistent/path.yaml"))
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# LoA enforcement on MCP server tools
+# ---------------------------------------------------------------------------
+
+class TestLoaEnforcement:
+    """Test that _check_loa raises PermissionError for insufficient LoA."""
+
+    def test_read_tools_pass_loa0(self):
+        import castor.mcp_server as srv
+        original = srv._CLIENT_LOA
+        try:
+            srv._CLIENT_LOA = 0
+            srv._check_loa(0)  # Should not raise
+        finally:
+            srv._CLIENT_LOA = original
+
+    def test_operate_tool_blocked_at_loa0(self):
+        import castor.mcp_server as srv
+        original = srv._CLIENT_LOA
+        try:
+            srv._CLIENT_LOA = 0
+            with pytest.raises(PermissionError, match="LoA"):
+                srv._check_loa(1)
+        finally:
+            srv._CLIENT_LOA = original
+
+    def test_admin_tool_blocked_at_loa1(self):
+        import castor.mcp_server as srv
+        original = srv._CLIENT_LOA
+        try:
+            srv._CLIENT_LOA = 1
+            with pytest.raises(PermissionError, match="LoA"):
+                srv._check_loa(3)
+        finally:
+            srv._CLIENT_LOA = original
+
+    def test_admin_tool_passes_at_loa3(self):
+        import castor.mcp_server as srv
+        original = srv._CLIENT_LOA
+        try:
+            srv._CLIENT_LOA = 3
+            srv._check_loa(3)  # Should not raise
+        finally:
+            srv._CLIENT_LOA = original
+
+    def test_higher_loa_covers_lower_requirements(self):
+        import castor.mcp_server as srv
+        original = srv._CLIENT_LOA
+        try:
+            srv._CLIENT_LOA = 3
+            srv._check_loa(0)
+            srv._check_loa(1)
+            srv._check_loa(3)
+        finally:
+            srv._CLIENT_LOA = original
+
+    def test_error_message_includes_required_loa(self):
+        import castor.mcp_server as srv
+        original = srv._CLIENT_LOA
+        try:
+            srv._CLIENT_LOA = 0
+            with pytest.raises(PermissionError, match="LoA ≥ 3"):
+                srv._check_loa(3)
+        finally:
+            srv._CLIENT_LOA = original
+
+
+# ---------------------------------------------------------------------------
+# MCP tool registration
+# ---------------------------------------------------------------------------
+
+class TestToolRegistration:
+    def test_all_expected_tools_registered(self):
+        from castor.mcp_server import mcp
+
+        # FastMCP exposes registered tools
+        tool_names = {t.name for t in mcp._tools.values()} if hasattr(mcp, "_tools") else set()
+
+        # Fall back: introspect via list_tools if _tools not public
+        if not tool_names:
+            import asyncio
+
+            async def _get_tools():
+                return await mcp.list_tools()
+
+            try:
+                tools = asyncio.run(_get_tools())
+                tool_names = {t.name for t in tools}
+            except Exception:
+                pytest.skip("Cannot introspect tools in this MCP version")
+
+        expected = {
+            "robot_status",
+            "robot_telemetry",
+            "fleet_list",
+            "rrf_lookup",
+            "robot_command",
+            "harness_get",
+            "research_run",
+            "contribute_toggle",
+            "components_list",
+            "harness_set",
+            "system_upgrade",
+            "loa_enable",
+        }
+        assert expected.issubset(tool_names), f"Missing tools: {expected - tool_names}"
+
+    def test_tool_count_is_twelve(self):
+        """Exactly 12 tools — 4 read, 5 operate, 3 admin."""
+        from castor.mcp_server import mcp
+        import asyncio
+
+        async def _count():
+            try:
+                tools = await mcp.list_tools()
+                return len(tools)
+            except Exception:
+                return -1
+
+        count = asyncio.run(_count())
+        if count == -1:
+            pytest.skip("Cannot count tools in this MCP version")
+        assert count == 12
+
+
+# ---------------------------------------------------------------------------
+# Config helpers
+# ---------------------------------------------------------------------------
+
+class TestConfigHelpers:
+    def test_default_rrn_from_env(self, monkeypatch):
+        monkeypatch.setenv("CASTOR_RRN", "RRN-000000000099")
+        from importlib import reload
+        import castor.mcp_server as srv
+        # _default_rrn reads env at call time
+        with patch.dict("os.environ", {"CASTOR_RRN": "RRN-000000000099"}):
+            assert "RRN-000000000099" in srv._default_rrn()
+
+    def test_gateway_url_default(self, monkeypatch):
+        monkeypatch.delenv("CASTOR_GATEWAY_URL", raising=False)
+        from castor.mcp_server import _gateway_url
+        with patch("castor.mcp_server._load_config", return_value={}):
+            assert "8001" in _gateway_url() or "127.0.0.1" in _gateway_url()
