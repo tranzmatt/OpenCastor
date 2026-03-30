@@ -236,6 +236,7 @@ def test_patch_transformers_imports_no_error():
 def test_patch_transformers_imports_exposes_padding_strategy():
     """After _patch_transformers_imports(), PaddingStrategy must be accessible
     on transformers.tokenization_utils (the path openvla remote code uses)."""
+    pytest.importorskip("transformers", reason="transformers not installed in CI")
     sys.modules.pop("castor.providers.vla_provider", None)
     import castor.providers.vla_provider as vmod  # noqa: PLC0415
 
@@ -251,6 +252,7 @@ def test_patch_transformers_imports_exposes_padding_strategy():
 
 def test_patch_transformers_imports_exposes_all_relocated_symbols():
     """All four symbols relocated in transformers 5.x must be present after patching."""
+    pytest.importorskip("transformers", reason="transformers not installed in CI")
     sys.modules.pop("castor.providers.vla_provider", None)
     import castor.providers.vla_provider as vmod  # noqa: PLC0415
 
