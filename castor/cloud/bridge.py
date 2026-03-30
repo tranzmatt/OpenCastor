@@ -945,10 +945,9 @@ class CastorBridge:
                 "authority_handler_enabled": True,
                 "audit_retention_days": 3650,
                 # MCP server config — published for Flutter MCP screen
-                "mcp_clients": [
-                    {"name": name, "loa": int(cfg.get("loa", 0))}
-                    for name, cfg in (self._rcan_config or {}).get("mcp_clients", {}).items()
-                ],
+                "mcp_clients": _format_mcp_clients(
+                    (self._rcan_config or {}).get("mcp_clients", [])
+                ),
                 "mcp_enabled": bool((self._rcan_config or {}).get("mcp_clients")),
             },
             merge=True,
@@ -2175,3 +2174,18 @@ def run_bridge(args: Any) -> None:
         bridge.start()
     except KeyboardInterrupt:
         bridge.stop()
+
+
+def _format_mcp_clients(clients) -> list:
+    """Normalise mcp_clients from bob.rcan.yaml (list or dict) for Firestore."""
+    if isinstance(clients, list):
+        # List format: [{name, token_hash, loa}, ...]
+        return [
+            {"name": c.get("name", ""), "loa": int(c.get("loa", 0))}
+            for c in clients
+            if isinstance(c, dict)
+        ]
+    if isinstance(clients, dict):
+        # Dict format: {name: {loa: N, ...}}
+        return [{"name": k, "loa": int(v.get("loa", 0))} for k, v in clients.items()]
+    return []
