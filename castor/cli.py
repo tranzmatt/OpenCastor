@@ -5683,7 +5683,7 @@ def _cmd_skills_run(args) -> None:
 
     skill_name = getattr(args, "skill_name", None)
     if not skill_name:
-        print("  Usage: castor skills run <name> [--args '{\"key\":\"val\"}']")
+        print('  Usage: castor skills run <name> [--args \'{"key":"val"}\']')
         return
 
     skill = get_skill(skill_name)
@@ -5783,9 +5783,7 @@ def _cmd_skills(args) -> None:
         if rcan_skills:
             print()
             print(f"  ── RCAN Skills {'─' * 44}")
-            print(
-                f"  {'NAME':<24} {'VER':<8} {'LOA':<5} {'MSG TYPE':<14} DESCRIPTION"
-            )
+            print(f"  {'NAME':<24} {'VER':<8} {'LOA':<5} {'MSG TYPE':<14} DESCRIPTION")
             print(f"  {'─' * 24} {'─' * 8} {'─' * 5} {'─' * 14} {'─' * 40}")
             for rs in rcan_skills:
                 print(
@@ -7926,7 +7924,9 @@ def main() -> None:
     p_skills.add_argument("--json", action="store_true", dest="skills_json", help="Output JSON")
     skills_sub = p_skills.add_subparsers(dest="skills_cmd")
     p_skills_run = skills_sub.add_parser("run", help="Run an RCAN skill by name")
-    p_skills_run.add_argument("skill_name", metavar="NAME", help="RCAN skill name (e.g. rcan_estop)")
+    p_skills_run.add_argument(
+        "skill_name", metavar="NAME", help="RCAN skill name (e.g. rcan_estop)"
+    )
     p_skills_run.add_argument(
         "--args",
         dest="skill_args",
