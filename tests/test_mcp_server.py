@@ -1,11 +1,9 @@
 """tests/test_mcp_server.py — MCP server: auth, LoA gating, tool listing."""
 from __future__ import annotations
 
-import hashlib
 import secrets
-import textwrap
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -16,7 +14,6 @@ from castor.mcp_auth import (
     list_clients,
     resolve_loa,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -211,7 +208,7 @@ class TestLoaEnforcement:
 class TestToolRegistration:
     def _get_tool_names(self):
         """Return set of registered tool names, compatible with stub and real FastMCP."""
-        from castor.mcp_server import mcp, _MCP_AVAILABLE
+        from castor.mcp_server import _MCP_AVAILABLE, mcp
 
         if not _MCP_AVAILABLE:
             # Stub: _tools dict maps name → function
@@ -252,15 +249,20 @@ class TestToolRegistration:
             "harness_set",
             "system_upgrade",
             "loa_enable",
+            "fleet_status",
+            "fleet_broadcast",
+            "fleet_estop",
+            "fleet_navigate",
+            "stream_telemetry",
         }
         assert expected.issubset(tool_names), f"Missing tools: {expected - tool_names}"
 
     def test_tool_count_is_twelve(self):
-        """Exactly 14 tools — 6 read, 5 operate, 3 admin."""
+        """19 tools: 12 core + robot_ping + compliance_report + 4 fleet + stream_telemetry."""
         tool_names = self._get_tool_names()
         if not tool_names:
             pytest.skip("Cannot count tools in this MCP version")
-        assert len(tool_names) == 14
+        assert len(tool_names) == 19
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +272,6 @@ class TestToolRegistration:
 class TestConfigHelpers:
     def test_default_rrn_from_env(self, monkeypatch):
         monkeypatch.setenv("CASTOR_RRN", "RRN-000000000099")
-        from importlib import reload
         import castor.mcp_server as srv
         # _default_rrn reads env at call time
         with patch.dict("os.environ", {"CASTOR_RRN": "RRN-000000000099"}):
@@ -306,9 +307,9 @@ class TestAdditionalTools:
         assert "compliance_report" in names
 
     def test_total_tool_count_is_fourteen(self):
-        """14 tools total: original 12 + robot_ping + compliance_report."""
+        """19 tools total: 12 core + robot_ping + compliance_report + 4 fleet + stream_telemetry."""
         helper = TestToolRegistration()
         names = helper._get_tool_names()
         if not names:
             pytest.skip("Cannot count tools")
-        assert len(names) == 14
+        assert len(names) == 19
