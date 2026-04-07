@@ -809,7 +809,11 @@ def main():
         logger.debug(f"Health check skipped: {e}")
 
     # 1b. INITIALIZE VIRTUAL FILESYSTEM
-    fs = CastorFS(persist_dir=args.memory_dir)
+    _safety_limits = {}
+    _safety_cfg = config.get("safety", {})
+    if "motor_rate_hz" in _safety_cfg:
+        _safety_limits["motor_rate_hz"] = float(_safety_cfg["motor_rate_hz"])
+    fs = CastorFS(persist_dir=args.memory_dir, limits=_safety_limits)
     fs.boot(config)
     set_shared_fs(fs)
     logger.info("Virtual Filesystem Online")
@@ -1634,8 +1638,10 @@ def main():
             except Exception:
                 pass
 
-            # Sleep to prevent API rate limiting
-            time.sleep(1.0)
+            # Sleep between ticks (configurable — set loop_sleep_s: 0 for high-Hz operation)
+            _loop_sleep = config.get("agent", {}).get("loop_sleep_s", 1.0)
+            if _loop_sleep > 0:
+                time.sleep(_loop_sleep)
 
     except (KeyboardInterrupt, SystemExit):
         logger.info("Shutting down...")

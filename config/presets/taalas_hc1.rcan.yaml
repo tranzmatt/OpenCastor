@@ -1,0 +1,21 @@
+rcan_version: "1.6.1"
+
+metadata:
+  robot_name: taalas-demo
+  description: >
+    High-Hz preset for Taalas HC1 ASIC inference (17K tokens/sec
+    on Llama 3.1 8B).  Designed for closed-loop motor control at
+    50-100+ Hz when paired with a fast camera and low-latency driver.
+
+agent:
+  provider: taalas
+  model: llama-3.1-8b
+  endpoint_url: "http://localhost:8000"
+  latency_budget_ms: 10
+  loop_sleep_s: 0
+
+safety:
+  motor_rate_hz: 100
+
+tiered_brain:
+  planner_interval: 0  # fast-only, no planner escalation

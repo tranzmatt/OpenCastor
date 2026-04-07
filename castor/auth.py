@@ -30,6 +30,7 @@ PROVIDER_AUTH_MAP: dict[str, tuple] = {
     "deepseek": ("DEEPSEEK_API_KEY", "api_key"),
     "grok": ("XAI_API_KEY", "api_key"),
     "mistral": ("MISTRAL_API_KEY", "api_key"),
+    "taalas": ("TAALAS_ENDPOINT", "endpoint_url"),
 }
 
 # Map of channel name -> list of (env var, config key) tuples
@@ -154,8 +155,8 @@ def check_provider_ready(provider: str, config: Optional[dict] = None) -> bool:
     """Check whether the given provider has credentials available."""
     provider_name = provider.lower()
 
-    if provider_name in ("ollama", "llamacpp", "mlx"):
-        return True  # Ollama doesn't need an API key
+    if provider_name in ("ollama", "llamacpp", "mlx", "taalas", "taalas-hc1"):
+        return True  # Local inference — no API key needed
 
     if provider_name in ("apple", "apple-fm", "foundationmodels"):
         try:
