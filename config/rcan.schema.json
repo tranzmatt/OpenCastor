@@ -100,7 +100,9 @@
             "vllm-mlx",
             "apple",
             "claude_oauth",
-            "groq"
+            "groq",
+            "taalas",
+            "taalas-hc1"
           ]
         },
         "model": {
@@ -126,6 +128,16 @@
         "base_url": {
           "type": "string",
           "description": "Custom API base URL for providers that support it."
+        },
+        "endpoint_url": {
+          "type": "string",
+          "description": "Inference endpoint URL for local providers (Taalas, Ollama, etc.)."
+        },
+        "loop_sleep_s": {
+          "type": "number",
+          "description": "Sleep duration (seconds) between perception-action loop ticks. Set to 0 for high-Hz operation.",
+          "default": 1.0,
+          "minimum": 0
         },
         "agentic_vision": {
           "type": "boolean",
@@ -945,6 +957,13 @@
           "type": "boolean",
           "description": "Engage emergency stop immediately on startup (cleared once the operator confirms).",
           "default": false
+        },
+        "motor_rate_hz": {
+          "type": "number",
+          "description": "Maximum motor commands per second (safety rate limiter). Increase for high-Hz inference hardware.",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 500
         }
       },
       "additionalProperties": true

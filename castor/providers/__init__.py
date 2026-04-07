@@ -13,6 +13,7 @@ from .mistral_provider import MistralProvider
 from .mlx_provider import MLXProvider
 from .ollama_provider import OllamaProvider
 from .openai_provider import OpenAIProvider
+from .taalas_provider import TaalasProvider
 
 __all__ = [
     "get_provider",
@@ -32,6 +33,7 @@ __all__ = [
     "OpenAIProvider",
     "GatedModelProvider",
     "OpenRouterProvider",
+    "TaalasProvider",
     "VertexAIProvider",
     "VLAProvider",
 ]
@@ -85,6 +87,8 @@ def _builtin_get_provider(config: dict):
         return GrokProvider(config)
     elif provider_name in ("mistral", "mistral_ai", "mistralai"):
         return MistralProvider(config)
+    elif provider_name in ("taalas", "taalas-hc1"):
+        return TaalasProvider(config)
     elif provider_name == "consensus":
         return ConsensusProvider(config)
     elif provider_name in ("pool", "provider_pool"):
