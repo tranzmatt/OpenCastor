@@ -18,6 +18,12 @@
     "handlebars": "^4.7.9",
     "picomatch": "^2.3.2",
     "h3": "^1.15.8",
-    "smol-toml": "^1.6.1"
+    "smol-toml": "^1.6.1",
+    "vite": ">=6.4.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": ">=6.4.2"
+    }
   }
 }
