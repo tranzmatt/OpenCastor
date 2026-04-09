@@ -2,6 +2,16 @@ rcan_version: "1.6.1"
 
 metadata:
   robot_name: taalas-demo
+  robot_uuid: a7d3c821-4f9e-4b1e-b5e2-8f0e6c2d1a93
+  manufacturer: Taalas
+  model: HC1
+  author: OpenCastor Default
+  license: Apache-2.0
+  tags:
+    - high-hz
+    - asic
+    - inference
+    - closed-loop
   description: >
     High-Hz preset for Taalas HC1 ASIC inference (17K tokens/sec
     on Llama 3.1 8B).  Designed for closed-loop motor control at
@@ -18,4 +28,4 @@ safety:
   motor_rate_hz: 100
 
 tiered_brain:
-  planner_interval: 0  # fast-only, no planner escalation
+  planner_interval: 999999  # effectively disabled — fast-only, no planner escalation
