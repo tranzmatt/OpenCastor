@@ -6,6 +6,26 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.4.10.0] - 2026-04-10
+
+### Added
+- `castor/watermark.py` — AI output watermark module (RCAN §16.5): `compute_watermark_token()`, `verify_token_format()`, `verify_watermark_token()`. Tokens use HMAC-SHA256 with the robot's ML-DSA-65 private key; format `rcan-wm-v1:{32 hex chars}` (craigm26/OpenCastor#857)
+- `GET /api/v1/watermark/verify` — public (no auth) endpoint for external compliance tools to verify AI-generated command provenance; delegates to audit HMAC index (craigm26/OpenCastor#857)
+- `AuditLog._watermark_index` — O(1) token lookup index, rebuilt on init from JSONL log, updated atomically on each `log_motor_command()` write (craigm26/OpenCastor#857)
+- `MessageSigner.secret_key_bytes()` — exposes ML-DSA-65 private key bytes for watermark HMAC computation (craigm26/OpenCastor#857)
+- `Thought.timestamp` field — ISO-8601 capture time; required for watermark token recomputation (§16.5) and audit record provenance
+
+### Fixed
+- `ai_confidence` not propagated to `safe_action` dict — `SOFTWARE_002` safety rule (`castor/safety/protocol.py`) now receives the field from `thought.confidence` at command dispatch
+- `taalas` and `taalas-hc1` providers missing from `KNOWN_PROVIDERS` in `castor/setup_catalog.py` — caused conformance validator false-positive warnings
+
+### Tests
+- `tests/test_watermark.py` — 15 tests: compute determinism, format validation, audit index hit/miss, cross-language compatibility
+- `tests/test_audit.py` — watermark index build-on-init and atomic write tests
+- `tests/test_api_endpoints.py` — 5 tests for `GET /api/v1/watermark/verify`: 200/400/404 paths, no-auth assertion
+
+---
+
 ## [2026.4.3.0] - 2026-04-02
 
 ### Fixed

@@ -4,6 +4,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
@@ -54,6 +55,8 @@ class Thought:
     gate_bypassed: bool = False
     # Tool calls requested by the model (set by think_with_tools)
     tool_calls: list = field(default_factory=list)
+    # Capture time — used by watermark token computation (§16.5) and audit records
+    timestamp: datetime = field(default_factory=datetime.now)
 
 
 class BaseProvider(ABC):

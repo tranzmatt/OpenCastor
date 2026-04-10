@@ -632,6 +632,8 @@ def get_known_provider_names() -> set[str]:
         "apple",
         "apple-fm",
         "foundationmodels",
+        "taalas",
+        "taalas-hc1",
     }
     return names
 
