@@ -1495,8 +1495,38 @@ def main():
                                 if bounds_result.status == "warning":
                                     logger.warning("Bounds warning: %s", bounds_result.details)
                                 driver.move(linear, angular)
+                            # §16.5 Watermark + ai_confidence propagation fix
+                            _wm_token = None
+                            try:
+                                from castor.rcan.message_signing import get_message_signer
+                                from castor.watermark import compute_watermark_token
+                                _signer = get_message_signer(config)
+                                _secret = _signer.secret_key_bytes() if _signer else None
+                                if _secret and thought is not None:
+                                    _ts = getattr(thought, "timestamp", None)
+                                    _ts_str = (
+                                        _ts.isoformat()
+                                        if hasattr(_ts, "isoformat")
+                                        else str(_ts or "")
+                                    )
+                                    _wm_token = compute_watermark_token(
+                                        rrn=config.get("metadata", {}).get("rrn", ""),
+                                        thought_id=getattr(thought, "id", "") or "",
+                                        timestamp=_ts_str,
+                                        private_key_bytes=_secret,
+                                    )
+                                    safe_action["watermark_token"] = _wm_token
+                                # Fix: propagate thought.confidence for SOFTWARE_002 safety rule
+                                if thought is not None:
+                                    safe_action["ai_confidence"] = getattr(
+                                        thought, "confidence", None
+                                    )
+                            except Exception as _wm_exc:
+                                logger.debug("Watermark embed skipped: %s", _wm_exc)
                             if audit:
-                                audit.log_motor_command(safe_action, thought=thought)
+                                audit.log_motor_command(
+                                    safe_action, thought=thought, watermark_token=_wm_token
+                                )
                         elif action_type == "stop":
                             driver.stop()
 

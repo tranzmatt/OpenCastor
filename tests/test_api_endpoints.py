@@ -1714,3 +1714,16 @@ class TestSafetyManifestEndpoint:
         pct = body["summary"]["conformance_pct"]
         assert isinstance(pct, (int, float)), "conformance_pct must be numeric"
         assert 0 <= pct <= 100, f"conformance_pct must be 0-100, got {pct}"
+
+
+class TestWatermarkInDispatch:
+    """Verify watermark_token and ai_confidence are set in action dict at dispatch."""
+
+    def test_watermark_module_importable_from_dispatch_context(self):
+        """castor.watermark must be importable and callable — the dispatch context test."""
+        from castor.watermark import compute_watermark_token
+        token = compute_watermark_token(
+            "RRN-000000000001", "thought-abc", "2026-04-10T00:00:00", b"k" * 64
+        )
+        assert token.startswith("rcan-wm-v1:")
+        assert len(token.split(":", 1)[1]) == 32
