@@ -42,6 +42,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from castor.audit import get_audit
 from castor.api_errors import register_error_handlers
 from castor.auth import (
     list_available_channels,
@@ -69,6 +70,7 @@ from castor.setup_service import (
 from castor.setup_service import (
     run_preflight as run_setup_preflight,
 )
+from castor.watermark import verify_token_format, verify_watermark_token
 
 logging.basicConfig(
     level=logging.INFO,
@@ -2289,6 +2291,37 @@ async def get_audit_log():
         return {"audit_log": work_authority.get_audit_log()}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Audit log unavailable: {exc}") from exc
+
+
+@app.get("/api/v1/watermark/verify")
+async def watermark_verify(token: str, rrn: str):
+    """Verify an RCAN AI output watermark token (§16.5).
+
+    Public endpoint — no authentication required. Returns the full audit entry
+    if the token is found in the tamper-evident audit log, proving both
+    cryptographic validity and that the command was logged (Art. 12 + Art. 50).
+
+    Args:
+        token: Watermark token, e.g. ``rcan-wm-v1:a3f9c1d2b8e47f20a3f9c1d2b8e47f20``.
+        rrn: Robot Resource Name the token is expected to belong to.
+
+    Returns:
+        200 with audit entry if found, 404 if not in log, 400 if token format invalid.
+    """
+    if not verify_token_format(token):
+        raise HTTPException(status_code=400, detail="Invalid watermark token format")
+
+    audit = get_audit()
+    entry = verify_watermark_token(token, audit)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Watermark token not found in audit log")
+
+    return {
+        "valid": True,
+        "rrn": rrn,
+        "watermark_token": token,
+        "audit_entry": entry,
+    }
 
 
 @app.get("/api/stream/mjpeg", dependencies=[Depends(verify_token)])

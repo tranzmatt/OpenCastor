@@ -1727,3 +1727,73 @@ class TestWatermarkInDispatch:
         )
         assert token.startswith("rcan-wm-v1:")
         assert len(token.split(":", 1)[1]) == 32
+
+
+class TestWatermarkVerifyEndpoint:
+    """GET /api/v1/watermark/verify — public, no auth."""
+
+    def test_valid_token_returns_200_with_audit_entry(self):
+        from unittest.mock import patch
+        from castor.api import app
+        from starlette.testclient import TestClient
+
+        token = "rcan-wm-v1:" + "a" * 32
+        entry = {
+            "event": "motor_command",
+            "watermark_token": token,
+            "ts": "2026-04-10T14:32:01",
+        }
+        fake_audit = type("A", (), {"_watermark_index": {token: entry}})()
+
+        with patch("castor.api.get_audit", return_value=fake_audit):
+            client = TestClient(app)
+            resp = client.get(f"/api/v1/watermark/verify?token={token}&rrn=RRN-000000000001")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["valid"] is True
+        assert data["watermark_token"] == token
+        assert data["audit_entry"]["watermark_token"] == token
+
+    def test_unknown_token_returns_404(self):
+        from unittest.mock import patch
+        from castor.api import app
+        from starlette.testclient import TestClient
+
+        fake_audit = type("A", (), {"_watermark_index": {}})()
+
+        with patch("castor.api.get_audit", return_value=fake_audit):
+            client = TestClient(app)
+            resp = client.get("/api/v1/watermark/verify?token=rcan-wm-v1:" + "b" * 32 + "&rrn=RRN-1")
+
+        assert resp.status_code == 404
+
+    def test_invalid_format_returns_400(self):
+        from unittest.mock import patch
+        from castor.api import app
+        from starlette.testclient import TestClient
+
+        fake_audit = type("A", (), {"_watermark_index": {}})()
+
+        with patch("castor.api.get_audit", return_value=fake_audit):
+            client = TestClient(app)
+            resp = client.get("/api/v1/watermark/verify?token=bad-token&rrn=RRN-1")
+
+        assert resp.status_code == 400
+
+    def test_no_auth_required(self):
+        """Endpoint must be publicly accessible — no Authorization header needed."""
+        from unittest.mock import patch
+        from castor.api import app
+        from starlette.testclient import TestClient
+
+        token = "rcan-wm-v1:" + "c" * 32
+        entry = {"event": "motor_command", "watermark_token": token}
+        fake_audit = type("A", (), {"_watermark_index": {token: entry}})()
+
+        with patch("castor.api.get_audit", return_value=fake_audit):
+            client = TestClient(app)
+            # No Authorization header — must still return 200
+            resp = client.get(f"/api/v1/watermark/verify?token={token}&rrn=RRN-1")
+
+        assert resp.status_code == 200
