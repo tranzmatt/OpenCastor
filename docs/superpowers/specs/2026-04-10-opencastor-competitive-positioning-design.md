@@ -51,7 +51,7 @@ The anchor page. Explains how RCAN enforces safety at the protocol layer for sys
 
 **SEO target terms**: `physical AI safety protocol`, `robot EU AI Act compliance`, `autonomous robot audit trail`, `robot safety standards`, `ML-DSA robot signing`, `RCAN protocol safety`, `robot conformance levels`
 
-**Tone**: Technical reference. No superlatives. Claims are backed by spec section numbers or benchmark results. Where a number doesn't yet exist (pending Gap 3 issue), say "benchmarks forthcoming — see OpenCastor#[issue]".
+**Tone**: Technical reference. No superlatives. Claims are backed by spec section numbers or benchmark results. Where a number doesn't yet exist (pending Gap 3 issue), say "benchmarks forthcoming — see craigm26/OpenCastor#859".
 
 ---
 
@@ -118,7 +118,7 @@ Not published as marketing. Framed as engineering due-diligence documentation.
 
 RCAN has HMAC-SHA256 audit chains but no per-output watermark token embedded in AI-generated command payloads. EU AI Act Art. 50 requires AI-generated content to be machine-detectable.
 
-**rcan-spec issue**: `§16.5 — AI Output Watermarking`
+**rcan-spec issue**: `§16.5 — AI Output Watermarking` (continuonai/rcan-spec#194)
 - Spec a deterministic HMAC watermark token embedded in every AI-generated `COMMAND` message
 - Token format: `rcan-wm-v1:{hmac_sha256(rrn + thought_id + timestamp, robot_signing_key)[:16]}`
 - Required audit record field: `watermark_token`
@@ -126,7 +126,7 @@ RCAN has HMAC-SHA256 audit chains but no per-output watermark token embedded in 
 - SDK surface in rcan-py and rcan-ts
 - EU AI Act Art. 50 compliance note in spec text
 
-**OpenCastor issue**: `Implement §16.5 AI output watermarking in brain and audit pipeline`
+**OpenCastor issue**: `Implement §16.5 AI output watermarking in brain and audit pipeline` (craigm26/OpenCastor#857)
 - Embed watermark token at command dispatch in `castor/brain/robot_context.py`
 - Verify and record in audit chain
 - Expose via existing API surface
@@ -135,14 +135,14 @@ RCAN has HMAC-SHA256 audit chains but no per-output watermark token embedded in 
 
 Static Art. 9 template exists in `rcan-spec/docs/compliance/art9-risk-assessment-template.md`. No automated workflow produces a signed FRIA artifact.
 
-**rcan-spec issue**: `§19 — Fundamental Rights Impact Assessment (FRIA) Protocol`
+**rcan-spec issue**: `§19 — Fundamental Rights Impact Assessment (FRIA) Protocol` (continuonai/rcan-spec#195)
 - Define FRIA JSON document schema
 - Required fields: system identity (RRN), deployment classification (Annex III basis), risk entries sourced from conformance gaps, human oversight configuration, signing key reference
 - Trigger conditions: L2+ conformance deployments
 - Signing: ML-DSA-65 with robot's identity key
 - Export format: JSON canonical + PDF rendering hint (for notified body submission)
 
-**OpenCastor issue**: `castor fria generate — automated FRIA artifact from conformance output`
+**OpenCastor issue**: `castor fria generate — automated FRIA artifact from conformance output` (craigm26/OpenCastor#858)
 - New CLI command: `castor fria generate --rrn RRN-xxx --output fria.json`
 - Sources: `ConformanceChecker.run_all()`, robot identity from config, `robot-memory.md` `hardware_observation` entries
 - Signs output with robot key
@@ -152,7 +152,7 @@ Static Art. 9 template exists in `rcan-spec/docs/compliance/art9-risk-assessment
 
 No equivalent to Geodesia's AUROC/latency claims. Compliance buyers cannot compare on benchmarks.
 
-**OpenCastor issue**: `Publish confidence gate and safety subsystem benchmarks`
+**OpenCastor issue**: `Publish confidence gate and safety subsystem benchmarks` (craigm26/OpenCastor#859)
 - Extend `castor/benchmarker.py` with safety benchmark suite
 - Metrics to capture:
   - Confidence gate rejection rate at configured thresholds (on a labelled inference test set)
