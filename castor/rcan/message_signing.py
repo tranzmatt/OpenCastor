@@ -114,6 +114,16 @@ class MessageSigner:
             return self._pq_key_pair.public_key
         return None
 
+    def secret_key_bytes(self) -> bytes | None:
+        """Return the raw ML-DSA-65 private key bytes, or None if unavailable.
+
+        Used by castor.watermark to key HMAC-SHA256 watermark tokens.
+        Never log or transmit these bytes.
+        """
+        if self._pq_key_pair is None:
+            return None
+        return getattr(self._pq_key_pair, "_secret_key", None)
+
     # ------------------------------------------------------------------
     # Signing
     # ------------------------------------------------------------------
