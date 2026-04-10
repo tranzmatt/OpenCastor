@@ -122,7 +122,13 @@ class MessageSigner:
         """
         if self._pq_key_pair is None:
             return None
-        return getattr(self._pq_key_pair, "_secret_key", None)
+        key = getattr(self._pq_key_pair, "_secret_key", None)
+        if key is None:
+            logger.warning(
+                "secret_key_bytes: MLDSAKeyPair has no _secret_key attribute — "
+                "watermarking will be disabled. Check rcan-py version."
+            )
+        return key
 
     # ------------------------------------------------------------------
     # Signing

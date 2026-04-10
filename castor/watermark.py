@@ -56,4 +56,7 @@ def verify_watermark_token(token: str, audit_log: Any) -> dict | None:
     """
     if not verify_token_format(token):
         return None
-    return audit_log._watermark_index.get(token)
+    index = getattr(audit_log, "_watermark_index", None)
+    if index is None:
+        return None
+    return index.get(token)

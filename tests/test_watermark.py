@@ -1,12 +1,11 @@
 """Tests for castor.watermark — AI output watermark token."""
 import re
-import pytest
+
 from castor.watermark import (
     compute_watermark_token,
     verify_token_format,
     verify_watermark_token,
 )
-
 
 FAKE_KEY = b"x" * 64  # stand-in for ML-DSA private key bytes
 RRN = "RRN-000000000001"
@@ -81,3 +80,23 @@ class TestVerifyWatermarkToken:
         audit_mock = type("A", (), {"_watermark_index": {}})()
         result = verify_watermark_token("invalid", audit_mock)
         assert result is None
+
+    def test_returns_none_for_real_audit_log_without_index(self):
+        """verify_watermark_token must not raise AttributeError before AuditLog has _watermark_index."""
+        import os
+        import tempfile
+
+        from castor.audit import AuditLog
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".log") as f:
+            log_path = f.name
+        try:
+            audit = AuditLog(log_path=log_path)
+            # Remove _watermark_index to simulate pre-Task-2 state
+            if hasattr(audit, "_watermark_index"):
+                del audit._watermark_index
+            token = compute_watermark_token(RRN, THOUGHT_ID, TIMESTAMP, FAKE_KEY)
+            result = verify_watermark_token(token, audit)
+            assert result is None
+        finally:
+            os.unlink(log_path)
