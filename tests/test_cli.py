@@ -2555,3 +2555,51 @@ class TestPluginLoading:
         with patch("sys.argv", ["castor"]):
             with patch.dict("sys.modules", {"castor.plugins": mock_plugins_mod}):
                 main()  # Just verify no crash
+
+
+class TestFriaGenerateCli:
+    """Tests for the castor fria generate subcommand."""
+
+    def test_fria_subcommand_registered(self):
+        """castor fria generate --help must not raise SystemExit(2)."""
+        import subprocess
+        import sys
+        result = subprocess.run(
+            [sys.executable, "-m", "castor.cli", "fria", "generate", "--help"],
+            capture_output=True,
+            text=True,
+        )
+        # --help exits 0 and prints usage
+        assert result.returncode == 0
+        assert "annex" in result.stdout.lower()
+
+    def test_missing_annex_iii_exits_nonzero(self, tmp_path):
+        """castor fria generate without --annex-iii must exit non-zero."""
+        import subprocess
+        import sys
+
+        import yaml
+
+        config = {
+            "rcan_version": "1.9.0",
+            "metadata": {"rrn": "RRN-000000000001", "robot_name": "bot"},
+            "agent": {"provider": "anthropic", "model": "claude-sonnet-4-6"},
+        }
+        cfg_path = tmp_path / "bot.rcan.yaml"
+        cfg_path.write_text(yaml.dump(config))
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "castor.cli",
+                "fria",
+                "generate",
+                "--config",
+                str(cfg_path),
+                "--intended-use",
+                "test",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode != 0

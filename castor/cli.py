@@ -3781,6 +3781,115 @@ def cmd_rcan_check(args) -> None:
         raise SystemExit(1)
 
 
+def cmd_fria_generate(args) -> None:
+    """castor fria generate — produce signed FRIA artifact for EU AI Act submission."""
+    import json as _json
+    import sys
+    from datetime import datetime
+
+    import yaml
+
+    from castor.fria import (
+        ANNEX_III_BASES,
+        build_fria_document,
+        check_fria_prerequisite,
+        render_fria_html,
+        sign_fria,
+    )
+
+    config_path = getattr(args, "config", None) or "robot.rcan.yaml"
+    if not os.path.exists(config_path):
+        print(f"Error: config not found: {config_path}", file=sys.stderr)
+        raise SystemExit(1)
+
+    with open(config_path) as _f:
+        config = yaml.safe_load(_f) or {}
+
+    annex_iii = getattr(args, "annex_iii", None)
+    if not annex_iii:
+        print("Error: --annex-iii is required.", file=sys.stderr)
+        print(f"Valid values: {', '.join(sorted(ANNEX_III_BASES))}", file=sys.stderr)
+        raise SystemExit(1)
+    if annex_iii not in ANNEX_III_BASES:
+        print(f"Error: invalid --annex-iii value: {annex_iii!r}", file=sys.stderr)
+        print(f"Valid values: {', '.join(sorted(ANNEX_III_BASES))}", file=sys.stderr)
+        raise SystemExit(1)
+
+    intended_use = getattr(args, "intended_use", None) or ""
+    force = getattr(args, "force", False)
+    no_html = getattr(args, "no_html", False)
+    skip_sign = getattr(args, "skip_sign", False)
+
+    prerequisite_waived = False
+    if not force:
+        gate_passed, blocking = check_fria_prerequisite(config)
+        if not gate_passed:
+            print("FRIA generation blocked — conformance gaps must be resolved:", file=sys.stderr)
+            for r in blocking:
+                print(f"  [{r.check_id}] {r.detail}", file=sys.stderr)
+                if r.fix:
+                    print(f"    Fix: {r.fix}", file=sys.stderr)
+            print("\nUse --force to generate despite conformance gaps.", file=sys.stderr)
+            raise SystemExit(1)
+    else:
+        prerequisite_waived = True
+
+    rrn = config.get("metadata", {}).get("rrn", "unknown")
+    date_str = datetime.now().strftime("%Y%m%d")
+    output_path = getattr(args, "output", None) or f"fria-{rrn}-{date_str}.json"
+    html_path = getattr(args, "html", None)
+    if html_path is None and not no_html:
+        stem = output_path[:-5] if output_path.endswith(".json") else output_path
+        html_path = f"{stem}.html"
+
+    # Find robot memory
+    memory_path = None
+    for candidate in ["robot-memory.md", os.path.expanduser("~/opencastor/robot-memory.md")]:
+        if os.path.exists(candidate):
+            memory_path = candidate
+            break
+
+    doc = build_fria_document(
+        config=config,
+        annex_iii_basis=annex_iii,
+        intended_use=intended_use,
+        memory_path=memory_path,
+        prerequisite_waived=prerequisite_waived,
+    )
+
+    if not skip_sign:
+        try:
+            doc = sign_fria(doc, config)
+        except Exception as exc:
+            print(f"Warning: signing failed ({exc}). Generating unsigned document.", file=sys.stderr)
+
+    with open(output_path, "w") as _f:
+        _json.dump(doc, _f, indent=2, default=str)
+    print(f"FRIA artifact: {output_path}")
+
+    if html_path:
+        try:
+            html = render_fria_html(doc)
+            with open(html_path, "w") as _f:
+                _f.write(html)
+            print(f"HTML companion: {html_path}")
+        except Exception as exc:
+            print(f"Warning: HTML rendering failed ({exc}).", file=sys.stderr)
+
+
+def cmd_fria(args) -> None:
+    """castor fria — EU AI Act FRIA compliance tools."""
+    import sys
+
+    fria_cmd = getattr(args, "fria_cmd", None)
+    if fria_cmd == "generate":
+        cmd_fria_generate(args)
+    else:
+        print("Usage: castor fria <subcommand>", file=sys.stderr)
+        print("Subcommands: generate", file=sys.stderr)
+        raise SystemExit(1)
+
+
 def cmd_validate(args) -> None:
     """castor validate — run RCAN conformance checks on a config file."""
     import json as _json
@@ -6640,6 +6749,60 @@ def main() -> None:
     )
     p_lint.add_argument("--config", default="robot.rcan.yaml", help="RCAN config file")
 
+    # ── fria ──────────────────────────────────────────────────────────────────
+    p_fria = sub.add_parser("fria", help="EU AI Act FRIA compliance tools")
+    p_fria_sub = p_fria.add_subparsers(dest="fria_cmd")
+    p_fria_gen = p_fria_sub.add_parser(
+        "generate",
+        help="Generate signed FRIA artifact for notified body submission (§22)",
+    )
+    p_fria_gen.add_argument(
+        "--config", metavar="FILE", help="RCAN config file (default: robot.rcan.yaml)"
+    )
+    p_fria_gen.add_argument(
+        "--output",
+        metavar="FILE",
+        help="JSON output path (default: fria-{rrn}-{date}.json)",
+    )
+    p_fria_gen.add_argument(
+        "--html", metavar="FILE", help="HTML output path (default: same stem as --output)"
+    )
+    p_fria_gen.add_argument(
+        "--annex-iii",
+        dest="annex_iii",
+        metavar="BASIS",
+        required=True,
+        help=(
+            "EU AI Act Annex III classification basis. One of: "
+            "safety_component, biometric, critical_infrastructure, education, "
+            "employment, essential_services, law_enforcement, migration, "
+            "administration_of_justice, general_purpose_ai"
+        ),
+    )
+    p_fria_gen.add_argument(
+        "--intended-use",
+        dest="intended_use",
+        metavar="TEXT",
+        default="",
+        help="Free-text deployment description",
+    )
+    p_fria_gen.add_argument(
+        "--force", action="store_true", help="Skip conformance prerequisite gate"
+    )
+    p_fria_gen.add_argument(
+        "--no-html",
+        action="store_true",
+        dest="no_html",
+        help="JSON output only, no HTML companion",
+    )
+    p_fria_gen.add_argument(
+        "--skip-sign",
+        action="store_true",
+        dest="skip_sign",
+        help="Omit ML-DSA-65 signature (dev/test mode)",
+    )
+    p_fria_gen.set_defaults(func=cmd_fria_generate)
+
     # castor validate
     p_validate = sub.add_parser(
         "validate",
@@ -8196,6 +8359,7 @@ def main() -> None:
         "benchmark": cmd_benchmark,
         "lint": cmd_lint,
         "validate": cmd_validate,
+        "fria": cmd_fria,
         "rcan-check": cmd_rcan_check,
         "swarm": cmd_swarm,
         "learn": cmd_learn,
