@@ -8,10 +8,14 @@ Provides:
 """
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import os
 from datetime import datetime, timezone
 from typing import Any
+
+from castor.rcan.message_signing import get_message_signer
 
 from castor.conformance import ConformanceChecker, ConformanceResult
 
@@ -182,10 +186,77 @@ def build_fria_document(
 
 
 def sign_fria(document: dict, config: dict) -> dict:
-    """Add ML-DSA-65 signature to the FRIA document. (Task 2)"""
-    raise NotImplementedError("sign_fria not yet implemented")
+    """Add ML-DSA-65 signature to the FRIA document.
+
+    The signature covers the canonical JSON of the document with the 'sig'
+    field absent — same algorithm as RCAN message signing (§16.5).
+    Returns a new dict with 'signing_key' and 'sig' fields added.
+    """
+    signer = get_message_signer(config)
+    if signer is None:
+        raise RuntimeError(
+            "No message signer available — check robot key configuration"
+        )
+
+    pq_pair = getattr(signer, "_pq_key_pair", None)
+    if pq_pair is None:
+        raise RuntimeError(
+            "ML-DSA-65 keypair not available — cannot sign FRIA"
+        )
+
+    pub_bytes = signer.public_key_bytes()
+    key_id = getattr(signer, "_pq_key_id", "")
+
+    # Build document with signing_key but without sig
+    doc = dict(document)
+    doc["signing_key"] = {
+        "alg": "ml-dsa-65",
+        "kid": key_id,
+        "public_key": base64.urlsafe_b64encode(pub_bytes).decode() if pub_bytes else "",
+    }
+
+    # Canonical JSON: sort keys, no whitespace, no 'sig' field
+    canonical = json.dumps(doc, sort_keys=True, separators=(",", ":"), default=str).encode()
+
+    raw_sig = pq_pair.sign_bytes(canonical)
+
+    doc["sig"] = {
+        "alg": "ml-dsa-65",
+        "kid": key_id,
+        "value": base64.urlsafe_b64encode(raw_sig).decode(),
+    }
+    return doc
 
 
 def render_fria_html(document: dict, template_path: str | None = None) -> str:
-    """Render the FRIA document to an HTML string using the Jinja2 template. (Task 2)"""
-    raise NotImplementedError("render_fria_html not yet implemented")
+    """Render the FRIA document to an HTML string using the Jinja2 template.
+
+    Args:
+        document:      The FRIA document dict (signed or unsigned).
+        template_path: Override path to the Jinja2 template file. Defaults to
+                       castor/templates/fria.html.j2 next to this module.
+
+    Returns:
+        Rendered HTML string.
+    """
+    try:
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+    except ImportError as exc:
+        raise ImportError(
+            "Jinja2 is required for HTML rendering. Install it with: pip install jinja2"
+        ) from exc
+
+    if template_path is None:
+        template_path = os.path.join(
+            os.path.dirname(__file__), "templates", "fria.html.j2"
+        )
+
+    template_dir = os.path.dirname(os.path.abspath(template_path))
+    template_name = os.path.basename(template_path)
+
+    env = Environment(
+        loader=FileSystemLoader(template_dir),
+        autoescape=select_autoescape(["html"]),
+    )
+    template = env.get_template(template_name)
+    return template.render(doc=document)

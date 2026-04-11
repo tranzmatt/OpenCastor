@@ -205,3 +205,160 @@ class TestBuildFriaDocument:
         assert len(obs) == 1
         assert obs[0]["id"] == "mem-abc01"
         assert obs[0]["text"] == "Left motor stalls"
+
+
+# ── sign_fria ────────────────────────────────────────────────────────────────
+
+class TestSignFria:
+    def _make_doc(self):
+        from castor.fria import FRIA_SCHEMA_VERSION, FRIA_SPEC_REF
+        return {
+            "schema": FRIA_SCHEMA_VERSION,
+            "spec_ref": FRIA_SPEC_REF,
+            "generated_at": "2026-04-10T14:32:01+00:00",
+            "system": {"rrn": "RRN-000000000001", "robot_name": "bot"},
+            "deployment": {"annex_iii_basis": "safety_component", "intended_use": "test"},
+            "conformance": {"score": 87, "pass": 1, "warn": 0, "fail": 0, "checks": []},
+            "human_oversight": {},
+            "hardware_observations": [],
+        }
+
+    def _mock_signer(self, pub=b"\x01" * 32, priv=b"\x02" * 64):
+        signer = MagicMock()
+        signer.public_key_bytes.return_value = pub
+        signer._pq_key_id = "test-kid"
+        pq_pair = MagicMock()
+        pq_pair.sign_bytes.return_value = b"\xff" * 32
+        pq_pair.key_id = "test-kid"
+        signer._pq_key_pair = pq_pair
+        return signer
+
+    def test_adds_signing_key_and_sig_fields(self):
+        from castor.fria import sign_fria
+        signer = self._mock_signer()
+        with patch("castor.fria.get_message_signer", return_value=signer):
+            signed = sign_fria(self._make_doc(), _make_config())
+        assert "signing_key" in signed
+        assert "sig" in signed
+        assert signed["signing_key"]["alg"] == "ml-dsa-65"
+        assert signed["sig"]["alg"] == "ml-dsa-65"
+        assert signed["sig"]["kid"] == "test-kid"
+
+    def test_sig_value_is_base64url(self):
+        import base64
+        from castor.fria import sign_fria
+        signer = self._mock_signer()
+        with patch("castor.fria.get_message_signer", return_value=signer):
+            signed = sign_fria(self._make_doc(), _make_config())
+        value = signed["sig"]["value"]
+        assert isinstance(value, str)
+        base64.urlsafe_b64decode(value + "==")  # must not raise
+
+    def test_sign_bytes_called_with_canonical_json(self):
+        import json
+        from castor.fria import sign_fria
+        signer = self._mock_signer()
+        with patch("castor.fria.get_message_signer", return_value=signer):
+            sign_fria(self._make_doc(), _make_config())
+        signer._pq_key_pair.sign_bytes.assert_called_once()
+        call_arg = signer._pq_key_pair.sign_bytes.call_args[0][0]
+        assert isinstance(call_arg, bytes)
+        # The canonical payload must not contain a 'sig' key
+        payload = json.loads(call_arg.decode())
+        assert "sig" not in payload
+
+    def test_raises_when_no_signer(self):
+        from castor.fria import sign_fria
+        with patch("castor.fria.get_message_signer", return_value=None):
+            with pytest.raises(RuntimeError, match="No message signer"):
+                sign_fria(self._make_doc(), _make_config())
+
+    def test_raises_when_no_keypair(self):
+        from castor.fria import sign_fria
+        signer = MagicMock()
+        signer._pq_key_pair = None
+        signer.public_key_bytes.return_value = b"\x01" * 32
+        with patch("castor.fria.get_message_signer", return_value=signer):
+            with pytest.raises(RuntimeError, match="keypair"):
+                sign_fria(self._make_doc(), _make_config())
+
+
+# ── render_fria_html ──────────────────────────────────────────────────────────
+
+class TestRenderFriaHtml:
+    def _make_full_doc(self):
+        return {
+            "schema": "rcan-fria-v1",
+            "spec_ref": "https://rcan.dev/spec/section-22",
+            "generated_at": "2026-04-10T14:32:01+00:00",
+            "system": {
+                "rrn": "RRN-000000000001",
+                "rrn_uri": "rrn://test/robot/model/001",
+                "robot_name": "test-bot",
+                "opencastor_version": "2026.4.10.0",
+                "rcan_version": "1.9.0",
+                "agent_provider": "anthropic",
+                "agent_model": "claude-sonnet-4-6",
+            },
+            "deployment": {
+                "annex_iii_basis": "safety_component",
+                "intended_use": "indoor navigation",
+                "prerequisite_waived": False,
+            },
+            "conformance": {
+                "score": 87,
+                "pass": 10,
+                "warn": 2,
+                "fail": 0,
+                "checks": [
+                    {"check_id": "safety.estop_configured", "category": "safety",
+                     "status": "pass", "detail": "ESTOP configured"},
+                ],
+            },
+            "human_oversight": {
+                "hitl_configured": True,
+                "confidence_gates_configured": True,
+                "estop_configured": True,
+            },
+            "hardware_observations": [
+                {"id": "mem-abc01", "text": "Left motor stalls", "confidence": 0.82, "tags": ["motor"]},
+            ],
+            "signing_key": {"alg": "ml-dsa-65", "kid": "test-kid", "public_key": "abc123"},
+            "sig": {"alg": "ml-dsa-65", "kid": "test-kid", "value": "sig-value"},
+        }
+
+    def test_returns_string_containing_rrn(self):
+        from castor.fria import render_fria_html
+        html = render_fria_html(self._make_full_doc())
+        assert isinstance(html, str)
+        assert "RRN-000000000001" in html
+
+    def test_contains_annex_iii_basis(self):
+        from castor.fria import render_fria_html
+        html = render_fria_html(self._make_full_doc())
+        assert "safety_component" in html
+
+    def test_contains_spec_ref(self):
+        from castor.fria import render_fria_html
+        html = render_fria_html(self._make_full_doc())
+        assert "rcan.dev/spec/section-22" in html
+
+    def test_contains_conformance_score(self):
+        from castor.fria import render_fria_html
+        html = render_fria_html(self._make_full_doc())
+        assert "87" in html
+
+    def test_contains_hardware_observation(self):
+        from castor.fria import render_fria_html
+        html = render_fria_html(self._make_full_doc())
+        assert "Left motor stalls" in html
+
+    def test_renders_without_sig_field(self):
+        """--skip-sign path: doc has no 'sig' key; template must not crash."""
+        from castor.fria import render_fria_html
+        doc = self._make_full_doc()
+        del doc["sig"]
+        del doc["signing_key"]
+        html = render_fria_html(doc)
+        assert isinstance(html, str)
+        assert "RRN-000000000001" in html
