@@ -107,6 +107,7 @@ def build_fria_document(
     check_map = {r.check_id: r for r in results}
 
     def _passed(*check_ids: str) -> bool:
+        # check_ids are aliases for the same gate — pass if any alias is found passing
         return any(
             check_map.get(cid) is not None and check_map[cid].status == "pass"
             for cid in check_ids

@@ -1,5 +1,4 @@
 """Tests for castor/fria.py — FRIA document generation (§22)."""
-import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -76,6 +75,16 @@ class TestCheckFriaPrerequisite:
         assert passed is False
         assert any(r.check_id == "safety.estop_configured" for r in blocking)
 
+    def test_passes_at_exact_boundary_score_80(self):
+        from castor.fria import check_fria_prerequisite
+        results = [
+            _make_result("protocol.rcan_version", "protocol", "pass"),
+        ]
+        with patch("castor.fria.ConformanceChecker", return_value=self._mock_checker(results, 80)):
+            passed, blocking = check_fria_prerequisite(_make_config())
+        assert passed is True
+        assert blocking == []
+
 
 # ── build_fria_document ───────────────────────────────────────────────────────
 
@@ -145,9 +154,10 @@ class TestBuildFriaDocument:
 
     def test_hardware_observations_loaded_from_memory(self, tmp_path):
         """HARDWARE_OBSERVATION entries with confidence >= 0.30 are included."""
+        from datetime import datetime
+
         from castor.brain.memory_schema import EntryType, MemoryEntry, RobotMemory, save_memory
         from castor.fria import build_fria_document
-        from datetime import datetime
 
         now = datetime.now()
         memory = RobotMemory(
