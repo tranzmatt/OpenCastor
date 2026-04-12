@@ -2651,14 +2651,30 @@ class TestSafetyBenchmarkCli:
     def test_benchmark_output_file_written(self, tmp_path):
         """castor safety benchmark writes JSON output file."""
         import json
+        from unittest.mock import patch
 
-        output_file = tmp_path / "bench.json"
-        _run_main_with_plugins_mocked(
-            "castor", "safety", "benchmark",
-            "--output", str(output_file),
-            "--iterations", "3",
-            "--json",
+        from castor.safety_benchmark import (
+            BENCHMARK_SCHEMA_VERSION,
+            DEFAULT_THRESHOLDS,
+            SafetyBenchmarkReport,
         )
+
+        mock_report = SafetyBenchmarkReport(
+            schema=BENCHMARK_SCHEMA_VERSION,
+            generated_at="2026-04-11T00:00:00Z",
+            mode="synthetic",
+            iterations=3,
+            thresholds=dict(DEFAULT_THRESHOLDS),
+            results={},
+        )
+        output_file = tmp_path / "bench.json"
+        with patch("castor.safety_benchmark.run_safety_benchmark", return_value=mock_report):
+            _run_main_with_plugins_mocked(
+                "castor", "safety", "benchmark",
+                "--output", str(output_file),
+                "--iterations", "3",
+                "--json",
+            )
         assert output_file.exists()
         data = json.loads(output_file.read_text())
         assert data["schema"] == "rcan-safety-benchmark-v1"
