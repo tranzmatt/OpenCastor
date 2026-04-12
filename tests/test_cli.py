@@ -2603,3 +2603,62 @@ class TestFriaGenerateCli:
             text=True,
         )
         assert result.returncode != 0
+
+
+class TestSafetyBenchmarkCli:
+    def test_safety_benchmark_help_exits_zero(self):
+        """castor safety benchmark --help exits 0."""
+        with pytest.raises(SystemExit) as exc_info:
+            _run_main_with_plugins_mocked("castor", "safety", "benchmark", "--help")
+        assert exc_info.value.code == 0
+
+    def test_fail_fast_exits_one_when_overall_pass_false(self, tmp_path):
+        """--fail-fast exits 1 when overall_pass is False."""
+        from unittest.mock import patch
+
+        from castor.safety_benchmark import (
+            BENCHMARK_SCHEMA_VERSION,
+            DEFAULT_THRESHOLDS,
+            SafetyBenchmarkReport,
+            SafetyBenchmarkResult,
+        )
+
+        failing_result = SafetyBenchmarkResult(
+            path="bounds_check",
+            iterations=5,
+            latencies_ms=[999.0] * 5,
+            threshold_p95_ms=DEFAULT_THRESHOLDS["bounds_check_p95_ms"],
+        )
+        mock_report = SafetyBenchmarkReport(
+            schema=BENCHMARK_SCHEMA_VERSION,
+            generated_at="2026-04-11T00:00:00Z",
+            mode="synthetic",
+            iterations=5,
+            thresholds=dict(DEFAULT_THRESHOLDS),
+            results={"bounds_check": failing_result},
+        )
+        output_file = tmp_path / "bench.json"
+        with patch("castor.safety_benchmark.run_safety_benchmark", return_value=mock_report):
+            with pytest.raises(SystemExit) as exc_info:
+                _run_main_with_plugins_mocked(
+                    "castor", "safety", "benchmark",
+                    "--output", str(output_file),
+                    "--iterations", "5",
+                    "--fail-fast",
+                )
+        assert exc_info.value.code == 1
+
+    def test_benchmark_output_file_written(self, tmp_path):
+        """castor safety benchmark writes JSON output file."""
+        import json
+
+        output_file = tmp_path / "bench.json"
+        _run_main_with_plugins_mocked(
+            "castor", "safety", "benchmark",
+            "--output", str(output_file),
+            "--iterations", "3",
+            "--json",
+        )
+        assert output_file.exists()
+        data = json.loads(output_file.read_text())
+        assert data["schema"] == "rcan-safety-benchmark-v1"

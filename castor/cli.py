@@ -2124,9 +2124,92 @@ def cmd_restore(args) -> None:
             print_restore_summary(files)
 
 
+def cmd_safety_benchmark(args) -> None:
+    """castor safety benchmark — measure safety path latencies."""
+    import json as _json
+    from datetime import date
+
+    from castor.safety_benchmark import run_safety_benchmark
+
+    config_path = getattr(args, "config", None)
+    if config_path:
+        import yaml as _yaml
+
+        with open(config_path) as _f:
+            config = _yaml.safe_load(_f) or {}
+    else:
+        config = {}
+    iterations = getattr(args, "iterations", 20)
+    live = getattr(args, "live", False)
+    fail_fast = getattr(args, "fail_fast", False)
+    json_only = getattr(args, "json_output", False)
+
+    output = getattr(args, "output", None)
+    if output is None:
+        output = f"safety-benchmark-{date.today().isoformat()}.json"
+
+    report = run_safety_benchmark(config=config, iterations=iterations, live=live)
+
+    with open(output, "w") as f:
+        _json.dump(report.to_dict(), f, indent=2)
+
+    if not json_only:
+        try:
+            from rich.console import Console
+            from rich.table import Table
+
+            console = Console()
+            table = Table(title="Safety Benchmark Results", show_header=True)
+            table.add_column("Path", style="cyan")
+            table.add_column("Iterations", justify="right")
+            table.add_column("P95 (ms)", justify="right")
+            table.add_column("Threshold (ms)", justify="right")
+            table.add_column("Pass", justify="center")
+
+            for path, result in report.results.items():
+                if result.skipped:
+                    table.add_row(path, "0", "skipped", "-", "\u229b")
+                    continue
+                status = "[green]\u2713[/green]" if result.passed else "[red]\u2717[/red]"
+                table.add_row(
+                    path,
+                    str(result.iterations),
+                    f"{result.p95_ms:.3f}",
+                    f"{result.threshold_p95_ms:.1f}",
+                    status,
+                )
+
+            console.print(table)
+            overall = "[green]PASS[/green]" if report.overall_pass else "[red]FAIL[/red]"
+            console.print(f"\nOverall: {overall}")
+            console.print(f"Written: {output}")
+        except ImportError:
+            print(f"Overall: {'PASS' if report.overall_pass else 'FAIL'}")
+            print(f"Written: {output}")
+    else:
+        print(_json.dumps(report.to_dict(), indent=2))
+
+    if fail_fast and not report.overall_pass:
+        raise SystemExit(1)
+
+
 def cmd_safety(args) -> None:
-    """castor safety — placeholder."""
-    print("castor safety: coming soon.")
+    """castor safety — safety protocol management."""
+    safety_cmd = getattr(args, "safety_cmd", None)
+    if safety_cmd == "benchmark":
+        cmd_safety_benchmark(args)
+    else:
+        from castor.safety.protocol import SafetyProtocol
+
+        config_path = getattr(args, "config", None)
+        protocol = SafetyProtocol(config_path=config_path)
+        category = getattr(args, "category", None)
+        rules = protocol.list_rules()
+        if category:
+            rules = [r for r in rules if r["rule_id"].startswith(category.upper())]
+        for rule in rules:
+            status = "enabled" if rule["enabled"] else "disabled"
+            print(f"  [{status}] {rule['rule_id']}: {rule['description']}")
 
 
 def cmd_llmfit(args) -> None:
@@ -3861,7 +3944,9 @@ def cmd_fria_generate(args) -> None:
         try:
             doc = sign_fria(doc, config)
         except Exception as exc:
-            print(f"Warning: signing failed ({exc}). Generating unsigned document.", file=sys.stderr)
+            print(
+                f"Warning: signing failed ({exc}). Generating unsigned document.", file=sys.stderr
+            )
 
     with open(output_path, "w") as _f:
         _json.dump(doc, _f, indent=2, default=str)
@@ -6801,6 +6886,13 @@ def main() -> None:
         dest="skip_sign",
         help="Omit ML-DSA-65 signature (dev/test mode)",
     )
+    p_fria_gen.add_argument(
+        "--benchmark",
+        metavar="FILE",
+        dest="benchmark_path",
+        default=None,
+        help="Path to safety-benchmark-*.json to inline in FRIA document",
+    )
     p_fria_gen.set_defaults(func=cmd_fria_generate)
 
     # castor validate
@@ -7662,22 +7754,65 @@ def main() -> None:
     p_safety = sub.add_parser(
         "safety",
         help="Safety protocol management",
-        epilog="Examples:\n  castor safety rules\n  castor safety rules --category motion\n",
+        epilog=(
+            "Examples:\n"
+            "  castor safety rules\n"
+            "  castor safety rules --category motion\n"
+            "  castor safety benchmark\n"
+            "  castor safety benchmark --iterations 50 --fail-fast\n"
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p_safety.add_argument(
-        "safety_action",
-        nargs="?",
-        default="rules",
-        choices=["rules"],
-        help="Safety sub-command (default: rules)",
+    p_safety.set_defaults(func=cmd_safety, safety_cmd=None)
+    p_safety_sub = p_safety.add_subparsers(dest="safety_cmd")
+
+    # castor safety rules
+    p_safety_rules = p_safety_sub.add_parser("rules", help="List safety rules")
+    p_safety_rules.add_argument("--category", default=None, help="Filter by category")
+    p_safety_rules.add_argument(
+        "--config", default=None, help="Path to safety protocol YAML config"
     )
-    p_safety.add_argument("--category", default=None, help="Filter by category")
-    p_safety.add_argument(
-        "--config",
+    p_safety_rules.set_defaults(func=cmd_safety)
+
+    # castor safety benchmark
+    p_safety_bench = p_safety_sub.add_parser(
+        "benchmark",
+        help="Measure safety path latencies (P95) against declared thresholds",
+    )
+    p_safety_bench.add_argument(
+        "--config", metavar="FILE", default=None, help="RCAN config file (default: auto-detect)"
+    )
+    p_safety_bench.add_argument(
+        "--output",
+        metavar="FILE",
         default=None,
-        help="Path to safety protocol YAML config",
+        help="JSON output path (default: safety-benchmark-{date}.json)",
     )
+    p_safety_bench.add_argument(
+        "--iterations",
+        type=int,
+        default=20,
+        metavar="N",
+        help="Runs per path (default: 20)",
+    )
+    p_safety_bench.add_argument(
+        "--live",
+        action="store_true",
+        help="Connect to live robot for estop path",
+    )
+    p_safety_bench.add_argument(
+        "--fail-fast",
+        action="store_true",
+        dest="fail_fast",
+        help="Exit 1 on first threshold breach (CI mode)",
+    )
+    p_safety_bench.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Machine-readable output only (no Rich table)",
+    )
+    p_safety_bench.set_defaults(func=cmd_safety_benchmark)
 
     # castor conformance
     p_conformance = sub.add_parser(
