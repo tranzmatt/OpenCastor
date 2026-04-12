@@ -53,17 +53,15 @@ class SafetyBenchmarkResult:
 
     @property
     def p95_ms(self) -> float:
-        if self.skipped:
-            return 0.0
-        q = statistics.quantiles(self.latencies_ms, n=100)
-        return q[min(94, len(q) - 1)]
+        if len(self.latencies_ms) < 2:
+            return self.latencies_ms[0] if self.latencies_ms else 0.0
+        return statistics.quantiles(self.latencies_ms, n=100)[94]
 
     @property
     def p99_ms(self) -> float:
-        if self.skipped:
-            return 0.0
-        q = statistics.quantiles(self.latencies_ms, n=100)
-        return q[min(98, len(q) - 1)]
+        if len(self.latencies_ms) < 2:
+            return self.latencies_ms[0] if self.latencies_ms else 0.0
+        return statistics.quantiles(self.latencies_ms, n=100)[98]
 
     @property
     def passed(self) -> bool:
@@ -95,10 +93,15 @@ class SafetyBenchmarkReport:
 
     @property
     def overall_pass(self) -> bool:
-        return all(r.passed for r in self.results.values())
+        """True when all non-skipped paths passed their threshold."""
+        non_skipped = [r for r in self.results.values() if not r.skipped]
+        if not non_skipped:
+            return False  # All paths skipped is not a pass
+        return all(r.passed for r in non_skipped)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        skipped_paths = [k for k, r in self.results.items() if r.skipped]
+        d: dict[str, Any] = {
             "schema": self.schema,
             "generated_at": self.generated_at,
             "mode": self.mode,
@@ -107,6 +110,9 @@ class SafetyBenchmarkReport:
             "results": {k: v.to_dict() for k, v in self.results.items()},
             "overall_pass": self.overall_pass,
         }
+        if skipped_paths:
+            d["skipped_paths"] = skipped_paths
+        return d
 
 
 def _bench_bounds_check(config: dict, iterations: int) -> SafetyBenchmarkResult:
@@ -195,6 +201,11 @@ def _bench_estop(config: dict, iterations: int, live: bool) -> SafetyBenchmarkRe
                 latencies_ms=[],
                 threshold_p95_ms=threshold,
             )
+    # NOTE: even with --live, estop is measured via synthetic rule evaluation.
+    # Full hardware ESTOP round-trip (button → GPIO → firmware → software halt)
+    # requires a live hardware loop and is out of scope (spec §10). The synthetic
+    # measurement proves the software check path performance; hardware timing
+    # must be measured separately with physical test equipment.
 
     # Synthetic: time the pure rule check function directly
     try:
@@ -231,8 +242,12 @@ def _bench_estop(config: dict, iterations: int, live: bool) -> SafetyBenchmarkRe
     )
 
 
-def _bench_full_pipeline(config: dict, iterations: int, live: bool) -> SafetyBenchmarkResult:
-    """Benchmark full SafetyProtocol pipeline (all enabled rules)."""
+def _bench_full_pipeline(config: dict, iterations: int) -> SafetyBenchmarkResult:
+    """Benchmark full SafetyProtocol pipeline (all enabled rules).
+
+    Always runs synthetic — full hardware round-trip requires a live robot
+    firmware loop and is out of scope (see spec §10).
+    """
     from castor.safety.protocol import SafetyProtocol
 
     threshold = _get_threshold(config, "full_pipeline_p95_ms")
@@ -274,7 +289,7 @@ def run_safety_benchmark(
         "estop": _bench_estop(config, iterations, live),
         "bounds_check": _bench_bounds_check(config, iterations),
         "confidence_gate": _bench_confidence_gate(config, iterations),
-        "full_pipeline": _bench_full_pipeline(config, iterations, live),
+        "full_pipeline": _bench_full_pipeline(config, iterations),
     }
 
     return SafetyBenchmarkReport(

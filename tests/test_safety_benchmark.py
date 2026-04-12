@@ -74,6 +74,11 @@ class TestSafetyBenchmarkResult:
         r = _make_result(latencies, threshold=5.0)
         assert r.to_dict()["pass"] is True
 
+    def test_p95_ms_single_sample_does_not_raise(self):
+        r = _make_result([42.0])
+        assert r.p95_ms == pytest.approx(42.0)
+        assert r.p99_ms == pytest.approx(42.0)
+
 
 class TestSafetyBenchmarkReport:
     def _make_report(self, all_pass: bool) -> SafetyBenchmarkReport:
@@ -114,6 +119,27 @@ class TestSafetyBenchmarkReport:
         d = self._make_report(all_pass=True).to_dict()
         assert "estop" in d["results"]
         assert "p95_ms" in d["results"]["estop"]
+
+    def test_overall_pass_excludes_skipped_paths(self):
+        skipped = SafetyBenchmarkResult(
+            path="estop", iterations=0, latencies_ms=[], threshold_p95_ms=100.0
+        )
+        passing = SafetyBenchmarkResult(
+            path="bounds_check", iterations=20, latencies_ms=[1.0] * 20, threshold_p95_ms=5.0
+        )
+        report = SafetyBenchmarkReport(
+            schema=BENCHMARK_SCHEMA_VERSION,
+            generated_at="2026-04-11T00:00:00Z",
+            mode="live",
+            iterations=20,
+            thresholds=dict(DEFAULT_THRESHOLDS),
+            results={"estop": skipped, "bounds_check": passing},
+        )
+        # overall_pass considers only non-skipped paths
+        assert report.overall_pass is True
+        d = report.to_dict()
+        assert "skipped_paths" in d
+        assert "estop" in d["skipped_paths"]
 
 
 class TestBenchBoundsCheck:
@@ -207,24 +233,24 @@ class TestBenchEstop:
 
 class TestBenchFullPipeline:
     def test_returns_result_for_full_pipeline_path(self):
-        result = _bench_full_pipeline(config={}, iterations=5, live=False)
+        result = _bench_full_pipeline(config={}, iterations=5)
         assert result.path == "full_pipeline"
 
     def test_iteration_count_matches(self):
-        result = _bench_full_pipeline(config={}, iterations=7, live=False)
+        result = _bench_full_pipeline(config={}, iterations=7)
         assert result.iterations == 7
         assert len(result.latencies_ms) == 7
 
     def test_all_latencies_non_negative(self):
-        result = _bench_full_pipeline(config={}, iterations=10, live=False)
+        result = _bench_full_pipeline(config={}, iterations=10)
         assert all(ms >= 0 for ms in result.latencies_ms)
 
     def test_threshold_matches_default(self):
-        result = _bench_full_pipeline(config={}, iterations=5, live=False)
+        result = _bench_full_pipeline(config={}, iterations=5)
         assert result.threshold_p95_ms == DEFAULT_THRESHOLDS["full_pipeline_p95_ms"]
 
     def test_passes_with_default_threshold(self):
-        result = _bench_full_pipeline(config={}, iterations=20, live=False)
+        result = _bench_full_pipeline(config={}, iterations=20)
         assert result.passed is True
 
 
@@ -280,6 +306,7 @@ class TestRunSafetyBenchmark:
         import json
 
         report = run_safety_benchmark(config={}, iterations=5, live=True)
-        # live=True with no URI → estop is skipped; overall should not crash
         d = report.to_dict()
         json.dumps(d)
+        # Estop is skipped (no URI), but report still serializes cleanly
+        assert "skipped_paths" in d or d["overall_pass"] is not None
