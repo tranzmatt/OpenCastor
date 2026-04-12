@@ -1,12 +1,15 @@
 """Tests for castor/fria.py — FRIA document generation (§22)."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+
 def _make_result(check_id, category, status, detail="ok", fix=None):
     from castor.conformance import ConformanceResult
+
     return ConformanceResult(
         check_id=check_id,
         category=category,
@@ -30,6 +33,7 @@ def _make_config(rrn="RRN-000000000001"):
 
 # ── check_fria_prerequisite ───────────────────────────────────────────────────
 
+
 class TestCheckFriaPrerequisite:
     def _mock_checker(self, results, score):
         checker = MagicMock()
@@ -44,6 +48,7 @@ class TestCheckFriaPrerequisite:
 
     def test_passes_when_score_ok_and_no_safety_failures(self):
         from castor.fria import check_fria_prerequisite
+
         results = [
             _make_result("safety.estop_configured", "safety", "pass"),
             _make_result("protocol.rcan_version", "protocol", "pass"),
@@ -55,6 +60,7 @@ class TestCheckFriaPrerequisite:
 
     def test_blocked_by_low_score(self):
         from castor.fria import check_fria_prerequisite
+
         results = [
             _make_result("protocol.rcan_version", "protocol", "fail", fix="Update RCAN version"),
             _make_result("protocol.other", "protocol", "fail"),
@@ -66,6 +72,7 @@ class TestCheckFriaPrerequisite:
 
     def test_blocked_by_safety_failure_even_if_score_ok(self):
         from castor.fria import check_fria_prerequisite
+
         results = [
             _make_result("safety.estop_configured", "safety", "fail", fix="Configure ESTOP"),
             _make_result("protocol.rcan_version", "protocol", "pass"),
@@ -77,6 +84,7 @@ class TestCheckFriaPrerequisite:
 
     def test_passes_at_exact_boundary_score_80(self):
         from castor.fria import check_fria_prerequisite
+
         results = [
             _make_result("protocol.rcan_version", "protocol", "pass"),
         ]
@@ -88,11 +96,14 @@ class TestCheckFriaPrerequisite:
 
 # ── build_fria_document ───────────────────────────────────────────────────────
 
+
 class TestBuildFriaDocument:
     def _patched_checker(self, score=87):
         results = [
             _make_result("safety.estop_configured", "safety", "pass"),
-            _make_result("safety.confidence_gates_configured", "safety", "warn", fix="Set threshold"),
+            _make_result(
+                "safety.confidence_gates_configured", "safety", "warn", fix="Set threshold"
+            ),
         ]
         checker = MagicMock()
         checker.run_all.return_value = results
@@ -101,14 +112,24 @@ class TestBuildFriaDocument:
 
     def test_returns_dict_with_required_top_level_keys(self):
         from castor.fria import build_fria_document
+
         with patch("castor.fria.ConformanceChecker", return_value=self._patched_checker()):
             doc = build_fria_document(_make_config(), "safety_component", "indoor nav")
-        for key in ("schema", "spec_ref", "generated_at", "system", "deployment",
-                    "conformance", "human_oversight", "hardware_observations"):
+        for key in (
+            "schema",
+            "spec_ref",
+            "generated_at",
+            "system",
+            "deployment",
+            "conformance",
+            "human_oversight",
+            "hardware_observations",
+        ):
             assert key in doc, f"Missing top-level key: {key}"
 
     def test_schema_version_and_spec_ref(self):
         from castor.fria import FRIA_SCHEMA_VERSION, FRIA_SPEC_REF, build_fria_document
+
         with patch("castor.fria.ConformanceChecker", return_value=self._patched_checker()):
             doc = build_fria_document(_make_config(), "safety_component", "indoor nav")
         assert doc["schema"] == FRIA_SCHEMA_VERSION
@@ -116,6 +137,7 @@ class TestBuildFriaDocument:
 
     def test_system_fields_populated_from_config(self):
         from castor.fria import build_fria_document
+
         with patch("castor.fria.ConformanceChecker", return_value=self._patched_checker()):
             doc = build_fria_document(_make_config(), "safety_component", "indoor nav")
         assert doc["system"]["rrn"] == "RRN-000000000001"
@@ -124,6 +146,7 @@ class TestBuildFriaDocument:
 
     def test_deployment_fields(self):
         from castor.fria import build_fria_document
+
         with patch("castor.fria.ConformanceChecker", return_value=self._patched_checker()):
             doc = build_fria_document(
                 _make_config(), "safety_component", "indoor nav", prerequisite_waived=True
@@ -134,6 +157,7 @@ class TestBuildFriaDocument:
 
     def test_conformance_score_present(self):
         from castor.fria import build_fria_document
+
         with patch("castor.fria.ConformanceChecker", return_value=self._patched_checker(87)):
             doc = build_fria_document(_make_config(), "safety_component", "indoor nav")
         assert doc["conformance"]["score"] == 87
@@ -142,14 +166,18 @@ class TestBuildFriaDocument:
 
     def test_raises_on_invalid_annex_iii_basis(self):
         from castor.fria import build_fria_document
+
         with patch("castor.fria.ConformanceChecker", return_value=self._patched_checker()):
             with pytest.raises(ValueError, match="Invalid annex_iii_basis"):
                 build_fria_document(_make_config(), "not_a_valid_basis", "indoor nav")
 
     def test_hardware_observations_empty_when_no_memory(self):
         from castor.fria import build_fria_document
+
         with patch("castor.fria.ConformanceChecker", return_value=self._patched_checker()):
-            doc = build_fria_document(_make_config(), "safety_component", "indoor nav", memory_path=None)
+            doc = build_fria_document(
+                _make_config(), "safety_component", "indoor nav", memory_path=None
+            )
         assert doc["hardware_observations"] == []
 
     def test_hardware_observations_loaded_from_memory(self, tmp_path):
@@ -209,9 +237,11 @@ class TestBuildFriaDocument:
 
 # ── sign_fria ────────────────────────────────────────────────────────────────
 
+
 class TestSignFria:
     def _make_doc(self):
         from castor.fria import FRIA_SCHEMA_VERSION, FRIA_SPEC_REF
+
         return {
             "schema": FRIA_SCHEMA_VERSION,
             "spec_ref": FRIA_SPEC_REF,
@@ -235,6 +265,7 @@ class TestSignFria:
 
     def test_adds_signing_key_and_sig_fields(self):
         from castor.fria import sign_fria
+
         signer = self._mock_signer()
         with patch("castor.fria.get_message_signer", return_value=signer):
             signed = sign_fria(self._make_doc(), _make_config())
@@ -248,6 +279,7 @@ class TestSignFria:
         import base64
 
         from castor.fria import sign_fria
+
         signer = self._mock_signer()
         with patch("castor.fria.get_message_signer", return_value=signer):
             signed = sign_fria(self._make_doc(), _make_config())
@@ -259,6 +291,7 @@ class TestSignFria:
         import json
 
         from castor.fria import sign_fria
+
         signer = self._mock_signer()
         with patch("castor.fria.get_message_signer", return_value=signer):
             sign_fria(self._make_doc(), _make_config())
@@ -271,12 +304,14 @@ class TestSignFria:
 
     def test_raises_when_no_signer(self):
         from castor.fria import sign_fria
+
         with patch("castor.fria.get_message_signer", return_value=None):
             with pytest.raises(RuntimeError, match="No message signer"):
                 sign_fria(self._make_doc(), _make_config())
 
     def test_raises_when_no_keypair(self):
         from castor.fria import sign_fria
+
         signer = MagicMock()
         signer._pq_key_pair = None
         signer.public_key_bytes.return_value = b"\x01" * 32
@@ -286,6 +321,7 @@ class TestSignFria:
 
 
 # ── _load_benchmark_block / build_fria_document with benchmark ───────────────
+
 
 class TestBuildFriaDocumentWithBenchmark:
     def _make_config(self) -> dict:
@@ -310,14 +346,43 @@ class TestBuildFriaDocumentWithBenchmark:
                 "full_pipeline_p95_ms": 50.0,
             },
             "results": {
-                "estop": {"min_ms": 0.3, "mean_ms": 1.2, "p95_ms": 4.1, "p99_ms": 7.2, "max_ms": 9.8, "pass": True},
-                "bounds_check": {"min_ms": 0.1, "mean_ms": 0.4, "p95_ms": 0.9, "p99_ms": 1.1, "max_ms": 1.4, "pass": True},
-                "confidence_gate": {"min_ms": 0.05, "mean_ms": 0.1, "p95_ms": 0.3, "p99_ms": 0.4, "max_ms": 0.5, "pass": True},
-                "full_pipeline": {"min_ms": 0.4, "mean_ms": 1.8, "p95_ms": 5.2, "p99_ms": 8.1, "max_ms": 11.0, "pass": True},
+                "estop": {
+                    "min_ms": 0.3,
+                    "mean_ms": 1.2,
+                    "p95_ms": 4.1,
+                    "p99_ms": 7.2,
+                    "max_ms": 9.8,
+                    "pass": True,
+                },
+                "bounds_check": {
+                    "min_ms": 0.1,
+                    "mean_ms": 0.4,
+                    "p95_ms": 0.9,
+                    "p99_ms": 1.1,
+                    "max_ms": 1.4,
+                    "pass": True,
+                },
+                "confidence_gate": {
+                    "min_ms": 0.05,
+                    "mean_ms": 0.1,
+                    "p95_ms": 0.3,
+                    "p99_ms": 0.4,
+                    "max_ms": 0.5,
+                    "pass": True,
+                },
+                "full_pipeline": {
+                    "min_ms": 0.4,
+                    "mean_ms": 1.8,
+                    "p95_ms": 5.2,
+                    "p99_ms": 8.1,
+                    "max_ms": 11.0,
+                    "pass": True,
+                },
             },
             "overall_pass": overall_pass,
         }
         import json
+
         path = tmp_path / "safety-benchmark-20260411.json"
         path.write_text(json.dumps(data))
         return str(path)
@@ -325,10 +390,14 @@ class TestBuildFriaDocumentWithBenchmark:
     def test_benchmark_inlined_when_path_provided(self, tmp_path):
         bench_path = self._make_benchmark_file(tmp_path)
         from castor.fria import build_fria_document
-        with patch("castor.fria.ConformanceChecker", return_value=MagicMock(
-            run_all=lambda: [],
-            summary=lambda r: {"pass": 0, "warn": 0, "fail": 0, "score": 87},
-        )):
+
+        with patch(
+            "castor.fria.ConformanceChecker",
+            return_value=MagicMock(
+                run_all=lambda: [],
+                summary=lambda r: {"pass": 0, "warn": 0, "fail": 0, "score": 87},
+            ),
+        ):
             doc = build_fria_document(
                 config=self._make_config(),
                 annex_iii_basis="safety_component",
@@ -340,10 +409,14 @@ class TestBuildFriaDocumentWithBenchmark:
     def test_benchmark_block_has_required_fields(self, tmp_path):
         bench_path = self._make_benchmark_file(tmp_path)
         from castor.fria import build_fria_document
-        with patch("castor.fria.ConformanceChecker", return_value=MagicMock(
-            run_all=lambda: [],
-            summary=lambda r: {"pass": 0, "warn": 0, "fail": 0, "score": 87},
-        )):
+
+        with patch(
+            "castor.fria.ConformanceChecker",
+            return_value=MagicMock(
+                run_all=lambda: [],
+                summary=lambda r: {"pass": 0, "warn": 0, "fail": 0, "score": 87},
+            ),
+        ):
             doc = build_fria_document(
                 config=self._make_config(),
                 annex_iii_basis="safety_component",
@@ -356,10 +429,14 @@ class TestBuildFriaDocumentWithBenchmark:
 
     def test_benchmark_omitted_when_path_is_none(self):
         from castor.fria import build_fria_document
-        with patch("castor.fria.ConformanceChecker", return_value=MagicMock(
-            run_all=lambda: [],
-            summary=lambda r: {"pass": 0, "warn": 0, "fail": 0, "score": 87},
-        )):
+
+        with patch(
+            "castor.fria.ConformanceChecker",
+            return_value=MagicMock(
+                run_all=lambda: [],
+                summary=lambda r: {"pass": 0, "warn": 0, "fail": 0, "score": 87},
+            ),
+        ):
             doc = build_fria_document(
                 config=self._make_config(),
                 annex_iii_basis="safety_component",
@@ -370,10 +447,14 @@ class TestBuildFriaDocumentWithBenchmark:
 
     def test_benchmark_omitted_when_file_missing(self, tmp_path):
         from castor.fria import build_fria_document
-        with patch("castor.fria.ConformanceChecker", return_value=MagicMock(
-            run_all=lambda: [],
-            summary=lambda r: {"pass": 0, "warn": 0, "fail": 0, "score": 87},
-        )):
+
+        with patch(
+            "castor.fria.ConformanceChecker",
+            return_value=MagicMock(
+                run_all=lambda: [],
+                summary=lambda r: {"pass": 0, "warn": 0, "fail": 0, "score": 87},
+            ),
+        ):
             doc = build_fria_document(
                 config=self._make_config(),
                 annex_iii_basis="safety_component",
@@ -384,24 +465,34 @@ class TestBuildFriaDocumentWithBenchmark:
 
     def test_invalid_schema_raises_value_error(self, tmp_path):
         import json
+
         from castor.fria import build_fria_document
+
         bad_file = tmp_path / "bad.json"
         bad_file.write_text(json.dumps({"schema": "wrong-schema", "results": {}}))
-        with pytest.raises(ValueError, match="schema"):
-            build_fria_document(
-                config=self._make_config(),
-                annex_iii_basis="safety_component",
-                intended_use="Indoor navigation",
-                benchmark_path=str(bad_file),
-            )
+        mock_checker = MagicMock()
+        mock_checker.run_all.return_value = []
+        mock_checker.summary.return_value = {"pass": 0, "warn": 0, "fail": 0, "score": 87}
+        with patch("castor.fria.ConformanceChecker", return_value=mock_checker):
+            with pytest.raises(ValueError, match="schema"):
+                build_fria_document(
+                    config=self._make_config(),
+                    annex_iii_basis="safety_component",
+                    intended_use="Indoor navigation",
+                    benchmark_path=str(bad_file),
+                )
 
     def test_ref_field_contains_filename(self, tmp_path):
         bench_path = self._make_benchmark_file(tmp_path)
         from castor.fria import build_fria_document
-        with patch("castor.fria.ConformanceChecker", return_value=MagicMock(
-            run_all=lambda: [],
-            summary=lambda r: {"pass": 0, "warn": 0, "fail": 0, "score": 87},
-        )):
+
+        with patch(
+            "castor.fria.ConformanceChecker",
+            return_value=MagicMock(
+                run_all=lambda: [],
+                summary=lambda r: {"pass": 0, "warn": 0, "fail": 0, "score": 87},
+            ),
+        ):
             doc = build_fria_document(
                 config=self._make_config(),
                 annex_iii_basis="safety_component",
@@ -412,6 +503,7 @@ class TestBuildFriaDocumentWithBenchmark:
 
 
 # ── render_fria_html ──────────────────────────────────────────────────────────
+
 
 class TestRenderFriaHtml:
     def _make_full_doc(self):
@@ -439,8 +531,12 @@ class TestRenderFriaHtml:
                 "warn": 2,
                 "fail": 0,
                 "checks": [
-                    {"check_id": "safety.estop_configured", "category": "safety",
-                     "status": "pass", "detail": "ESTOP configured"},
+                    {
+                        "check_id": "safety.estop_configured",
+                        "category": "safety",
+                        "status": "pass",
+                        "detail": "ESTOP configured",
+                    },
                 ],
             },
             "human_oversight": {
@@ -449,7 +545,12 @@ class TestRenderFriaHtml:
                 "estop_configured": True,
             },
             "hardware_observations": [
-                {"id": "mem-abc01", "text": "Left motor stalls", "confidence": 0.82, "tags": ["motor"]},
+                {
+                    "id": "mem-abc01",
+                    "text": "Left motor stalls",
+                    "confidence": 0.82,
+                    "tags": ["motor"],
+                },
             ],
             "signing_key": {"alg": "ml-dsa-65", "kid": "test-kid", "public_key": "abc123"},
             "sig": {"alg": "ml-dsa-65", "kid": "test-kid", "value": "sig-value"},
@@ -457,33 +558,39 @@ class TestRenderFriaHtml:
 
     def test_returns_string_containing_rrn(self):
         from castor.fria import render_fria_html
+
         html = render_fria_html(self._make_full_doc())
         assert isinstance(html, str)
         assert "RRN-000000000001" in html
 
     def test_contains_annex_iii_basis(self):
         from castor.fria import render_fria_html
+
         html = render_fria_html(self._make_full_doc())
         assert "safety_component" in html
 
     def test_contains_spec_ref(self):
         from castor.fria import render_fria_html
+
         html = render_fria_html(self._make_full_doc())
         assert "rcan.dev/spec/section-22" in html
 
     def test_contains_conformance_score(self):
         from castor.fria import render_fria_html
+
         html = render_fria_html(self._make_full_doc())
         assert "87" in html
 
     def test_contains_hardware_observation(self):
         from castor.fria import render_fria_html
+
         html = render_fria_html(self._make_full_doc())
         assert "Left motor stalls" in html
 
     def test_renders_without_sig_field(self):
         """--skip-sign path: doc has no 'sig' key; template must not crash."""
         from castor.fria import render_fria_html
+
         doc = self._make_full_doc()
         del doc["sig"]
         del doc["signing_key"]

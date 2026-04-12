@@ -117,6 +117,9 @@ def build_fria_document(
         memory_path:         Path to robot-memory.md. HARDWARE_OBSERVATION entries
                              with confidence >= 0.30 are included.
         prerequisite_waived: True when --force was passed; recorded in the document.
+        benchmark_path:      Path to a safety benchmark JSON artifact (rcan-safety-benchmark-v1).
+                             Validated and inlined under ``safety_benchmarks`` when provided and valid.
+                             Silently omitted when None or file missing.
 
     Returns:
         Unsigned FRIA document dict (no 'sig' or 'signing_key' fields).
