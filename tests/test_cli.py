@@ -2711,3 +2711,18 @@ class TestEuRegisterCli:
             capture_output=True, text=True
         )
         assert result.returncode == 1
+
+    def test_wrong_fria_schema_exits_1(self, tmp_path):
+        """CLI exits 1 when FRIA has wrong schema (ValueError path)."""
+        import json
+        import subprocess
+        fria = tmp_path / "bad.json"
+        fria.write_text(json.dumps({"schema": "wrong-schema", "system": {}}))
+        config = tmp_path / "robot.rcan.yaml"
+        config.write_text("rcan_version: '2.2'\nmetadata:\n  rrn: RRN-000000000001\n")
+        result = subprocess.run(
+            ["python3", "-m", "castor.cli", "eu-register", str(fria), "--config", str(config)],
+            capture_output=True, text=True
+        )
+        assert result.returncode == 1
+        assert "rcan-fria-v1" in result.stderr
