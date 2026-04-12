@@ -4021,6 +4021,61 @@ def cmd_eu_register(args) -> None:
     print("\n" + package["submission_instructions"], file=sys.stderr)
 
 
+def cmd_incidents(args) -> None:
+    """castor incidents — post-market monitoring incident log (EU AI Act Art. 72)."""
+    import json as _json
+    import sys
+
+    from castor.incidents import IncidentLog, IncidentSeverity, generate_report
+
+    incidents_cmd = getattr(args, "incidents_cmd", None)
+    log_path = getattr(args, "log", None)
+    log = IncidentLog(log_path) if log_path else IncidentLog()
+
+    if incidents_cmd == "record":
+        severity_str = getattr(args, "severity", "other")
+        try:
+            severity = IncidentSeverity(severity_str)
+        except ValueError:
+            print(
+                f"Error: invalid severity {severity_str!r}. Use: life_health, other",
+                file=sys.stderr,
+            )
+            raise SystemExit(1) from None
+        incident_id = log.record(
+            severity=severity,
+            category=getattr(args, "category", "unspecified"),
+            description=getattr(args, "description", ""),
+            system_state={},
+        )
+        print(f"Incident recorded: {incident_id}")
+
+    elif incidents_cmd == "list":
+        incidents = log.list_incidents()
+        if not incidents:
+            print("No incidents recorded.")
+        else:
+            for inc in incidents:
+                print(
+                    f"[{inc['timestamp']}] [{inc['severity'].upper()}] "
+                    f"{inc['category']}: {inc['description']}"
+                )
+
+    elif incidents_cmd == "report":
+        report = generate_report(log)
+        output = getattr(args, "output", None)
+        if output:
+            with open(output, "w") as f:
+                _json.dump(report, f, indent=2, default=str)
+            print(f"Report written to: {output}")
+        else:
+            print(_json.dumps(report, indent=2, default=str))
+
+    else:
+        print("Usage: castor incidents {record|list|report}", file=sys.stderr)
+        raise SystemExit(1)
+
+
 def cmd_validate(args) -> None:
     """castor validate — run RCAN conformance checks on a config file."""
     import json as _json
@@ -6965,6 +7020,40 @@ def main() -> None:
     )
     p_eu_register.set_defaults(func=cmd_eu_register)
 
+    # ── incidents ─────────────────────────────────────────────────────────────────
+    p_incidents = sub.add_parser(
+        "incidents",
+        help="Post-market monitoring incident log (EU AI Act Art. 72)",
+    )
+    p_incidents_sub = p_incidents.add_subparsers(dest="incidents_cmd")
+    p_incidents.add_argument(
+        "--log",
+        metavar="FILE",
+        help="Incident log path (default: ~/.opencastor/incidents.jsonl)",
+    )
+    p_incidents.set_defaults(func=cmd_incidents)
+
+    p_incidents_record = p_incidents_sub.add_parser("record", help="Record a new incident")
+    p_incidents_record.add_argument(
+        "--severity",
+        choices=["life_health", "other"],
+        default="other",
+        help="Incident severity (life_health: 15-day deadline; other: 3-month deadline)",
+    )
+    p_incidents_record.add_argument("--category", required=True, help="Incident category")
+    p_incidents_record.add_argument(
+        "--description", required=True, help="Human-readable description"
+    )
+
+    p_incidents_sub.add_parser("list", help="List all recorded incidents")
+
+    p_incidents_report = p_incidents_sub.add_parser(
+        "report", help="Generate Art. 72 incident report"
+    )
+    p_incidents_report.add_argument(
+        "--output", metavar="FILE", help="Output JSON path (default: stdout)"
+    )
+
     # castor validate
     p_validate = sub.add_parser(
         "validate",
@@ -8566,6 +8655,7 @@ def main() -> None:
         "validate": cmd_validate,
         "fria": cmd_fria,
         "eu-register": cmd_eu_register,
+        "incidents": cmd_incidents,
         "rcan-check": cmd_rcan_check,
         "swarm": cmd_swarm,
         "learn": cmd_learn,

@@ -2726,3 +2726,38 @@ class TestEuRegisterCli:
         )
         assert result.returncode == 1
         assert "rcan-fria-v1" in result.stderr
+
+
+class TestIncidentsCli:
+    def test_help_exits_0(self):
+        import subprocess
+        result = subprocess.run(
+            ["python3", "-m", "castor.cli", "incidents", "--help"],
+            capture_output=True, text=True
+        )
+        assert result.returncode == 0
+
+    def test_record_subcommand_help(self):
+        import subprocess
+        result = subprocess.run(
+            ["python3", "-m", "castor.cli", "incidents", "record", "--help"],
+            capture_output=True, text=True
+        )
+        assert result.returncode == 0
+        assert "--severity" in result.stdout
+
+    def test_report_subcommand_writes_json(self, tmp_path):
+        import json
+        import subprocess
+        log_path = str(tmp_path / "test.jsonl")
+        output_path = str(tmp_path / "report.json")
+        result = subprocess.run(
+            ["python3", "-m", "castor.cli", "incidents", "--log", log_path,
+             "report", "--output", output_path],
+            capture_output=True, text=True
+        )
+        assert result.returncode == 0
+        with open(output_path) as f:
+            report = json.load(f)
+        assert report["schema"] == "rcan-incidents-v1"
+        assert report["total_incidents"] == 0
