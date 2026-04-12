@@ -11,6 +11,9 @@ from castor.safety_benchmark import (
     SafetyBenchmarkResult,
     _bench_bounds_check,
     _bench_confidence_gate,
+    _bench_estop,
+    _bench_full_pipeline,
+    run_safety_benchmark,
 )
 
 
@@ -162,3 +165,104 @@ class TestBenchConfidenceGate:
     def test_passes_with_default_threshold(self):
         result = _bench_confidence_gate(config={}, iterations=20)
         assert result.passed is True
+
+
+class TestBenchEstop:
+    def test_returns_result_for_estop_path(self):
+        result = _bench_estop(config={}, iterations=5, live=False)
+        assert result.path == "estop"
+
+    def test_iteration_count_matches(self):
+        result = _bench_estop(config={}, iterations=6, live=False)
+        assert result.iterations == 6
+        assert len(result.latencies_ms) == 6
+
+    def test_all_latencies_non_negative(self):
+        result = _bench_estop(config={}, iterations=10, live=False)
+        assert all(ms >= 0 for ms in result.latencies_ms)
+
+    def test_threshold_matches_default(self):
+        result = _bench_estop(config={}, iterations=5, live=False)
+        assert result.threshold_p95_ms == DEFAULT_THRESHOLDS["estop_p95_ms"]
+
+    def test_passes_with_default_threshold(self):
+        result = _bench_estop(config={}, iterations=20, live=False)
+        assert result.passed is True
+
+    def test_live_skipped_when_no_uri(self):
+        result = _bench_estop(config={}, iterations=5, live=True)
+        assert result.path == "estop"
+        # No URI → skipped (0 iterations) or synthetic fallback
+        assert result.iterations == 0
+
+
+class TestBenchFullPipeline:
+    def test_returns_result_for_full_pipeline_path(self):
+        result = _bench_full_pipeline(config={}, iterations=5, live=False)
+        assert result.path == "full_pipeline"
+
+    def test_iteration_count_matches(self):
+        result = _bench_full_pipeline(config={}, iterations=7, live=False)
+        assert result.iterations == 7
+        assert len(result.latencies_ms) == 7
+
+    def test_all_latencies_non_negative(self):
+        result = _bench_full_pipeline(config={}, iterations=10, live=False)
+        assert all(ms >= 0 for ms in result.latencies_ms)
+
+    def test_threshold_matches_default(self):
+        result = _bench_full_pipeline(config={}, iterations=5, live=False)
+        assert result.threshold_p95_ms == DEFAULT_THRESHOLDS["full_pipeline_p95_ms"]
+
+    def test_passes_with_default_threshold(self):
+        result = _bench_full_pipeline(config={}, iterations=20, live=False)
+        assert result.passed is True
+
+
+class TestRunSafetyBenchmark:
+    def test_returns_safety_benchmark_report(self):
+        report = run_safety_benchmark(config={}, iterations=5, live=False)
+        assert isinstance(report, SafetyBenchmarkReport)
+
+    def test_schema_version_correct(self):
+        report = run_safety_benchmark(config={}, iterations=5)
+        assert report.schema == BENCHMARK_SCHEMA_VERSION
+
+    def test_all_four_paths_present(self):
+        report = run_safety_benchmark(config={}, iterations=5)
+        assert set(report.results.keys()) == {
+            "estop",
+            "bounds_check",
+            "confidence_gate",
+            "full_pipeline",
+        }
+
+    def test_mode_synthetic_by_default(self):
+        report = run_safety_benchmark(config={}, iterations=5)
+        assert report.mode == "synthetic"
+
+    def test_mode_live_when_live_flag_set(self):
+        report = run_safety_benchmark(config={}, iterations=5, live=True)
+        assert report.mode == "live"
+
+    def test_overall_pass_reflects_all_paths(self):
+        report = run_safety_benchmark(config={}, iterations=20)
+        assert report.overall_pass is True
+
+    def test_to_dict_produces_json_serializable_output(self):
+        import json
+
+        report = run_safety_benchmark(config={}, iterations=5)
+        d = report.to_dict()
+        json.dumps(d)  # Should not raise
+
+    def test_overall_pass_false_when_threshold_very_low(self):
+        config = {
+            "safety": {
+                "benchmark_thresholds": {
+                    "bounds_check_p95_ms": 0.000001,
+                }
+            }
+        }
+        report = run_safety_benchmark(config=config, iterations=20)
+        assert report.overall_pass is False

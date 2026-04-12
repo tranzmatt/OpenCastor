@@ -151,13 +151,103 @@ def _bench_confidence_gate(config: dict, iterations: int) -> SafetyBenchmarkResu
 
 
 def _bench_estop(config: dict, iterations: int, live: bool) -> SafetyBenchmarkResult:
-    """Benchmark ESTOP software path."""
-    raise NotImplementedError("implemented in Task 2")
+    """Benchmark ESTOP software path.
+
+    Synthetic: calls _check_estop_response directly with a compliant action dict.
+    Live: connects to running robot via RCAN URI (skipped gracefully if unreachable).
+    """
+    threshold = _get_threshold(config, "estop_p95_ms")
+
+    if live:
+        rcan_uri = config.get("metadata", {}).get("rcan_uri", "")
+        if not rcan_uri:
+            return SafetyBenchmarkResult(
+                path="estop",
+                iterations=0,
+                latencies_ms=[],
+                threshold_p95_ms=threshold,
+            )
+        try:
+            import socket
+            import urllib.parse
+
+            parsed = urllib.parse.urlparse(rcan_uri)
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 8000
+            with socket.create_connection((host, port), timeout=2.0):
+                pass
+        except OSError:
+            return SafetyBenchmarkResult(
+                path="estop",
+                iterations=0,
+                latencies_ms=[],
+                threshold_p95_ms=threshold,
+            )
+
+    # Synthetic: time the pure rule check function directly
+    try:
+        from castor.safety.protocol import _check_estop_response as _estop_fn
+
+        action = {"estop_response_ms": 5.0}
+        params = {"max_response_ms": threshold}
+
+        def _run_estop() -> None:
+            _estop_fn(action, params)
+
+    except ImportError:
+        from castor.safety.protocol import SafetyProtocol
+
+        _protocol = SafetyProtocol()
+        _rule = _protocol.get_rule("MOTION_003")
+        _action = {"estop_response_ms": 5.0}
+
+        def _run_estop() -> None:
+            _rule.evaluate(_action)
+
+    latencies: list[float] = []
+    for _ in range(iterations):
+        t0 = time.perf_counter()
+        _run_estop()
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        latencies.append(elapsed_ms)
+
+    return SafetyBenchmarkResult(
+        path="estop",
+        iterations=iterations,
+        latencies_ms=latencies,
+        threshold_p95_ms=threshold,
+    )
 
 
 def _bench_full_pipeline(config: dict, iterations: int, live: bool) -> SafetyBenchmarkResult:
-    """Benchmark full SafetyLayer pipeline."""
-    raise NotImplementedError("implemented in Task 2")
+    """Benchmark full SafetyProtocol pipeline (all enabled rules)."""
+    from castor.safety.protocol import SafetyProtocol
+
+    threshold = _get_threshold(config, "full_pipeline_p95_ms")
+    protocol = SafetyProtocol()
+
+    action = {
+        "linear_velocity": 0.5,
+        "angular_velocity": 0.5,
+        "estop_response_ms": 5.0,
+        "estop_available": True,
+        "destructive": False,
+        "sensor_active": False,
+    }
+
+    latencies: list[float] = []
+    for _ in range(iterations):
+        t0 = time.perf_counter()
+        protocol.check_action(action)
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        latencies.append(elapsed_ms)
+
+    return SafetyBenchmarkResult(
+        path="full_pipeline",
+        iterations=iterations,
+        latencies_ms=latencies,
+        threshold_p95_ms=threshold,
+    )
 
 
 def run_safety_benchmark(
@@ -166,4 +256,20 @@ def run_safety_benchmark(
     live: bool = False,
 ) -> SafetyBenchmarkReport:
     """Run all four safety path benchmarks. Returns a SafetyBenchmarkReport."""
-    raise NotImplementedError("implemented in Task 2")
+    from datetime import datetime, timezone
+
+    results = {
+        "estop": _bench_estop(config, iterations, live),
+        "bounds_check": _bench_bounds_check(config, iterations),
+        "confidence_gate": _bench_confidence_gate(config, iterations),
+        "full_pipeline": _bench_full_pipeline(config, iterations, live),
+    }
+
+    return SafetyBenchmarkReport(
+        schema=BENCHMARK_SCHEMA_VERSION,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        mode="live" if live else "synthetic",
+        iterations=iterations,
+        thresholds={k: _get_threshold(config, k) for k in DEFAULT_THRESHOLDS},
+        results=results,
+    )
