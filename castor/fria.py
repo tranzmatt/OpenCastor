@@ -166,6 +166,7 @@ def build_fria_document(
     prerequisite_waived: bool = False,
     benchmark_path: str | None = None,
     annex_iii_strict: bool = False,
+    qms_reference: str | None = None,
 ) -> dict:
     """Assemble the unsigned FRIA JSON document dict.
 
@@ -291,6 +292,7 @@ def build_fria_document(
             ),
         },
         "annex_iv_coverage": ANNEX_IV_COVERAGE,
+        **({"qms_reference": qms_reference} if qms_reference else {}),
         **_load_benchmark_block(benchmark_path),
     }
 

@@ -1413,3 +1413,36 @@ class TestWatermarkEnforcedCheck:
         wm = next(r for r in results if r.check_id == "rcan_v22.watermark_enforced")
         assert wm.fix is not None
         assert "watermark_enforcement" in wm.fix
+
+
+class TestQmsDeclarationCheck:
+    """rcan_v22.qms_declaration — Art. 17 QMS conformance check."""
+
+    def _checker(self, extra=None):
+        config = {
+            "rcan_version": "2.2",
+            "metadata": {"rrn": "RRN-000000000001"},
+            "reactive": {"min_obstacle_m": 0.3},
+            "agent": {"provider": "google", "model": "gemini-2.5-flash"},
+        }
+        if extra:
+            config.update(extra)
+        return ConformanceChecker(config)
+
+    def test_warns_when_qms_reference_absent(self):
+        results = self._checker().run_category("rcan_v21")
+        qms = next((r for r in results if r.check_id == "rcan_v22.qms_declaration"), None)
+        assert qms is not None
+        assert qms.status == "warn"
+
+    def test_passes_when_qms_reference_set(self):
+        results = self._checker({"qms_reference": "https://example.com/qms.pdf"}).run_category(
+            "rcan_v21"
+        )
+        qms = next(r for r in results if r.check_id == "rcan_v22.qms_declaration")
+        assert qms.status == "pass"
+
+    def test_check_in_rcan_v22_category(self):
+        results = self._checker().run_category("rcan_v21")
+        qms = next(r for r in results if r.check_id == "rcan_v22.qms_declaration")
+        assert qms.category == "rcan_v22"

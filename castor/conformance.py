@@ -1789,6 +1789,7 @@ class ConformanceChecker:
             self._v22_pq_signing_key(),
             self._v22_firmware_pq_sig(),
             self._v22_watermark_enforced(),
+            self._v22_qms_declaration(),
         ]
 
     def _v22_pq_signing_key(self) -> ConformanceResult:
@@ -1884,6 +1885,31 @@ class ConformanceChecker:
                 detail=f"Could not read firmware manifest: {e}",
                 fix="castor attest generate && castor attest sign",
             )
+
+    def _v22_qms_declaration(self) -> ConformanceResult:
+        """RCAN v2.2 §17 — Quality Management System reference (EU AI Act Art. 17)."""
+        cid = "rcan_v22.qms_declaration"
+        qms_ref = self._cfg.get("qms_reference", None)
+        if qms_ref:
+            return ConformanceResult(
+                check_id=cid,
+                category="rcan_v22",
+                status="pass",
+                detail=f"QMS reference declared: {qms_ref}",
+            )
+        return ConformanceResult(
+            check_id=cid,
+            category="rcan_v22",
+            status="warn",
+            detail=(
+                "No QMS reference declared — EU AI Act Art. 17 requires a quality management "
+                "system for high-risk AI providers"
+            ),
+            fix=(
+                "Add `qms_reference: <uri-or-hash>` to your RCAN config pointing to your "
+                "Art. 17 QMS documentation. See rcan-spec/docs/compliance/art17-qms-template.md"
+            ),
+        )
 
     def _v22_watermark_enforced(self) -> ConformanceResult:
         """RCAN v2.2 §16.5 — AI output watermarking MUST be enabled (EU AI Act Art. 50)."""

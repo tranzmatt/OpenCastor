@@ -3933,6 +3933,7 @@ def cmd_fria_generate(args) -> None:
             memory_path = candidate
             break
 
+    qms_reference = getattr(args, "qms_reference", None)
     doc = build_fria_document(
         config=config,
         annex_iii_basis=annex_iii,
@@ -3941,6 +3942,7 @@ def cmd_fria_generate(args) -> None:
         prerequisite_waived=prerequisite_waived,
         benchmark_path=getattr(args, "benchmark_path", None),
         annex_iii_strict=annex_iii_strict,
+        qms_reference=qms_reference,
     )
 
     if not skip_sign:
@@ -6996,6 +6998,12 @@ def main() -> None:
             "Promote Art. 16 conformance checks (SBOM, firmware manifest, authority handler) "
             "from warn to fail. Required for Annex III high-risk system deployments."
         ),
+    )
+    p_fria_gen.add_argument(
+        "--qms-reference",
+        dest="qms_reference",
+        metavar="URI",
+        help="URI or hash of the Art. 17 Quality Management System document",
     )
     p_fria_gen.set_defaults(func=cmd_fria_generate)
 

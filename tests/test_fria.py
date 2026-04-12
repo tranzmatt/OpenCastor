@@ -681,3 +681,34 @@ class TestFriaAnnexIVCoverage:
         doc = self._build()
         points = [e["point"] for e in doc["annex_iv_coverage"]]
         assert points == list(range(1, 10))
+
+
+class TestFriaQmsReference:
+    """Art. 17 QMS declaration in FRIA."""
+
+    def _build(self, qms_reference=None):
+        from unittest.mock import patch
+
+        from castor.fria import build_fria_document
+
+        cfg = {
+            "rcan_version": "2.2",
+            "metadata": {"rrn": "RRN-000000000001"},
+            "reactive": {"min_obstacle_m": 0.3},
+            "agent": {"provider": "google", "model": "gemini-2.5-flash"},
+        }
+        with patch("castor.fria.ConformanceChecker") as MockCC:
+            MockCC.return_value.run_all.return_value = []
+            MockCC.return_value.summary.return_value = {
+                "score": 90, "pass": 5, "warn": 0, "fail": 0
+            }
+            return build_fria_document(cfg, "safety_component", "nav",
+                                       qms_reference=qms_reference)
+
+    def test_qms_reference_absent_when_not_provided(self):
+        doc = self._build()
+        assert "qms_reference" not in doc
+
+    def test_qms_reference_present_when_provided(self):
+        doc = self._build(qms_reference="https://example.com/qms/v1.pdf")
+        assert doc["qms_reference"] == "https://example.com/qms/v1.pdf"
