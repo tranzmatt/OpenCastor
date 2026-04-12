@@ -1333,11 +1333,29 @@ class TestAnnexIIIStrictMode:
         fw = next(r for r in results if r.check_id == "rcan_v21.firmware_manifest")
         assert fw.status == "fail"
 
-    def test_authority_fail_in_strict_mode(self):
-        checker = ConformanceChecker(self.base_config, annex_iii_strict=True)
-        results = checker.run_category("rcan_v21")
-        auth = next(r for r in results if r.check_id == "rcan_v21.authority_handler")
-        assert auth.status == "fail"
+    def test_authority_warn_in_default_mode_when_module_available(self):
+        """When castor.authority exists but handler unregistered, default mode → warn."""
+        import sys
+        from unittest.mock import MagicMock, patch
+        mock_authority = MagicMock()
+        mock_authority.AuthorityRequestHandler = MagicMock()
+        with patch.dict(sys.modules, {"castor.authority": mock_authority}):
+            checker = ConformanceChecker(self.base_config)
+            results = checker.run_category("rcan_v21")
+            auth = next(r for r in results if r.check_id == "rcan_v21.authority_handler")
+            assert auth.status == "warn"
+
+    def test_authority_fail_in_strict_mode_when_module_available(self):
+        """When castor.authority exists but handler unregistered, strict mode → fail."""
+        import sys
+        from unittest.mock import MagicMock, patch
+        mock_authority = MagicMock()
+        mock_authority.AuthorityRequestHandler = MagicMock()
+        with patch.dict(sys.modules, {"castor.authority": mock_authority}):
+            checker = ConformanceChecker(self.base_config, annex_iii_strict=True)
+            results = checker.run_category("rcan_v21")
+            auth = next(r for r in results if r.check_id == "rcan_v21.authority_handler")
+            assert auth.status == "fail"
 
     def test_strict_mode_does_not_affect_non_art16_checks(self):
         checker_default = ConformanceChecker(self.base_config)
