@@ -743,6 +743,14 @@
         "whisper_model": {
           "type": "string",
           "description": "Whisper model size (tiny, base, small, medium, large)."
+        },
+        "wake_word_enabled": {
+          "type": "boolean",
+          "description": "Auto-start wake word detection + voice loop on startup. Defaults to true when a microphone is detected. Set false to disable."
+        },
+        "wake_phrase": {
+          "type": "string",
+          "description": "Wake word / phrase to listen for (e.g. 'hey castor'). Overrides CASTOR_HOTWORD env var when set."
         }
       },
       "additionalProperties": true
