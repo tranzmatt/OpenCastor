@@ -78,6 +78,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("OpenCastor.Gateway")
 
+# Suppress noisy third-party INFO logs — HuggingFace HEAD/307 redirects and
+# httpx request traces are expected behaviour, not actionable signals.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
+logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
+logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+
 
 # ---------------------------------------------------------------------------
 # App & state
@@ -394,6 +401,9 @@ async def health():
         "rcan_version": "2.2",
         "rrn": getattr(state, "ruri", "") or "",
     }
+
+
+app.add_api_route("/api/health", health, methods=["GET"])
 
 
 @app.get("/api/health/detail", dependencies=[Depends(verify_token)])
