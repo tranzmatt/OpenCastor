@@ -6,6 +6,19 @@ from unittest import mock
 
 import pytest
 
+# neonize is compiled against protobuf ≥7.34; the rest of the venv pins <7.
+# Skip all tests in this file when the protobuf runtime is too old.
+try:
+    from neonize import _neonize  # noqa: F401
+    _NEONIZE_OK = True
+except Exception:
+    _NEONIZE_OK = False
+
+pytestmark = pytest.mark.skipif(
+    not _NEONIZE_OK,
+    reason="neonize protobuf gencode/runtime version mismatch — upgrade protobuf to fix",
+)
+
 
 # =====================================================================
 # Session DB path resolution

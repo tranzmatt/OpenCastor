@@ -149,7 +149,7 @@ class TestSecondaryModels:
             result = choose_secondary_models("anthropic", {"anthropic"})
         assert len(result) == 1
         assert result[0]["provider"] == "google"
-        assert result[0]["model"] == "gemini-er-1.5"
+        assert result[0]["model"] == "gemini-er-1.6"
 
     @patch("builtins.input", return_value="1,3")
     def test_select_multiple(self, mock_input):
