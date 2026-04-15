@@ -1650,6 +1650,97 @@ class CastorBridge:
             except Exception:
                 pass
 
+    def _dispatch_pick_place(
+        self,
+        target: str,
+        destination: str,
+        doc: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Route a pick-and-place instruction to /api/arm/pick_place.
+
+        Creates a Firestore task doc, optionally waits for user confirmation
+        (ask mode), then calls the gateway endpoint and returns its result.
+        """
+        import httpx
+
+        task_id = str(uuid.uuid4())[:8]
+
+        # Read task_execution from Firestore at dispatch time (respects Flutter toggle)
+        task_execution = self._rcan_config.get("task_execution", "ask")
+        if self._db:
+            try:
+                robot_doc = self._robot_ref().get()
+                if robot_doc.exists:
+                    _fs_val = robot_doc.to_dict().get("task_execution", task_execution)
+                    if isinstance(_fs_val, str):
+                        task_execution = _fs_val
+            except Exception:
+                pass  # fall back to config value
+
+        initial_status = "pending_confirmation" if task_execution == "ask" else "running"
+        self._write_task_doc(task_id, target, destination, initial_status)
+
+        # Pre-scan: fetch latest detection to populate detected_objects
+        try:
+            with httpx.Client(timeout=5.0) as _client:
+                _det_resp = _client.get(
+                    f"{self.gateway_url}/api/detection/latest",
+                    headers=self._auth_headers(),
+                )
+                if _det_resp.status_code == 200:
+                    _det = _det_resp.json()
+                    _objects = [
+                        d.get("label", "") for d in _det.get("detections", [])
+                    ]
+                    self._update_task_doc(task_id, {
+                        "detected_objects": _objects,
+                        "phase": "SCAN",
+                        "status": initial_status,
+                    })
+        except Exception:
+            pass  # best-effort
+
+        # Attach task_id to the command doc so Flutter can link to it
+        cmd_id = doc.get("cmd_id", "")
+        if cmd_id and self._db:
+            try:
+                self._commands_ref().document(cmd_id).update({"task_id": task_id})
+            except Exception:
+                pass
+
+        if task_execution == "ask":
+            confirmed = self._wait_for_confirmation(task_id, timeout_s=120.0)
+            if not confirmed:
+                self._update_task_doc(task_id, {
+                    "status": "cancelled",
+                    "error": "user_timeout",
+                })
+                return {"status": "cancelled", "task_id": task_id}
+            self._update_task_doc(task_id, {"status": "running"})
+
+        headers = self._auth_headers()
+        try:
+            with httpx.Client(timeout=120.0) as client:
+                resp = client.post(
+                    f"{self.gateway_url}/api/arm/pick_place",
+                    json={
+                        "target": target,
+                        "destination": destination,
+                        "task_id": task_id,
+                        "firebase_project": self.firebase_project,
+                        "rrn": self.rrn,
+                    },
+                    headers=headers,
+                )
+            resp.raise_for_status()
+            ct = resp.headers.get("content-type", "")
+            result = resp.json() if "application/json" in ct else {"raw": resp.text}
+            self._update_task_doc(task_id, {"status": "complete", "phase": "PLACE"})
+            return result
+        except Exception as exc:
+            self._update_task_doc(task_id, {"status": "failed", "error": str(exc)})
+            raise
+
     # ------------------------------------------------------------------
     # Gateway dispatch
     # ------------------------------------------------------------------
@@ -1908,6 +1999,10 @@ class CastorBridge:
                     )
 
         elif scope in ("chat", "control"):
+            pick_place = _detect_pick_place_intent(instruction)
+            if pick_place:
+                target, destination = pick_place
+                return self._dispatch_pick_place(target, destination, doc)
             payload: dict[str, Any] = {
                 "instruction": instruction,
                 "channel": "opencastor_app",

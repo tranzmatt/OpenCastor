@@ -1,7 +1,8 @@
 """Tests for pick-and-place UX: intent detection, task doc helpers, dispatch."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import time
+from unittest.mock import MagicMock, patch
 
 from castor.cloud.bridge import CastorBridge, _detect_pick_place_intent
 
@@ -149,3 +150,84 @@ class TestWaitForConfirmation:
 
         result = bridge._wait_for_confirmation("task-abc", timeout_s=0.2)
         assert result is False
+
+
+# ── 4. _dispatch_pick_place ───────────────────────────────────────────────────
+
+class TestDispatchPickPlace:
+    def test_routes_pick_intent_to_pick_place_endpoint(self):
+        bridge = _make_bridge(task_execution="automatic")
+
+        with patch("httpx.Client") as mock_client_cls:
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {"status": "complete", "log": []}
+            mock_resp.headers = {"content-type": "application/json"}
+            mock_resp.raise_for_status = MagicMock()
+            mock_client_cls.return_value.__enter__.return_value.post.return_value = mock_resp
+
+            doc = {"scope": "chat", "instruction": "pick lego into bowl",
+                   "issued_at": time.time(), "sender_type": "human"}
+            result = bridge._dispatch_to_gateway("chat", "pick lego into bowl", doc)
+
+        # Should have called /api/arm/pick_place, not /api/command
+        call_args = mock_client_cls.return_value.__enter__.return_value.post.call_args
+        assert "/api/arm/pick_place" in call_args[0][0]
+        body = call_args[1]["json"]
+        assert body["target"] == "lego"
+        assert body["destination"] == "bowl"
+
+    def test_non_pick_intent_routes_to_api_command(self):
+        bridge = _make_bridge(task_execution="automatic")
+
+        with patch("httpx.Client") as mock_client_cls:
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {"raw_text": "hello"}
+            mock_resp.headers = {"content-type": "application/json"}
+            mock_resp.raise_for_status = MagicMock()
+            mock_client_cls.return_value.__enter__.return_value.post.return_value = mock_resp
+
+            doc = {"scope": "chat", "instruction": "what do you see",
+                   "issued_at": time.time(), "sender_type": "human"}
+            bridge._dispatch_to_gateway("chat", "what do you see", doc)
+
+        call_args = mock_client_cls.return_value.__enter__.return_value.post.call_args
+        assert "/api/command" in call_args[0][0]
+
+    def test_ask_mode_cancels_on_timeout(self):
+        bridge = _make_bridge(task_execution="ask")
+
+        # _wait_for_confirmation returns False (timeout)
+        with patch.object(bridge, "_wait_for_confirmation", return_value=False):
+            with patch.object(bridge, "_write_task_doc"):
+                with patch.object(bridge, "_update_task_doc") as mock_update:
+                    doc = {"scope": "chat", "instruction": "pick lego into bowl",
+                           "issued_at": time.time(), "sender_type": "human"}
+                    result = bridge._dispatch_to_gateway("chat", "pick lego into bowl", doc)
+
+        assert result.get("status") == "cancelled"
+        # Must update task doc to cancelled
+        update_calls = [c[0][1] for c in mock_update.call_args_list]
+        assert any(d.get("status") == "cancelled" for d in update_calls)
+
+
+class TestDispatchPickPlaceFirestoreRead:
+    def test_reads_task_execution_from_firestore(self):
+        bridge = _make_bridge(task_execution="ask")  # config says ask
+
+        # Firestore robot doc says automatic
+        robot_doc = MagicMock()
+        robot_doc.exists = True
+        robot_doc.to_dict.return_value = {"task_execution": "automatic"}
+        bridge._robot_ref().get.return_value = robot_doc
+
+        with patch("httpx.Client") as mock_client_cls:
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {"status": "complete", "log": []}
+            mock_resp.headers = {"content-type": "application/json"}
+            mock_resp.raise_for_status = MagicMock()
+            mock_client_cls.return_value.__enter__.return_value.post.return_value = mock_resp
+
+            # With automatic mode (from Firestore), should NOT call _wait_for_confirmation
+            with patch.object(bridge, "_wait_for_confirmation") as mock_wait:
+                bridge._dispatch_pick_place("lego", "bowl", {})
+                mock_wait.assert_not_called()
