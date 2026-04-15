@@ -6,6 +6,7 @@ AI-produced commands are machine-detectable per EU AI Act Art. 50.
 
 Token format: rcan-wm-v1:{hex(hmac_sha256(rrn:thought_id:timestamp, key)[:16])}
 """
+
 from __future__ import annotations
 
 import hashlib

@@ -2033,7 +2033,9 @@ class ConformanceChecker:
         # Check configured retention period — EU AI Act Art. 12 requires min 10 years (3650 days)
         # Also check attestation.audit_retention_days (canonical location in RCAN 3.0 configs)
         attestation_cfg = self._cfg.get("attestation", {}) or {}
-        retention_days = self._cfg.get("audit_retention_days") or attestation_cfg.get("audit_retention_days", 0)
+        retention_days = self._cfg.get("audit_retention_days") or attestation_cfg.get(
+            "audit_retention_days", 0
+        )
         if retention_days >= 3650:
             return ConformanceResult(
                 check_id=cid,

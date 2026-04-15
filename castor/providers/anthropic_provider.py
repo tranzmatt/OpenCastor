@@ -258,7 +258,10 @@ class AnthropicProvider(BaseProvider):
         if not is_blank and len(image_bytes) > 100:
             b64 = base64.b64encode(image_bytes).decode("utf-8")
             user_content = [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
+                },
                 {"type": "text", "text": instruction},
             ]
         else:

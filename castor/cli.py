@@ -92,6 +92,7 @@ def _launch_with_dashboard(args) -> None:
 def cmd_run(args) -> None:
     """Run the main perception-action loop."""
     import logging as _logging
+
     # Suppress noisy third-party INFO logs (HuggingFace 307 redirects, httpx traces).
     _logging.getLogger("httpx").setLevel(_logging.WARNING)
     _logging.getLogger("huggingface_hub").setLevel(_logging.WARNING)
