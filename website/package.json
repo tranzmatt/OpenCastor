@@ -14,15 +14,12 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.9"
   },
-  "overrides": {
-    "handlebars": "^4.7.9",
-    "picomatch": "^2.3.2",
-    "h3": "^1.15.8",
-    "smol-toml": "^1.6.1",
-    "vite": ">=6.4.2"
-  },
   "pnpm": {
     "overrides": {
+      "handlebars": "^4.7.9",
+      "picomatch": "^2.3.2",
+      "h3": "^1.15.8",
+      "smol-toml": "^1.6.1",
       "vite": ">=6.4.2"
     }
   }
