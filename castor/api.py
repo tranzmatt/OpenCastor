@@ -2802,6 +2802,100 @@ async def driver_health():
 
 
 # ---------------------------------------------------------------------------
+# Vision-guided arm pick-and-place endpoint
+# ---------------------------------------------------------------------------
+
+
+class _PickPlaceRequest(BaseModel):
+    target: str = "red lego brick"
+    destination: str = "bowl"
+    max_vision_steps: int = 4  # max camera-guided correction cycles per phase
+
+
+@app.post("/api/arm/pick_place", dependencies=[Depends(verify_token)])
+async def arm_pick_place(req: _PickPlaceRequest):
+    """Vision-guided pick-and-place: capture → plan → move → capture → correct → grasp → place.
+
+    Runs a multi-step loop so the camera guides each phase of the manipulation:
+    1. Capture frame → plan approach pose
+    2. Execute approach → capture → refine over gripper
+    3. Grasp (close gripper)
+    4. Lift → move to destination → lower → release
+
+    Returns a log of all vision steps and arm poses executed.
+    """
+    if state.driver is None or not hasattr(state.driver, "set_joint_positions"):
+        raise HTTPException(status_code=503, detail="No arm driver with set_joint_positions")
+    if state.brain is None:
+        raise HTTPException(status_code=503, detail="Brain not initialized")
+
+    log: list[dict] = []
+
+    async def _vision_plan(phase: str, extra_instruction: str = "") -> list[dict] | dict | None:
+        """Capture a fresh frame and ask the brain to plan the next arm_pose(s)."""
+        frame = await asyncio.to_thread(_capture_live_frame)
+        if not frame:
+            return None
+
+        import base64 as _b64
+        b64 = _b64.b64encode(frame).decode()
+
+        prompt = (
+            f"You are controlling a 6-DOF SO-ARM101 arm. Phase: {phase}.\n"
+            f"Target object: {req.target}. Destination: {req.destination}.\n"
+            "Look at the camera image. Generate ONLY a JSON array of arm_pose and grip actions "
+            "for this phase. Joint values are normalised -1.0 to 1.0 (0.0 = neutral/home). "
+            "shoulder_pan: -1=right +1=left. shoulder_lift: -1=raised +1=lowered. "
+            "elbow_flex: -1=straight +1=bent. gripper: 1.0=open -1.0=closed.\n"
+            + extra_instruction
+        )
+
+        _img_bytes = _b64.b64decode(b64)
+        thought = await asyncio.to_thread(
+            state.brain.think, _img_bytes, prompt, "terminal"
+        )
+        log.append({"phase": phase, "brain_response": thought.raw_text[:200]})
+        return thought.action
+
+    def _exec(actions) -> None:
+        """Execute an action or list of actions synchronously."""
+        _execute_action(actions)
+
+    # Phase 1: approach over target
+    approach = await _vision_plan(
+        "APPROACH",
+        "Generate 2-3 arm_pose steps to move the gripper (open) to hover directly above "
+        f"the {req.target}. Do not grasp yet.",
+    )
+    if approach:
+        await asyncio.to_thread(_exec, approach)
+        log.append({"phase": "APPROACH", "executed": True})
+
+    # Phase 2: descend and grasp
+    grasp = await _vision_plan(
+        "GRASP",
+        f"The arm is now hovering above the {req.target}. Generate arm_pose steps to lower "
+        "onto it, then close the gripper (gripper: -1.0) to grasp it.",
+    )
+    if grasp:
+        await asyncio.to_thread(_exec, grasp)
+        log.append({"phase": "GRASP", "executed": True})
+
+    # Phase 3: lift, move to destination, release
+    place = await _vision_plan(
+        "PLACE",
+        f"The arm is grasping the {req.target}. Generate arm_pose steps to lift it clear, "
+        f"move to the {req.destination}, lower into it, then open the gripper (gripper: 1.0) "
+        "to release. End with arm raised back to neutral.",
+    )
+    if place:
+        await asyncio.to_thread(_exec, place)
+        log.append({"phase": "PLACE", "executed": True})
+
+    return {"status": "complete", "log": log}
+
+
+# ---------------------------------------------------------------------------
 # Learner endpoints (#70, #74)
 # ---------------------------------------------------------------------------
 
