@@ -1841,7 +1841,7 @@ def _setup_whatsapp():
 
         neonize_ok = True
         print(f"    {Colors.GREEN}[OK]{Colors.ENDC} neonize package installed")
-    except ImportError:
+    except Exception:
         print(f"    {Colors.WARNING}[WARN]{Colors.ENDC} neonize not installed")
         print("    Installing neonize (WhatsApp Web protocol)...")
         import subprocess
@@ -1912,8 +1912,8 @@ def main():
     try:
         from neonize.client import NewClient
         from neonize.events import ConnectedEv, PairStatusEv, QREvent
-    except ImportError:
-        print("    ⚠️  neonize not installed. Run: pip install 'opencastor[whatsapp]'")
+    except Exception:
+        print("    ⚠️  neonize not available. Run: pip install 'opencastor[whatsapp]'")
         sys.exit(1)
 
     db_path = os.path.expanduser("~/.opencastor/whatsapp_session.db")
