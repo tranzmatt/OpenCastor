@@ -97,9 +97,15 @@ class BaseProvider(ABC):
             "Available Actions:\n"
             '- {"type": "move", "linear": float (-1.0 to 1.0), "angular": float (-1.0 to 1.0)}\n'
             '- {"type": "grip", "state": "open" | "close"}\n'
+            '- {"type": "arm_pose", "joints": {"shoulder_pan": float, "shoulder_lift": float, '
+            '"elbow_flex": float, "wrist_flex": float, "wrist_roll": float, "gripper": float}}\n'
+            '  # All joint values normalised -1.0 (min) to 1.0 (max). 0.0 = home/neutral.\n'
+            '  # shoulder_pan: -1=right, +1=left. shoulder_lift: -1=up, +1=down.\n'
+            '  # elbow_flex: -1=straight, +1=bent. gripper: -1=closed, +1=open.\n'
             '- {"type": "wait", "duration_ms": int}\n'
             '- {"type": "stop"}\n\n'
-            "Do not output markdown. Do not explain yourself. Output ONLY valid JSON."
+            "For pick-and-place tasks, emit a SEQUENCE of arm_pose and grip actions as a JSON array.\n"
+            "Do not output markdown. Do not explain yourself. Output ONLY valid JSON (object or array)."
         )
         if memory_context:
             base += f"\n\n--- Robot Memory ---\n{memory_context}"

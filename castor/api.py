@@ -5358,8 +5358,16 @@ def _print_gateway_qr(host: str, port: str):
         pass
 
 
-def _execute_action(action: dict):
-    """Translate an action dict into driver commands."""
+def _execute_action(action):
+    """Translate an action dict (or list of actions) into driver commands."""
+    # Support action sequences: list of action dicts
+    if isinstance(action, list):
+        for step in action:
+            if isinstance(step, dict):
+                _execute_action(step)
+                # Brief pause between sequential arm moves for servo settling
+                time.sleep(0.5)
+        return
     action_type = action.get("type", "")
 
     _action_t0 = time.perf_counter()
@@ -5426,6 +5434,18 @@ def _execute_action(action: dict):
         state.driver.stop()
     elif action_type == "grip":
         logger.info(f"Grip: {action.get('state', 'unknown')}")
+        # Execute gripper command if driver supports set_joint_positions
+        if state.driver and hasattr(state.driver, "set_joint_positions"):
+            grip_val = 1.0 if action.get("state") == "open" else -1.0
+            state.driver.set_joint_positions({"gripper": grip_val})
+    elif action_type == "arm_pose":
+        # Move 6-DOF arm to joint positions (normalised -1.0 to 1.0)
+        joints: dict = action.get("joints", {})
+        if joints and state.driver and hasattr(state.driver, "set_joint_positions"):
+            logger.info("arm_pose: %s", joints)
+            state.driver.set_joint_positions(joints)
+        else:
+            logger.warning("arm_pose: no joints or driver does not support set_joint_positions")
     elif action_type == "wait":
         logger.info(f"Wait: {action.get('duration_ms', 0)}ms")
 
