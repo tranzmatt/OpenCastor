@@ -115,25 +115,33 @@ def get_accepted_key_ids(config: dict[str, Any]) -> list[str]:
     return accepted
 
 
+def is_strict_mode(config: dict) -> bool:
+    """Return True if strict key validation is enabled in config."""
+    return bool(config.get("security", {}).get("strict_key_validation", False))
+
+
 def validate_incoming_key_id(
     incoming_key_id: Optional[str],
     config: dict[str, Any],
+    strict: bool = False,
 ) -> bool:
     """Validate that an incoming message's key_id is in the accepted set.
 
     Args:
         incoming_key_id: key_id from the incoming RCAN message, or None if absent.
         config:          RCAN config dict.
+        strict:          If True, reject messages with missing or unknown key_id.
+                         Defaults to False for backward compatibility (permissive mode).
 
     Returns:
         True if the key_id is accepted.
-        False if the key_id is unknown (caller should log a warning and decide
-        whether to reject — strict mode) or accept (permissive mode).
+        False if strict=True and the key_id is missing or not in the accepted set.
+        True (with a warning log) if strict=False and the key_id is missing or unknown.
     """
     if incoming_key_id is None:
-        # Pre-v1.5 message with no key_id — accept in permissive mode
-        # TODO (v2026.4.x): strict mode should reject messages without key_id
-        # SAFETY: do not auto-implement — changes message acceptance policy; requires config flag
+        if strict:
+            log.warning("key_rotation: incoming message has no key_id — rejected (strict mode)")
+            return False
         log.debug("key_rotation: incoming message has no key_id — accepted (permissive mode)")
         return True
 
@@ -145,15 +153,23 @@ def validate_incoming_key_id(
     if incoming_key_id in accepted:
         return True
 
+    if strict:
+        log.warning(
+            "key_rotation: unknown key_id=%r — not in accepted set %s. "
+            "This may indicate a compromised key or misconfiguration. "
+            "Rejecting (strict mode).",
+            incoming_key_id,
+            accepted,
+        )
+        return False
+
     log.warning(
         "key_rotation: unknown key_id=%r — not in accepted set %s. "
         "This may indicate a compromised key or misconfiguration. "
-        "Accepting in permissive mode (TODO v2026.4.x: enforce strict mode).",
+        "Accepting (permissive mode).",
         incoming_key_id,
         accepted,
     )
-    # TODO (v2026.4.x): return False here to enforce strict key validation
-    # SAFETY: do not auto-implement — rejection of unknown keys is a security policy change
     return True
 
 

@@ -40,15 +40,38 @@ def build_hop(robot_rrn: str, scope: str, ttl_seconds: int = 3600) -> dict:
 
 
 def verify_chain(chain: list[Any], expected_rrn: str = "") -> bool:
-    """Verify delegation chain structure. Signature verification is a stub."""
+    """Verify delegation chain structure and expiry. Signature verification is a stub."""
     try:
         validate_chain(chain)
     except ValueError:
         return False
-    # TODO: verify cryptographic signatures when key-rotation infrastructure is complete
+
     import logging
 
-    logging.getLogger(__name__).warning(
-        "RCAN: delegation chain signature verification is a stub — update in v2026.4.x"
-    )
+    _log = logging.getLogger(__name__)
+    now = time.time()
+
+    for i, hop in enumerate(chain):
+        if isinstance(hop, dict):
+            expires_at = hop.get("expires_at")
+        elif hasattr(hop, "expires_at"):
+            expires_at = hop.expires_at
+        else:
+            expires_at = None
+
+        if expires_at is not None:
+            try:
+                if float(expires_at) < now:
+                    _log.warning(
+                        "RCAN: delegation chain hop %d expired at %s (now=%s)",
+                        i,
+                        expires_at,
+                        int(now),
+                    )
+                    return False
+            except (ValueError, TypeError):
+                pass  # non-numeric expires_at — skip expiry check
+
+    # Signature verification deferred pending full key-rotation infrastructure
+    _log.debug("RCAN: delegation chain structure/expiry valid (signature verification pending)")
     return True
