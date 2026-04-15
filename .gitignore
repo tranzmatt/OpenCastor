@@ -18,6 +18,7 @@ node_modules/
 hailort.log
 *.audit.log
 .opencastor-audit.log
+.opencastor-commitments.jsonl
 !tests/fixtures/*.rcan.yaml
 
 # Local robot operation configs (not preset templates)
