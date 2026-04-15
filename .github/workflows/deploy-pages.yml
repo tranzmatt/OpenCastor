@@ -28,9 +28,7 @@ jobs:
           node-version: '22'
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          run_install: false
+        run: npm install -g pnpm@9.15.9
 
       - name: Install dependencies
         run: cd website && pnpm install --no-frozen-lockfile
