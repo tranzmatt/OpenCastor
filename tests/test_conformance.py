@@ -963,6 +963,7 @@ class TestCmdValidate:
             "local_safety_wins": True,
             "emergency_stop_distance": 0.3,
             "watchdog": {"timeout_s": 10},
+            "watermark_enforcement": True,  # Art. 50 requirement
         }
         cfg["p66"] = {"enabled": True}
         cfg["reactive"] = {"min_obstacle_m": 0.3}
@@ -1303,3 +1304,145 @@ class TestISOCheck:
         src = inspect.getsource(api_mod)
         assert "iso_conformance" in src
         assert "iso_42001" in src
+
+
+class TestAnnexIIIStrictMode:
+    """Art. 16 checks promote from warn to fail in strict mode."""
+
+    base_config = {
+        "rcan_version": "2.2",
+        "metadata": {"rrn": "RRN-000000000001"},
+        "reactive": {"min_obstacle_m": 0.3},
+        "agent": {"provider": "google", "model": "gemini-2.5-flash"},
+    }
+
+    def test_sbom_warn_in_default_mode(self):
+        checker = ConformanceChecker(self.base_config)
+        results = checker.run_category("rcan_v21")
+        sbom = next(r for r in results if r.check_id == "rcan_v21.sbom_attestation")
+        assert sbom.status == "warn"
+
+    def test_sbom_fail_in_strict_mode(self):
+        checker = ConformanceChecker(self.base_config, annex_iii_strict=True)
+        results = checker.run_category("rcan_v21")
+        sbom = next(r for r in results if r.check_id == "rcan_v21.sbom_attestation")
+        assert sbom.status == "fail"
+
+    def test_firmware_fail_in_strict_mode(self):
+        checker = ConformanceChecker(self.base_config, annex_iii_strict=True)
+        results = checker.run_category("rcan_v21")
+        fw = next(r for r in results if r.check_id == "rcan_v21.firmware_manifest")
+        assert fw.status == "fail"
+
+    def test_authority_warn_in_default_mode_when_module_available(self):
+        """When castor.authority exists but handler unregistered, default mode → warn."""
+        import sys
+        from unittest.mock import MagicMock, patch
+        mock_authority = MagicMock()
+        mock_authority.AuthorityRequestHandler = MagicMock()
+        with patch.dict(sys.modules, {"castor.authority": mock_authority}):
+            checker = ConformanceChecker(self.base_config)
+            results = checker.run_category("rcan_v21")
+            auth = next(r for r in results if r.check_id == "rcan_v21.authority_handler")
+            assert auth.status == "warn"
+
+    def test_authority_fail_in_strict_mode_when_module_available(self):
+        """When castor.authority exists but handler unregistered, strict mode → fail."""
+        import sys
+        from unittest.mock import MagicMock, patch
+        mock_authority = MagicMock()
+        mock_authority.AuthorityRequestHandler = MagicMock()
+        with patch.dict(sys.modules, {"castor.authority": mock_authority}):
+            checker = ConformanceChecker(self.base_config, annex_iii_strict=True)
+            results = checker.run_category("rcan_v21")
+            auth = next(r for r in results if r.check_id == "rcan_v21.authority_handler")
+            assert auth.status == "fail"
+
+    def test_strict_mode_does_not_affect_non_art16_checks(self):
+        checker_default = ConformanceChecker(self.base_config)
+        checker_strict = ConformanceChecker(self.base_config, annex_iii_strict=True)
+        default_safety = checker_default.run_category("safety")
+        strict_safety = checker_strict.run_category("safety")
+        assert [r.status for r in default_safety] == [r.status for r in strict_safety]
+
+    def test_check_fria_prerequisite_strict_blocks_on_art16(self):
+        from castor.fria import check_fria_prerequisite
+        passed, blocking = check_fria_prerequisite(self.base_config, annex_iii_strict=True)
+        blocking_ids = [r.check_id for r in blocking]
+        assert "rcan_v21.sbom_attestation" in blocking_ids
+        assert not passed
+
+
+class TestWatermarkEnforcedCheck:
+    """rcan_v22.watermark_enforced — Art. 50 detectability."""
+
+    def _checker(self, extra: dict | None = None):
+        config = {
+            "rcan_version": "2.2",
+            "metadata": {"rrn": "RRN-000000000001"},
+            "reactive": {"min_obstacle_m": 0.3},
+            "agent": {"provider": "google", "model": "gemini-2.5-flash"},
+        }
+        if extra:
+            config.update(extra)
+        return ConformanceChecker(config)
+
+    def test_fails_when_watermark_enforcement_absent(self):
+        results = self._checker().run_category("rcan_v21")
+        wm = next((r for r in results if r.check_id == "rcan_v22.watermark_enforced"), None)
+        assert wm is not None
+        assert wm.status == "fail"
+
+    def test_fails_when_watermark_enforcement_false(self):
+        results = self._checker({"safety": {"watermark_enforcement": False}}).run_category("rcan_v21")
+        wm = next(r for r in results if r.check_id == "rcan_v22.watermark_enforced")
+        assert wm.status == "fail"
+
+    def test_passes_when_watermark_enforcement_true(self):
+        results = self._checker({"safety": {"watermark_enforcement": True}}).run_category("rcan_v21")
+        wm = next(r for r in results if r.check_id == "rcan_v22.watermark_enforced")
+        assert wm.status == "pass"
+
+    def test_check_id_and_category(self):
+        results = self._checker().run_category("rcan_v21")
+        wm = next(r for r in results if r.check_id == "rcan_v22.watermark_enforced")
+        assert wm.category == "rcan_v22"
+
+    def test_fix_message_present_when_failing(self):
+        results = self._checker().run_category("rcan_v21")
+        wm = next(r for r in results if r.check_id == "rcan_v22.watermark_enforced")
+        assert wm.fix is not None
+        assert "watermark_enforcement" in wm.fix
+
+
+class TestQmsDeclarationCheck:
+    """rcan_v22.qms_declaration — Art. 17 QMS conformance check."""
+
+    def _checker(self, extra=None):
+        config = {
+            "rcan_version": "2.2",
+            "metadata": {"rrn": "RRN-000000000001"},
+            "reactive": {"min_obstacle_m": 0.3},
+            "agent": {"provider": "google", "model": "gemini-2.5-flash"},
+        }
+        if extra:
+            config.update(extra)
+        return ConformanceChecker(config)
+
+    def test_warns_when_qms_reference_absent(self):
+        results = self._checker().run_category("rcan_v21")
+        qms = next((r for r in results if r.check_id == "rcan_v22.qms_declaration"), None)
+        assert qms is not None
+        assert qms.status == "warn"
+
+    def test_passes_when_qms_reference_set(self):
+        results = self._checker({"qms_reference": "https://example.com/qms.pdf"}).run_category(
+            "rcan_v21"
+        )
+        qms = next(r for r in results if r.check_id == "rcan_v22.qms_declaration")
+        assert qms.status == "pass"
+
+    def test_check_in_rcan_v22_category(self):
+        results = self._checker().run_category("rcan_v21")
+        qms = next(r for r in results if r.check_id == "rcan_v22.qms_declaration")
+        assert qms.category == "rcan_v22"

@@ -3911,9 +3911,10 @@ def cmd_fria_generate(args) -> None:
     no_html = getattr(args, "no_html", False)
     skip_sign = getattr(args, "skip_sign", False)
 
+    annex_iii_strict = getattr(args, "annex_iii_strict", False)
     prerequisite_waived = False
     if not force:
-        gate_passed, blocking = check_fria_prerequisite(config)
+        gate_passed, blocking = check_fria_prerequisite(config, annex_iii_strict=annex_iii_strict)
         if not gate_passed:
             print("FRIA generation blocked — conformance gaps must be resolved:", file=sys.stderr)
             for r in blocking:
@@ -3940,6 +3941,7 @@ def cmd_fria_generate(args) -> None:
             memory_path = candidate
             break
 
+    qms_reference = getattr(args, "qms_reference", None)
     doc = build_fria_document(
         config=config,
         annex_iii_basis=annex_iii,
@@ -3947,6 +3949,8 @@ def cmd_fria_generate(args) -> None:
         memory_path=memory_path,
         prerequisite_waived=prerequisite_waived,
         benchmark_path=getattr(args, "benchmark_path", None),
+        annex_iii_strict=annex_iii_strict,
+        qms_reference=qms_reference,
     )
 
     if not skip_sign:
@@ -3982,6 +3986,143 @@ def cmd_fria(args) -> None:
         print("Usage: castor fria <subcommand>", file=sys.stderr)
         print("Subcommands: generate", file=sys.stderr)
         raise SystemExit(1)
+
+
+def cmd_eu_register(args) -> None:
+    """castor eu-register — generate EU AI Act Art. 49 database submission package."""
+    import json as _json
+    import sys
+    from pathlib import Path
+
+    import yaml
+
+    from castor.eu_register import build_submission_package
+
+    fria_path = getattr(args, "fria", None)
+    if not fria_path or not Path(fria_path).exists():
+        print(f"Error: FRIA file not found: {fria_path!r}", file=sys.stderr)
+        print("Run `castor fria generate` first.", file=sys.stderr)
+        raise SystemExit(1)
+
+    config_path = getattr(args, "config", None) or "robot.rcan.yaml"
+    if not Path(config_path).exists():
+        print(f"Error: config file not found: {config_path!r}", file=sys.stderr)
+        raise SystemExit(1)
+
+    with open(fria_path) as f:
+        fria = _json.load(f)
+    with open(config_path) as f:
+        config = yaml.safe_load(f) or {}
+
+    try:
+        package = build_submission_package(fria, config)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+
+    output = getattr(args, "output", None)
+    if output:
+        with open(output, "w") as f:
+            _json.dump(package, f, indent=2, default=str)
+        print(f"Submission package written to: {output}")
+    else:
+        print(_json.dumps(package, indent=2, default=str))
+
+    print("\n" + package["submission_instructions"], file=sys.stderr)
+
+
+def cmd_incidents(args) -> None:
+    """castor incidents — post-market monitoring incident log (EU AI Act Art. 72)."""
+    import json as _json
+    import sys
+
+    from castor.incidents import IncidentLog, IncidentSeverity, generate_report
+
+    incidents_cmd = getattr(args, "incidents_cmd", None)
+    log_path = getattr(args, "log", None)
+    log = IncidentLog(log_path) if log_path else IncidentLog()
+
+    if incidents_cmd == "record":
+        severity_str = getattr(args, "severity", "other")
+        severity = IncidentSeverity(severity_str)
+        incident_id = log.record(
+            severity=severity,
+            category=getattr(args, "category", "unspecified"),
+            description=getattr(args, "description", ""),
+            system_state={},
+        )
+        print(f"Incident recorded: {incident_id}")
+
+    elif incidents_cmd == "list":
+        incidents = log.list_incidents()
+        if not incidents:
+            print("No incidents recorded.")
+        else:
+            for inc in incidents:
+                print(
+                    f"[{inc['timestamp']}] [{inc['severity'].upper()}] "
+                    f"{inc['category']}: {inc['description']}"
+                )
+
+    elif incidents_cmd == "report":
+        report = generate_report(log)
+        output = getattr(args, "output", None)
+        if output:
+            with open(output, "w") as f:
+                _json.dump(report, f, indent=2, default=str)
+            print(f"Report written to: {output}")
+        else:
+            print(_json.dumps(report, indent=2, default=str))
+
+    else:
+        print("Usage: castor incidents {record|list|report}", file=sys.stderr)
+        raise SystemExit(1)
+
+
+def cmd_ifu(args) -> None:
+    """castor ifu — EU AI Act Art. 13 Instructions for Use document."""
+    import json as _json
+    import sys
+    from pathlib import Path
+
+    import yaml
+
+    from castor.fria import ANNEX_III_BASES
+    from castor.instructions_for_use import build_ifu_document
+
+    ifu_cmd = getattr(args, "ifu_cmd", None)
+    if ifu_cmd != "generate":
+        print(
+            ("Usage: castor ifu generate --config ... --annex-iii-basis ... --intended-use ..."),
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    config_path = getattr(args, "config", None) or "robot.rcan.yaml"
+    if not Path(config_path).exists():
+        print(f"Error: config not found: {config_path!r}", file=sys.stderr)
+        raise SystemExit(1)
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f) or {}
+
+    annex_iii_basis = getattr(args, "annex_iii_basis", None)
+    if not annex_iii_basis or annex_iii_basis not in ANNEX_III_BASES:
+        print(
+            (f"Error: --annex-iii-basis required. Valid: {', '.join(sorted(ANNEX_III_BASES))}"),
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    doc = build_ifu_document(config, annex_iii_basis, getattr(args, "intended_use", "") or "")
+
+    output = getattr(args, "output", None)
+    if output:
+        with open(output, "w") as f:
+            _json.dump(doc, f, indent=2, default=str)
+        print(f"Instructions for Use written to: {output}")
+    else:
+        print(_json.dumps(doc, indent=2, default=str))
 
 
 def cmd_validate(args) -> None:
@@ -6902,7 +7043,98 @@ def main() -> None:
         default=None,
         help="Path to safety-benchmark-*.json to inline in FRIA document",
     )
+    p_fria_gen.add_argument(
+        "--annex-iii-strict",
+        dest="annex_iii_strict",
+        action="store_true",
+        default=False,
+        help=(
+            "Promote Art. 16 conformance checks (SBOM, firmware manifest, authority handler) "
+            "from warn to fail. Required for Annex III high-risk system deployments."
+        ),
+    )
+    p_fria_gen.add_argument(
+        "--qms-reference",
+        dest="qms_reference",
+        metavar="URI",
+        help="URI or hash of the Art. 17 Quality Management System document",
+    )
     p_fria_gen.set_defaults(func=cmd_fria_generate)
+
+    # ── eu-register ───────────────────────────────────────────────────────────────
+    p_eu_register = sub.add_parser(
+        "eu-register",
+        help="Generate EU AI Act Art. 49 database submission package from FRIA artifact",
+    )
+    p_eu_register.add_argument("fria", metavar="FRIA_FILE", help="Signed FRIA JSON artifact")
+    p_eu_register.add_argument(
+        "--config", metavar="FILE", default="robot.rcan.yaml", help="RCAN config file"
+    )
+    p_eu_register.add_argument(
+        "--output", metavar="FILE", help="Output path (default: print to stdout)"
+    )
+    p_eu_register.set_defaults(func=cmd_eu_register)
+
+    # ── incidents ─────────────────────────────────────────────────────────────────
+    p_incidents = sub.add_parser(
+        "incidents",
+        help="Post-market monitoring incident log (EU AI Act Art. 72)",
+    )
+    p_incidents_sub = p_incidents.add_subparsers(dest="incidents_cmd")
+    p_incidents.add_argument(
+        "--log",
+        metavar="FILE",
+        help="Incident log path (default: ~/.opencastor/incidents.jsonl)",
+    )
+    p_incidents.set_defaults(func=cmd_incidents)
+
+    p_incidents_record = p_incidents_sub.add_parser("record", help="Record a new incident")
+    p_incidents_record.add_argument(
+        "--severity",
+        choices=["life_health", "other"],
+        default="other",
+        help="Incident severity (life_health: 15-day deadline; other: 3-month deadline)",
+    )
+    p_incidents_record.add_argument("--category", required=True, help="Incident category")
+    p_incidents_record.add_argument(
+        "--description", required=True, help="Human-readable description"
+    )
+
+    p_incidents_sub.add_parser("list", help="List all recorded incidents")
+
+    p_incidents_report = p_incidents_sub.add_parser(
+        "report", help="Generate Art. 72 incident report"
+    )
+    p_incidents_report.add_argument(
+        "--output", metavar="FILE", help="Output JSON path (default: stdout)"
+    )
+
+    # ── ifu ────────────────────────────────────────────────────────────────────────
+    p_ifu = sub.add_parser(
+        "ifu",
+        help="EU AI Act Art. 13 Instructions for Use document",
+    )
+    p_ifu_sub = p_ifu.add_subparsers(dest="ifu_cmd")
+    p_ifu.set_defaults(func=cmd_ifu)
+    p_ifu_gen = p_ifu_sub.add_parser(
+        "generate", help="Generate Art. 13 Instructions for Use document"
+    )
+    p_ifu_gen.add_argument("--config", metavar="FILE", default="robot.rcan.yaml")
+    p_ifu_gen.add_argument(
+        "--annex-iii-basis",
+        dest="annex_iii_basis",
+        required=True,
+        metavar="BASIS",
+        help=("EU AI Act Annex III classification (e.g. safety_component)"),
+    )
+    p_ifu_gen.add_argument(
+        "--intended-use",
+        dest="intended_use",
+        required=True,
+        metavar="TEXT",
+        help="Deployment description",
+    )
+    p_ifu_gen.add_argument("--output", metavar="FILE", help="Output JSON path (default: stdout)")
 
     # castor validate
     p_validate = sub.add_parser(
@@ -8504,6 +8736,9 @@ def main() -> None:
         "lint": cmd_lint,
         "validate": cmd_validate,
         "fria": cmd_fria,
+        "eu-register": cmd_eu_register,
+        "incidents": cmd_incidents,
+        "ifu": cmd_ifu,
         "rcan-check": cmd_rcan_check,
         "swarm": cmd_swarm,
         "learn": cmd_learn,

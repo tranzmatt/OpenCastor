@@ -42,15 +42,75 @@ ANNEX_III_BASES = frozenset(
     }
 )
 
+ANNEX_IV_COVERAGE = [
+    {
+        "point": 1,
+        "title": "General description of the AI system",
+        "fria_field": "system",
+        "status": "covered",
+    },
+    {
+        "point": 2,
+        "title": "Detailed description of elements and development process",
+        "fria_field": "conformance",
+        "status": "covered",
+    },
+    {
+        "point": 3,
+        "title": "Monitoring, functioning, and control measures",
+        "fria_field": "human_oversight",
+        "status": "covered",
+    },
+    {
+        "point": 4,
+        "title": "Performance metrics and validation results",
+        "fria_field": "safety_benchmarks",
+        "status": "covered_when_benchmark_provided",
+    },
+    {
+        "point": 5,
+        "title": "Risk management system (Art. 9)",
+        "fria_field": "hardware_observations",
+        "status": "covered",
+    },
+    {
+        "point": 6,
+        "title": "Changes made throughout the lifecycle",
+        "fria_field": None,
+        "status": "deployer_responsibility",
+    },
+    {
+        "point": 7,
+        "title": "Applied harmonised standards",
+        "fria_field": None,
+        "status": "partial_p66_iso10218",
+    },
+    {
+        "point": 8,
+        "title": "EU declaration of conformity",
+        "fria_field": None,
+        "status": "deployer_responsibility",
+    },
+    {
+        "point": 9,
+        "title": "Instructions for use",
+        "fria_field": None,
+        "status": "requires_ifu_command",
+    },
+]
+
 
 def check_fria_prerequisite(
     config: dict,
+    annex_iii_strict: bool = False,
 ) -> tuple[bool, list[ConformanceResult]]:
     """Run conformance checks and return (gate_passed, blocking_results).
 
     Gate passes when conformance score >= 80 and there are zero safety.* failures.
+    When annex_iii_strict=True, Art. 16 checks (SBOM, firmware, authority) are
+    promoted from warn to fail, raising the bar for Annex III high-risk systems.
     """
-    checker = ConformanceChecker(config)
+    checker = ConformanceChecker(config, annex_iii_strict=annex_iii_strict)
     results = checker.run_all()
     summary = checker.summary(results)
 
@@ -59,7 +119,6 @@ def check_fria_prerequisite(
     gate_passed = score_ok and len(safety_failures) == 0
 
     if not gate_passed:
-        # Return all failures when score gate failed; safety failures when score ok
         blocking = [r for r in results if r.status == "fail"] if not score_ok else safety_failures
     else:
         blocking = []
@@ -106,6 +165,8 @@ def build_fria_document(
     memory_path: str | None = None,
     prerequisite_waived: bool = False,
     benchmark_path: str | None = None,
+    annex_iii_strict: bool = False,
+    qms_reference: str | None = None,
 ) -> dict:
     """Assemble the unsigned FRIA JSON document dict.
 
@@ -141,7 +202,7 @@ def build_fria_document(
         oc_version = "unknown"
 
     # Run conformance
-    checker = ConformanceChecker(config)
+    checker = ConformanceChecker(config, annex_iii_strict=annex_iii_strict)
     results = checker.run_all()
     summary = checker.summary(results)
 
@@ -219,6 +280,19 @@ def build_fria_document(
         },
         "human_oversight": human_oversight,
         "hardware_observations": hardware_observations,
+        "model_provenance": {
+            "provider": agent_cfg.get("provider", ""),
+            "model": agent_cfg.get("model", ""),
+            "art10_responsibility": "upstream_ai_provider",
+            "note": (
+                "EU AI Act Art. 10 data governance obligations for training data apply "
+                "to the upstream AI provider (e.g. Anthropic, Google, OpenAI), not the "
+                "OpenCastor deployer. Deployer responsibility: pin model version and "
+                "document the provider's Art. 10 compliance status."
+            ),
+        },
+        "annex_iv_coverage": ANNEX_IV_COVERAGE,
+        **({"qms_reference": qms_reference} if qms_reference else {}),
         **_load_benchmark_block(benchmark_path),
     }
 
