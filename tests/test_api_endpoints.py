@@ -1735,8 +1735,10 @@ class TestWatermarkVerifyEndpoint:
 
     def test_valid_token_returns_200_with_audit_entry(self):
         from unittest.mock import patch
-        from castor.api import app
+
         from starlette.testclient import TestClient
+
+        from castor.api import app
 
         token = "rcan-wm-v1:" + "a" * 32
         entry = {
@@ -1758,8 +1760,10 @@ class TestWatermarkVerifyEndpoint:
 
     def test_unknown_token_returns_404(self):
         from unittest.mock import patch
-        from castor.api import app
+
         from starlette.testclient import TestClient
+
+        from castor.api import app
 
         fake_audit = type("A", (), {"_watermark_index": {}})()
 
@@ -1773,8 +1777,10 @@ class TestWatermarkVerifyEndpoint:
 
     def test_invalid_format_returns_400(self):
         from unittest.mock import patch
-        from castor.api import app
+
         from starlette.testclient import TestClient
+
+        from castor.api import app
 
         fake_audit = type("A", (), {"_watermark_index": {}})()
 
@@ -1787,8 +1793,10 @@ class TestWatermarkVerifyEndpoint:
     def test_no_auth_required(self):
         """Endpoint must be publicly accessible — no Authorization header needed."""
         from unittest.mock import patch
-        from castor.api import app
+
         from starlette.testclient import TestClient
+
+        from castor.api import app
 
         token = "rcan-wm-v1:" + "c" * 32
         entry = {"event": "motor_command", "watermark_token": token}

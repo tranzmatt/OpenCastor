@@ -39,8 +39,8 @@ from typing import Any
 import httpx
 import yaml
 
-from .mcp_auth import resolve_loa
 from . import mcp_fleet as _mcp_fleet  # noqa: F401 — registers fleet tools
+from .mcp_auth import resolve_loa
 
 try:
     from mcp.server.fastmcp import FastMCP

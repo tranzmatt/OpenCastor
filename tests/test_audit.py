@@ -237,6 +237,7 @@ class TestAuditLogWatermarkIndex:
 
     def test_watermark_index_built_from_existing_log(self, tmp_path):
         import json
+
         from castor.audit import AuditLog
 
         log_file = str(tmp_path / "audit.log")
