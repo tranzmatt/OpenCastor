@@ -1689,14 +1689,15 @@ class CastorBridge:
                 )
                 if _det_resp.status_code == 200:
                     _det = _det_resp.json()
-                    _objects = [
-                        d.get("label", "") for d in _det.get("detections", [])
-                    ]
-                    self._update_task_doc(task_id, {
-                        "detected_objects": _objects,
-                        "phase": "SCAN",
-                        "status": initial_status,
-                    })
+                    _objects = [d.get("label", "") for d in _det.get("detections", [])]
+                    self._update_task_doc(
+                        task_id,
+                        {
+                            "detected_objects": _objects,
+                            "phase": "SCAN",
+                            "status": initial_status,
+                        },
+                    )
         except Exception:
             pass  # best-effort
 
@@ -1711,10 +1712,13 @@ class CastorBridge:
         if task_execution == "ask":
             confirmed = self._wait_for_confirmation(task_id, timeout_s=120.0)
             if not confirmed:
-                self._update_task_doc(task_id, {
-                    "status": "cancelled",
-                    "error": "user_timeout",
-                })
+                self._update_task_doc(
+                    task_id,
+                    {
+                        "status": "cancelled",
+                        "error": "user_timeout",
+                    },
+                )
                 return {"status": "cancelled", "task_id": task_id}
             self._update_task_doc(task_id, {"status": "running"})
 

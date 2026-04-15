@@ -2819,6 +2819,7 @@ def _write_task_phase(
     try:
         from datetime import datetime
         from datetime import timezone as _tz
+
         fields: dict[str, Any] = {
             "phase": phase,
             "status": status,
@@ -2839,9 +2840,9 @@ class _PickPlaceRequest(BaseModel):
     target: str = "red lego brick"
     destination: str = "bowl"
     max_vision_steps: int = 4  # max camera-guided correction cycles per phase
-    task_id: Optional[str] = None          # Firestore task doc to write progress to
+    task_id: Optional[str] = None  # Firestore task doc to write progress to
     firebase_project: Optional[str] = None  # Firebase project for task doc writes
-    rrn: Optional[str] = None              # Robot RRN for Firestore path
+    rrn: Optional[str] = None  # Robot RRN for Firestore path
 
 
 @app.post("/api/arm/pick_place", dependencies=[Depends(verify_token)])
