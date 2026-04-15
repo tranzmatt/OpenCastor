@@ -1,10 +1,10 @@
 """Tests for castor.instructions_for_use — EU AI Act Art. 13 IFU document."""
+
 import json
 
 import pytest
 
-from castor.instructions_for_use import build_ifu_document, IFU_SCHEMA_VERSION
-
+from castor.instructions_for_use import IFU_SCHEMA_VERSION, build_ifu_document
 
 SAMPLE_CONFIG = {
     "rcan_version": "2.2",
@@ -64,6 +64,7 @@ class TestBuildIfuDocument:
 
     def test_art13_coverage_contains_all_fields(self):
         from castor.instructions_for_use import ART13_FIELDS
+
         doc = build_ifu_document(SAMPLE_CONFIG, "safety_component", "Navigation")
         assert "art13_coverage" in doc
         assert set(doc["art13_coverage"]) == set(ART13_FIELDS)

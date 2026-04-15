@@ -21,7 +21,7 @@ Examples::
     rrn://opencastor.com/component/hailo8/module-42
     rrn://luxonis.com/sensor/oak-d/cam-007
     rrn://opencastor.com/assembly/perception-stack/asm-003
-    rrn://example.org/rover-1               # legacy 2-segment; category=robot assumed
+    rrn://example.org/robots/rover-1        # legacy 3-segment; still valid
 
 Spec: https://rcan.dev/spec/section-21/
 """
@@ -75,41 +75,30 @@ _VALID_CATEGORIES = {c.value for c in RRNCategory}
 _SEGMENT_RE = re.compile(r"^[A-Za-z0-9._\-]+$")
 
 
-_NUMERIC_RRN_RE: re.Pattern[str] = re.compile(r"^RRN-\d{8,12}$")
-
-
 def _validate_rrn(rrn: str) -> None:
-    """Validate a Robot Registration Number (RRN).
+    """Validate a Robot Registration Number (RRN) URI format.
 
-    Accepts the numeric format (issued by registries) and both URI formats::
+    Accepts both the legacy flat format and the new structured format::
 
-        RRN-000000000001                             # numeric — issued by RRF / rcan.dev
-        rrn://[org]/[id]                             # URI legacy — 2 path segments
-        rrn://[org]/[category]/[id]                  # URI 3-segment
-        rrn://[org]/[category]/[model]/[id]          # URI 4-segment (recommended)
+        rrn://[org]/[id]                             # legacy — 2 path segments
+        rrn://[org]/[category]/[id]                  # 3 segments
+        rrn://[org]/[category]/[model]/[id]          # 4 segments (recommended)
 
-    The ``[category]`` segment in URI format, when present, must be one of:
+    The ``[category]`` segment, when present, must be one of:
     ``robot``, ``component``, ``sensor``, ``assembly``.
 
     Args:
         rrn: The RRN string to validate.
 
     Raises:
-        ValueError: If the RRN does not conform to any accepted format.
+        ValueError: If the RRN does not conform to the expected format.
     """
-    if not isinstance(rrn, str):
-        raise ValueError(f"RRN must be a string, got {type(rrn).__name__}: {rrn!r}")
     if not rrn:
         raise ValueError("RRN must not be empty")
-
-    # Numeric format: RRN-000000000001 (8–12 digits, issued by registries)
-    if _NUMERIC_RRN_RE.match(rrn):
-        return
-
     if not rrn.startswith(_RRN_SCHEME):
         raise ValueError(
-            f"RRN must be a numeric RRN (e.g. 'RRN-000000000001') or a URI starting with "
-            f"{_RRN_SCHEME!r}, got: {rrn!r}"
+            f"RRN must start with {_RRN_SCHEME!r} (Robot Registration Number URI scheme), "
+            f"got: {rrn!r}"
         )
     rest = rrn[len(_RRN_SCHEME) :]
     parts = rest.split("/")
@@ -165,9 +154,6 @@ def _parse_rrn(rrn: str) -> dict[str, Optional[str]]:
         # {"org": "example.org", "category": None, "model": None, "id": "rover-1"}
     """
     _validate_rrn(rrn)
-    # Numeric RRN (e.g. RRN-000000000001) — no sub-structure to parse
-    if _NUMERIC_RRN_RE.match(rrn):
-        return {"org": None, "category": None, "model": None, "id": rrn}
     parts = rrn[len(_RRN_SCHEME) :].split("/")
     return {
         "org": parts[0],
@@ -325,9 +311,9 @@ class RegistryResolveResponse:
     tier: str
 
     def to_message(self) -> dict[str, Any]:
-        """Serialize to a response dict using REGISTRY_RESOLVE_RESULT type (§21.5)."""
+        """Serialize to a response dict."""
         return {
-            "type": MessageType.REGISTRY_RESOLVE_RESULT,
+            "type": MessageType.REGISTRY_RESOLVE,
             "payload": {
                 "rrn": self.rrn,
                 "ruri": self.ruri,
@@ -399,26 +385,16 @@ class RegistryRegisterResult:
             data: Raw message dict (as returned by ``to_message()``).
 
         Raises:
-            ValueError: If required fields are missing or inconsistent with status:
-                        ``status`` is always required; ``rrn`` is required on success;
-                        ``error`` is required on failure.
+            ValueError: If ``status`` field is missing.
         """
         payload = data.get("payload", data)
         if "status" not in payload:
             raise ValueError("Missing required field: 'status'")
-        status = payload["status"]
-        if status == "success" and "rrn" not in payload:
-            raise ValueError("RegistryRegisterResult: 'rrn' is required when status='success'")
-        if status == "failure" and "error" not in payload:
-            raise ValueError("RegistryRegisterResult: 'error' is required when status='failure'")
-        rrn = payload.get("rrn")
-        if rrn is not None:
-            _validate_rrn(rrn)
         msg_id = data.get("msg_id") or str(uuid.uuid4())
         return cls(
             msg_id=msg_id,
-            status=status,
-            rrn=rrn,
+            status=payload["status"],
+            rrn=payload.get("rrn"),
             error=payload.get("error"),
         )
 
@@ -473,24 +449,17 @@ class RegistryResolveResult:
             data: Raw message dict (as returned by ``to_message()``).
 
         Raises:
-            ValueError: If required fields are missing or inconsistent with status:
-                        ``status`` and ``rrn`` are always required; ``ruri`` is required
-                        when status is ``"found"``; ``rrn`` is validated as a legal RRN.
+            ValueError: If ``status`` or ``rrn`` fields are missing.
         """
         payload = data.get("payload", data)
         for key in ("status", "rrn"):
             if key not in payload:
                 raise ValueError(f"Missing required field: '{key}'")
-        status = payload["status"]
-        rrn = payload["rrn"]
-        _validate_rrn(rrn)
-        if status == "found" and "ruri" not in payload:
-            raise ValueError("RegistryResolveResult: 'ruri' is required when status='found'")
         msg_id = data.get("msg_id") or str(uuid.uuid4())
         return cls(
             msg_id=msg_id,
-            status=status,
-            rrn=rrn,
+            status=payload["status"],
+            rrn=payload["rrn"],
             ruri=payload.get("ruri"),
             error=payload.get("error"),
             verified=payload.get("verified", False),

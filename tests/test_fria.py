@@ -616,7 +616,10 @@ class TestFriaModelProvenance:
         with patch("castor.fria.ConformanceChecker") as MockCC:
             MockCC.return_value.run_all.return_value = []
             MockCC.return_value.summary.return_value = {
-                "score": 90, "pass": 5, "warn": 0, "fail": 0
+                "score": 90,
+                "pass": 5,
+                "warn": 0,
+                "fail": 0,
             }
             return build_fria_document(cfg, "safety_component", "Indoor nav")
 
@@ -654,7 +657,10 @@ class TestFriaAnnexIVCoverage:
         with patch("castor.fria.ConformanceChecker") as MockCC:
             MockCC.return_value.run_all.return_value = []
             MockCC.return_value.summary.return_value = {
-                "score": 90, "pass": 5, "warn": 0, "fail": 0
+                "score": 90,
+                "pass": 5,
+                "warn": 0,
+                "fail": 0,
             }
             return build_fria_document(cfg, "safety_component", "Indoor nav")
 
@@ -700,10 +706,12 @@ class TestFriaQmsReference:
         with patch("castor.fria.ConformanceChecker") as MockCC:
             MockCC.return_value.run_all.return_value = []
             MockCC.return_value.summary.return_value = {
-                "score": 90, "pass": 5, "warn": 0, "fail": 0
+                "score": 90,
+                "pass": 5,
+                "warn": 0,
+                "fail": 0,
             }
-            return build_fria_document(cfg, "safety_component", "nav",
-                                       qms_reference=qms_reference)
+            return build_fria_document(cfg, "safety_component", "nav", qms_reference=qms_reference)
 
     def test_qms_reference_absent_when_not_provided(self):
         doc = self._build()

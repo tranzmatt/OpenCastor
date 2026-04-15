@@ -2692,9 +2692,11 @@ class TestSafetyBenchmarkCli:
 class TestFriaGenerateAnnexIIIStrict:
     def test_annex_iii_strict_flag_exists(self):
         import subprocess
+
         result = subprocess.run(
             ["python", "-m", "castor.cli", "fria", "generate", "--help"],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         assert "--annex-iii-strict" in result.stdout
@@ -2703,21 +2705,30 @@ class TestFriaGenerateAnnexIIIStrict:
 class TestEuRegisterCli:
     def test_help_exits_0(self):
         import subprocess
+
         result = subprocess.run(
-            ["python3", "-m", "castor.cli", "eu-register", "--help"],
-            capture_output=True, text=True
+            ["python3", "-m", "castor.cli", "eu-register", "--help"], capture_output=True, text=True
         )
         assert result.returncode == 0
         assert "FRIA" in result.stdout
 
     def test_missing_fria_exits_1(self, tmp_path):
         import subprocess
+
         config = tmp_path / "robot.rcan.yaml"
         config.write_text("rcan_version: '2.2'\nmetadata:\n  rrn: RRN-000000000001\n")
         result = subprocess.run(
-            ["python3", "-m", "castor.cli", "eu-register", "nonexistent.json",
-             "--config", str(config)],
-            capture_output=True, text=True
+            [
+                "python3",
+                "-m",
+                "castor.cli",
+                "eu-register",
+                "nonexistent.json",
+                "--config",
+                str(config),
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 1
 
@@ -2725,13 +2736,15 @@ class TestEuRegisterCli:
         """CLI exits 1 when FRIA has wrong schema (ValueError path)."""
         import json
         import subprocess
+
         fria = tmp_path / "bad.json"
         fria.write_text(json.dumps({"schema": "wrong-schema", "system": {}}))
         config = tmp_path / "robot.rcan.yaml"
         config.write_text("rcan_version: '2.2'\nmetadata:\n  rrn: RRN-000000000001\n")
         result = subprocess.run(
             ["python3", "-m", "castor.cli", "eu-register", str(fria), "--config", str(config)],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 1
         assert "rcan-fria-v1" in result.stderr
@@ -2740,17 +2753,19 @@ class TestEuRegisterCli:
 class TestIncidentsCli:
     def test_help_exits_0(self):
         import subprocess
+
         result = subprocess.run(
-            ["python3", "-m", "castor.cli", "incidents", "--help"],
-            capture_output=True, text=True
+            ["python3", "-m", "castor.cli", "incidents", "--help"], capture_output=True, text=True
         )
         assert result.returncode == 0
 
     def test_record_subcommand_help(self):
         import subprocess
+
         result = subprocess.run(
             ["python3", "-m", "castor.cli", "incidents", "record", "--help"],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         assert "--severity" in result.stdout
@@ -2758,12 +2773,23 @@ class TestIncidentsCli:
     def test_report_subcommand_writes_json(self, tmp_path):
         import json
         import subprocess
+
         log_path = str(tmp_path / "test.jsonl")
         output_path = str(tmp_path / "report.json")
         result = subprocess.run(
-            ["python3", "-m", "castor.cli", "incidents", "--log", log_path,
-             "report", "--output", output_path],
-            capture_output=True, text=True
+            [
+                "python3",
+                "-m",
+                "castor.cli",
+                "incidents",
+                "--log",
+                log_path,
+                "report",
+                "--output",
+                output_path,
+            ],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         with open(output_path) as f:
@@ -2775,9 +2801,11 @@ class TestIncidentsCli:
 class TestIfuCli:
     def test_generate_help_exits_0(self):
         import subprocess
+
         result = subprocess.run(
             ["python3", "-m", "castor.cli", "ifu", "generate", "--help"],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         assert "--annex-iii" in result.stdout

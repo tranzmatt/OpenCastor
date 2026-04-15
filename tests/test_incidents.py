@@ -1,13 +1,12 @@
 """Tests for castor.incidents — Art. 72 post-market monitoring."""
+
 import json
 
-import pytest
-
 from castor.incidents import (
+    INCIDENT_SCHEMA_VERSION,
     IncidentLog,
     IncidentSeverity,
     generate_report,
-    INCIDENT_SCHEMA_VERSION,
 )
 
 

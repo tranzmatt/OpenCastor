@@ -1,10 +1,10 @@
 """Tests for castor.eu_register — EU AI Act Art. 49 database submission package."""
+
 import json
 
 import pytest
 
-from castor.eu_register import build_submission_package, EU_AI_ACT_REGISTRATION_URL
-
+from castor.eu_register import EU_AI_ACT_REGISTRATION_URL, build_submission_package
 
 SAMPLE_FRIA = {
     "schema": "rcan-fria-v1",

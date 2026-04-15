@@ -1338,6 +1338,7 @@ class TestAnnexIIIStrictMode:
         """When castor.authority exists but handler unregistered, default mode → warn."""
         import sys
         from unittest.mock import MagicMock, patch
+
         mock_authority = MagicMock()
         mock_authority.AuthorityRequestHandler = MagicMock()
         with patch.dict(sys.modules, {"castor.authority": mock_authority}):
@@ -1350,6 +1351,7 @@ class TestAnnexIIIStrictMode:
         """When castor.authority exists but handler unregistered, strict mode → fail."""
         import sys
         from unittest.mock import MagicMock, patch
+
         mock_authority = MagicMock()
         mock_authority.AuthorityRequestHandler = MagicMock()
         with patch.dict(sys.modules, {"castor.authority": mock_authority}):
@@ -1367,6 +1369,7 @@ class TestAnnexIIIStrictMode:
 
     def test_check_fria_prerequisite_strict_blocks_on_art16(self):
         from castor.fria import check_fria_prerequisite
+
         passed, blocking = check_fria_prerequisite(self.base_config, annex_iii_strict=True)
         blocking_ids = [r.check_id for r in blocking]
         assert "rcan_v21.sbom_attestation" in blocking_ids
@@ -1394,12 +1397,16 @@ class TestWatermarkEnforcedCheck:
         assert wm.status == "fail"
 
     def test_fails_when_watermark_enforcement_false(self):
-        results = self._checker({"safety": {"watermark_enforcement": False}}).run_category("rcan_v21")
+        results = self._checker({"safety": {"watermark_enforcement": False}}).run_category(
+            "rcan_v21"
+        )
         wm = next(r for r in results if r.check_id == "rcan_v22.watermark_enforced")
         assert wm.status == "fail"
 
     def test_passes_when_watermark_enforcement_true(self):
-        results = self._checker({"safety": {"watermark_enforcement": True}}).run_category("rcan_v21")
+        results = self._checker({"safety": {"watermark_enforcement": True}}).run_category(
+            "rcan_v21"
+        )
         wm = next(r for r in results if r.check_id == "rcan_v22.watermark_enforced")
         assert wm.status == "pass"
 
