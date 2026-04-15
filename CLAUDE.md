@@ -6,7 +6,7 @@
 
 OpenCastor is the open-source **reference implementation of the RCAN protocol** (v1.9.0)). It connects LLM "brains" to robot "bodies" through a plug-and-play architecture and exposes them to messaging platforms for remote control.
 
-- **Version**: 2026.3.21.1 (date-based: `YYYY.MM.DD.patch`)
+- **Version**: 2026.4.12.0 (date-based: `YYYY.MM.DD.patch`)
 - **RCAN**: v1.9.0 — see [rcan.dev/spec](https://rcan.dev/spec/)
 - **License**: Apache 2.0 | **Python**: 3.10+ | **Tests**: 7804+ passing
 
@@ -288,11 +288,14 @@ Versioning: `YYYY.MM.DD.patch` — bump patch for each commit, date when date ch
 
 ## Bob (the reference robot)
 
-- **Hardware**: Raspberry Pi 5 16GB + Hailo-8 NPU + PCA9685 ESC/steering + CSI camera
-- **RRN**: `RRN-000000000001` / `rrn://craigm26/robot/opencastor-rpi5-hailo/bob-001`
-- **Config**: `~/opencastor/bob.rcan.yaml` (gitignored)
-- **Host**: `robot.local` / `192.168.68.61`
-- **RURI**: `rcan://robot.local:8000/bob`
+- **Hardware**: Raspberry Pi 5 16GB + Hailo-8 NPU + SO-ARM101 6-DOF follower arm + Luxonis OAK-D camera
+- **RRN**: `RRN-000000000003` / `rrn://craigm26/robot/opencastor-rpi5-hailo-soarm101/bob-001`
+- **Config**: `~/opencastor/bob.rcan.yaml` (gitignored — RCAN 3.0)
+- **Host**: `robot.local`
+- **RURI**: `rcan://robot.local:8001/bob`
+- **Agent**: `claude-sonnet-4-6` via Claude Max/Pro (OAuth token at `~/.opencastor/anthropic-token`)
+- **Servos**: Feetech STS3215 ×6 on `/dev/ttyUSB0`
+- **Camera**: DepthAI OAK-D (`type: depthai` in config)
 
 ## Useful Links
 
