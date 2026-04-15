@@ -40,6 +40,7 @@ Usage::
 from __future__ import annotations
 
 import logging
+import re as _re
 import signal
 import sys
 import threading
@@ -263,6 +264,32 @@ _validate_cross_registry_command, _TrustAnchorCacheCls = _try_import_federation(
 # True when rcan.federation is unavailable and we fell back to the stub
 _FEDERATION_STUB_ACTIVE: bool = _TrustAnchorCacheCls is _TrustAnchorCacheStub
 _extract_loa_from_jwt, _validate_loa_for_scope = _try_import_loa()
+
+
+# ---------------------------------------------------------------------------
+# Pick-and-place intent detection
+# ---------------------------------------------------------------------------
+
+_PICK_PLACE_RE = _re.compile(
+    r"(?:pick|grab|take|get)\s+(?P<target>.+?)\s+"
+    r"(?:into|in\b|to\b|onto\b|and\s+place\s+(?:it\s+)?(?:into|in))\s+"
+    r"(?P<destination>.+)",
+    _re.IGNORECASE,
+)
+
+
+def _detect_pick_place_intent(instruction: str) -> tuple[str, str] | None:
+    """Return (target, destination) if instruction is a pick-and-place, else None.
+
+    Examples::
+        "pick the red lego into the bowl"  → ("the red lego", "the bowl")
+        "grab cube and place it into tray" → ("cube", "tray")
+        "move forward"                     → None
+    """
+    m = _PICK_PLACE_RE.search(instruction.strip())
+    if m:
+        return m.group("target").strip(), m.group("destination").strip()
+    return None
 
 
 class CastorBridge:
