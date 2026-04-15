@@ -1624,6 +1624,32 @@ class CastorBridge:
         except Exception as exc:
             log.warning("_update_task_doc failed (task_id=%s): %s", task_id, exc)
 
+    def _wait_for_confirmation(self, task_id: str, timeout_s: float = 120.0) -> bool:
+        """Wait for the Flutter app to set confirmed=True on the task doc.
+
+        Uses a Firestore on_snapshot listener (no polling). Returns True if
+        confirmed within timeout_s, False otherwise. Always detaches the listener.
+        """
+        if not self._db:
+            return False
+
+        confirmed_event = threading.Event()
+
+        def _on_snapshot(doc_snapshots, changes, read_time) -> None:
+            for snap in doc_snapshots:
+                if snap.exists and snap.to_dict().get("confirmed") is True:
+                    confirmed_event.set()
+
+        task_ref = self._tasks_ref().document(task_id)
+        listener = task_ref.on_snapshot(_on_snapshot)
+        try:
+            return confirmed_event.wait(timeout=timeout_s)
+        finally:
+            try:
+                listener.unsubscribe()
+            except Exception:
+                pass
+
     # ------------------------------------------------------------------
     # Gateway dispatch
     # ------------------------------------------------------------------

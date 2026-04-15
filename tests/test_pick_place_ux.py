@@ -102,3 +102,50 @@ class TestTaskDocHelpers:
         bridge = _make_bridge()
         bridge._robot_ref().collection.return_value.document.return_value.update.side_effect = Exception("boom")
         bridge._update_task_doc("abc", {"status": "failed"})
+
+
+# ── 3. Wait for confirmation ───────────────────────────────────────────────────
+
+class TestWaitForConfirmation:
+    def test_returns_true_when_confirmed_immediately(self):
+        bridge = _make_bridge()
+
+        # Simulate: Firestore listener fires immediately with confirmed=True
+        def fake_on_snapshot(callback, error_callback=None, snapshot_listener_info=None):
+            snap = MagicMock()
+            snap.exists = True
+            snap.to_dict.return_value = {"confirmed": True, "status": "pending_confirmation"}
+            callback([snap], None, None)
+            return MagicMock()  # listener handle
+
+        bridge._tasks_ref().document.return_value.on_snapshot = fake_on_snapshot
+
+        result = bridge._wait_for_confirmation("task-abc", timeout_s=5)
+        assert result is True
+
+    def test_returns_false_on_timeout(self):
+        bridge = _make_bridge()
+
+        # Simulate: listener never fires confirmed
+        def fake_on_snapshot(callback, error_callback=None, snapshot_listener_info=None):
+            return MagicMock()  # handle, but never fires
+
+        bridge._tasks_ref().document.return_value.on_snapshot = fake_on_snapshot
+
+        result = bridge._wait_for_confirmation("task-xyz", timeout_s=0.1)
+        assert result is False
+
+    def test_returns_false_when_confirmed_false(self):
+        bridge = _make_bridge()
+
+        def fake_on_snapshot(callback, error_callback=None, snapshot_listener_info=None):
+            snap = MagicMock()
+            snap.exists = True
+            snap.to_dict.return_value = {"confirmed": False}
+            callback([snap], None, None)
+            return MagicMock()
+
+        bridge._tasks_ref().document.return_value.on_snapshot = fake_on_snapshot
+
+        result = bridge._wait_for_confirmation("task-abc", timeout_s=0.2)
+        assert result is False
