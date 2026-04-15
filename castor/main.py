@@ -291,14 +291,16 @@ class Camera:
         self.last_depth = None  # Expose depth for reactive layer
         self.last_imu = None  # Expose IMU for orientation-aware navigation (OAK-4 Pro)
 
-        cam_cfg = config.get("camera", {})
+        # Support both `camera:` (legacy flat key) and `cameras.main:` (RCAN 3.0 nested)
+        cam_cfg = config.get("camera") or config.get("cameras", {}).get("main") or {}
         cam_type = cam_cfg.get("type", "auto")
         res = cam_cfg.get("resolution", [640, 480])
         depth_enabled = cam_cfg.get("depth_enabled", False)
         imu_enabled = cam_cfg.get("imu_enabled", False)
 
         # --- Try OAK-D / OAK-4 Pro (DepthAI USB camera with depth) ---
-        if cam_type in ("oakd", "auto"):
+        # "depthai" and "oak" are accepted aliases for "oakd"
+        if cam_type in ("oakd", "auto", "depthai", "oak"):
             try:
                 import depthai as dai
 
@@ -930,6 +932,34 @@ def main():
     speaker = Speaker(config)
     set_shared_speaker(speaker)
     fs.proc.set_speaker("online" if speaker.enabled else "offline")
+
+    # 5b. AUTO-START VOICE LOOP if a microphone is detected.
+    # Full pipeline: wake word → STT → LLM → TTS.
+    # Wake phrase: CASTOR_HOTWORD env → robot_name → "hey castor".
+    # Disabled if audio.wake_word_enabled: false in RCAN config.
+    _audio_cfg_main = config.get("audio", {})
+    if _audio_cfg_main.get("wake_word_enabled") is not False:
+        try:
+            from castor.voice import detect_usb_microphone
+            from castor.voice_loop import get_voice_loop
+
+            _mic = detect_usb_microphone()
+            _env_phrase = os.getenv("CASTOR_HOTWORD", "")
+            _config_enabled = _audio_cfg_main.get("wake_word_enabled", None)
+
+            if _mic["found"] or bool(_env_phrase) or _config_enabled is True:
+                _robot_name_v = config.get("metadata", {}).get("robot_name", "")
+                _cfg_phrase_v = _audio_cfg_main.get("wake_phrase", "")
+                _wake_phrase = _env_phrase or _cfg_phrase_v or _robot_name_v or "hey castor"
+                _vloop = get_voice_loop(brain=brain, hotword=_wake_phrase)
+                _vloop.start()
+                logger.info(
+                    "Voice loop started: wake_phrase=%r mic=%s",
+                    _wake_phrase,
+                    _mic.get("name", "none"),
+                )
+        except Exception as _vl_exc:
+            logger.debug("Voice loop auto-start skipped: %s", _vl_exc)
 
     # 6. mDNS BROADCAST (opt-in)
     mdns_broadcaster = None
