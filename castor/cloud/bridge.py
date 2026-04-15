@@ -1577,6 +1577,54 @@ class CastorBridge:
             return False
 
     # ------------------------------------------------------------------
+    # Pick-and-place task doc helpers
+    # ------------------------------------------------------------------
+
+    def _tasks_ref(self) -> Any:
+        return self._robot_ref().collection("tasks")
+
+    def _write_task_doc(
+        self,
+        task_id: str,
+        target: str,
+        destination: str,
+        status: str,
+    ) -> None:
+        """Create the initial task document in Firestore. Best-effort — never raises."""
+        if not self._db:
+            return
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+            self._tasks_ref().document(task_id).set(
+                {
+                    "task_id": task_id,
+                    "type": "pick_place",
+                    "target": target,
+                    "destination": destination,
+                    "status": status,
+                    "phase": "SCAN",
+                    "detected_objects": [],
+                    "frame_b64": None,
+                    "error": None,
+                    "confirmed": False,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            )
+        except Exception as exc:
+            log.warning("_write_task_doc failed (task_id=%s): %s", task_id, exc)
+
+    def _update_task_doc(self, task_id: str, fields: dict[str, Any]) -> None:
+        """Partial update to a task document. Best-effort — never raises."""
+        if not self._db:
+            return
+        try:
+            fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._tasks_ref().document(task_id).update(fields)
+        except Exception as exc:
+            log.warning("_update_task_doc failed (task_id=%s): %s", task_id, exc)
+
+    # ------------------------------------------------------------------
     # Gateway dispatch
     # ------------------------------------------------------------------
 
