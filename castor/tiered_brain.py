@@ -21,7 +21,6 @@ and Layer 2 every N ticks or when Layer 1 signals uncertainty.
 
 import logging
 import time
-from collections import deque
 
 from .providers.base import Thought
 from .providers.task_router import TaskCategory, TaskRouter
@@ -245,14 +244,6 @@ class TieredBrain:
             "interpreter_escalations": 0,
         }
 
-        # Per-layer motor command frequency tracking (sliding window)
-        self._hz_window_s = 30.0
-        self._layer_timestamps: dict[str, deque[float]] = {
-            "reactive": deque(),
-            "fast": deque(),
-            "planner": deque(),
-        }
-
     def think(
         self,
         image_bytes: bytes,
@@ -293,7 +284,6 @@ class TieredBrain:
         reactive_action = self.reactive.evaluate(image_bytes, sensor_data)
         if reactive_action:
             self.stats["reactive_count"] += 1
-            self._layer_timestamps["reactive"].append(time.time())
             logger.debug(
                 f"Reactive: {reactive_action['type']} ({reactive_action.get('reason', '')})"
             )
@@ -326,18 +316,14 @@ class TieredBrain:
         self.stats["fast_count"] += 1
 
         if thought.action:
-            self._layer_timestamps["fast"].append(time.time())
             logger.info(f"Fast brain ({fast_ms:.0f}ms): {thought.action.get('type', '?')}")
 
         # Layer 2: Planner (periodic or on escalation)
         # Task-category overrides: SENSOR_POLL skips planner; high-complexity categories force it.
         if _resolved_category in _FAST_ONLY_CATEGORIES:
-            # Cheap tasks: NEVER escalate to planner — hard override.
-            # Explicitly clear should_plan even if interpreter pre-think set should_escalate=True,
-            # so sensor_poll ticks stay cheap regardless of prior escalation signals.
-            should_plan = False
+            # Cheap tasks: never escalate to planner regardless of interval or uncertainty
             logger.debug(
-                "TieredBrain: task_category=%s → fast-only, planner suppressed",
+                "TieredBrain: task_category=%s → fast-only, skipping planner",
                 _resolved_category.value if _resolved_category else None,
             )
         elif _resolved_category in _PREFER_PLANNER_CATEGORIES and self.planner:
@@ -387,7 +373,6 @@ class TieredBrain:
                 plan_thought.escalated = True
                 self.stats["planner_count"] += 1
                 if plan_thought.action:
-                    self._layer_timestamps["planner"].append(time.time())
                     self.last_plan = plan_thought.action
                     self.last_plan_time = time.time()
                     logger.info(
@@ -434,27 +419,6 @@ class TieredBrain:
 
         return thought
 
-    def effective_hz(self) -> dict:
-        """Return effective motor command frequency (Hz) per layer.
-
-        Uses a sliding window (default 30s) to compute the rate at which
-        each layer produces motor commands.
-        """
-        now = time.time()
-        cutoff = now - self._hz_window_s
-        result = {}
-        total_count = 0
-        for layer, timestamps in self._layer_timestamps.items():
-            # Prune old entries outside the window
-            while timestamps and timestamps[0] < cutoff:
-                timestamps.popleft()
-            count = len(timestamps)
-            total_count += count
-            result[f"{layer}_hz"] = round(count / self._hz_window_s, 2)
-        result["overall_hz"] = round(total_count / self._hz_window_s, 2)
-        result["window_s"] = self._hz_window_s
-        return result
-
     def get_stats(self) -> dict:
         """Return brain layer usage stats."""
         total = max(self.stats["total_ticks"], 1)
@@ -464,7 +428,6 @@ class TieredBrain:
             "fast_pct": round(self.stats["fast_count"] / total * 100, 1),
             "planner_pct": round(self.stats["planner_count"] / total * 100, 1),
             "swarm_pct": round(self.stats["swarm_count"] / total * 100, 1),
-            "effective_hz": self.effective_hz(),
         }
         # Include prompt cache stats from planner if available
         if self.planner and hasattr(self.planner, "cache_stats"):
