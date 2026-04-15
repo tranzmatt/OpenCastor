@@ -212,6 +212,12 @@ _MODELS: dict[str, list[dict[str, Any]]] = {
             "tags": ["reasoning", "multimodal", "preview"],
         },
         {
+            "id": "gemini-2.5-flash-8b",
+            "label": "Gemini 2.5 Flash 8B",
+            "desc": "Ultra-fast 8B Gemini — minimal latency for reactive robot loops",
+            "tags": ["fast", "cost-effective", "multimodal"],
+        },
+        {
             "id": "gemini-3-flash-preview",
             "label": "Gemini 3 Flash — Agentic Vision (Preview)",
             "desc": "Think→Act→Observe loop for fine-grained vision tasks via code execution",
@@ -228,6 +234,12 @@ _MODELS: dict[str, list[dict[str, Any]]] = {
             "label": "Gemini 3.1 Flash (Preview)",
             "desc": "Next-generation fast multimodal with strong tool use (preview)",
             "tags": ["fast", "multimodal", "tool-use", "preview"],
+        },
+        {
+            "id": "gemini-er-1.6",
+            "label": "Gemini Robotics ER 1.6",
+            "desc": "Improved embodied AI with better spatial reasoning and manipulation planning",
+            "tags": ["robotics", "physical-ai", "manipulation"],
         },
         {
             "id": "gemini-er-1.5",
@@ -296,7 +308,87 @@ _MODELS: dict[str, list[dict[str, Any]]] = {
             "tags": ["fast"],
         },
     ],
-    "ollama": [],
+    "ollama": [
+        {
+            "id": "moondream:latest",
+            "label": "Moondream 1.8B",
+            "desc": "Ultra-lightweight vision model — ideal for reactive robot loops on Pi 5",
+            "tags": ["vision", "fast", "recommended"],
+            "recommended": True,
+        },
+        {
+            "id": "smolvlm:500m",
+            "label": "SmolVLM 500M",
+            "desc": "Smallest VLM for edge deployment — minimal RAM footprint",
+            "tags": ["vision", "fast", "tiny"],
+        },
+        {
+            "id": "smolvlm:2.2b",
+            "label": "SmolVLM 2.2B",
+            "desc": "Efficient VLM balancing speed and quality",
+            "tags": ["vision", "fast"],
+        },
+        {
+            "id": "qwen2.5vl:3b",
+            "label": "Qwen 2.5 VL 3B",
+            "desc": "Strong vision-language model for scene understanding on-device",
+            "tags": ["vision", "multimodal"],
+        },
+        {
+            "id": "qwen2.5vl:7b",
+            "label": "Qwen 2.5 VL 7B",
+            "desc": "High-quality vision-language model — best quality local VLM",
+            "tags": ["vision", "multimodal", "quality"],
+        },
+        {
+            "id": "minicpm-v:8b",
+            "label": "MiniCPM-V 8B",
+            "desc": "Efficient multimodal model for robotics and device-side inference",
+            "tags": ["vision", "multimodal"],
+        },
+        {
+            "id": "granite3.2-vision:2b",
+            "label": "Granite 3.2 Vision 2B",
+            "desc": "IBM open vision model — compact and instruction-tuned",
+            "tags": ["vision", "fast", "open-source"],
+        },
+        {
+            "id": "llava:7b",
+            "label": "LLaVA 7B",
+            "desc": "Classic vision-language model — well-supported in Ollama",
+            "tags": ["vision", "multimodal"],
+        },
+        {
+            "id": "llava:13b",
+            "label": "LLaVA 13B",
+            "desc": "Larger LLaVA for higher-quality visual reasoning",
+            "tags": ["vision", "multimodal", "quality"],
+        },
+        {
+            "id": "llava-llama3:8b",
+            "label": "LLaVA-Llama3 8B",
+            "desc": "LLaVA fine-tuned on Llama 3 — improved instruction following",
+            "tags": ["vision", "multimodal"],
+        },
+        {
+            "id": "llama3.2:3b",
+            "label": "Llama 3.2 3B",
+            "desc": "Text-only fast model for reasoning and reactive text tasks",
+            "tags": ["text", "fast"],
+        },
+        {
+            "id": "phi4-mini:3.8b",
+            "label": "Phi-4 Mini 3.8B",
+            "desc": "Microsoft compact model with strong reasoning for its size",
+            "tags": ["text", "reasoning", "fast"],
+        },
+        {
+            "id": "gemma3:4b",
+            "label": "Gemma 3 4B",
+            "desc": "Google open model — good quality for small footprint",
+            "tags": ["text", "fast", "open-source"],
+        },
+    ],
     "llamacpp": [],
     "mlx": [
         {
@@ -406,6 +498,13 @@ _MODELS: dict[str, list[dict[str, Any]]] = {
 }
 
 _SECONDARY_MODELS: list[dict[str, Any]] = [
+    {
+        "provider": "google",
+        "id": "gemini-er-1.6",
+        "label": "Google Gemini Robotics ER 1.6",
+        "desc": "Improved embodied AI with better manipulation planning",
+        "tags": ["robotics", "physical-ai", "manipulation"],
+    },
     {
         "provider": "google",
         "id": "gemini-er-1.5",
