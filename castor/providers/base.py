@@ -99,9 +99,9 @@ class BaseProvider(ABC):
             '- {"type": "grip", "state": "open" | "close"}\n'
             '- {"type": "arm_pose", "joints": {"shoulder_pan": float, "shoulder_lift": float, '
             '"elbow_flex": float, "wrist_flex": float, "wrist_roll": float, "gripper": float}}\n'
-            '  # All joint values normalised -1.0 (min) to 1.0 (max). 0.0 = home/neutral.\n'
-            '  # shoulder_pan: -1=right, +1=left. shoulder_lift: -1=up, +1=down.\n'
-            '  # elbow_flex: -1=straight, +1=bent. gripper: -1=closed, +1=open.\n'
+            "  # All joint values normalised -1.0 (min) to 1.0 (max). 0.0 = home/neutral.\n"
+            "  # shoulder_pan: -1=right, +1=left. shoulder_lift: -1=up, +1=down.\n"
+            "  # elbow_flex: -1=straight, +1=bent. gripper: -1=closed, +1=open.\n"
             '- {"type": "wait", "duration_ms": int}\n'
             '- {"type": "stop"}\n\n'
             "For pick-and-place tasks, emit a SEQUENCE of arm_pose and grip actions as a JSON array.\n"

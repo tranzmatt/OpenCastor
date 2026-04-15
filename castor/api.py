@@ -2838,6 +2838,7 @@ async def arm_pick_place(req: _PickPlaceRequest):
             return None
 
         import base64 as _b64
+
         b64 = _b64.b64encode(frame).decode()
 
         prompt = (
@@ -2846,14 +2847,11 @@ async def arm_pick_place(req: _PickPlaceRequest):
             "Look at the camera image. Generate ONLY a JSON array of arm_pose and grip actions "
             "for this phase. Joint values are normalised -1.0 to 1.0 (0.0 = neutral/home). "
             "shoulder_pan: -1=right +1=left. shoulder_lift: -1=raised +1=lowered. "
-            "elbow_flex: -1=straight +1=bent. gripper: 1.0=open -1.0=closed.\n"
-            + extra_instruction
+            "elbow_flex: -1=straight +1=bent. gripper: 1.0=open -1.0=closed.\n" + extra_instruction
         )
 
         _img_bytes = _b64.b64decode(b64)
-        thought = await asyncio.to_thread(
-            state.brain.think, _img_bytes, prompt, "terminal"
-        )
+        thought = await asyncio.to_thread(state.brain.think, _img_bytes, prompt, "terminal")
         log.append({"phase": phase, "brain_response": thought.raw_text[:200]})
         return thought.action
 

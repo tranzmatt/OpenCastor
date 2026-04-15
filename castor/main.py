@@ -1530,6 +1530,7 @@ def main():
                             try:
                                 from castor.rcan.message_signing import get_message_signer
                                 from castor.watermark import compute_watermark_token
+
                                 _signer = get_message_signer(config)
                                 _secret = _signer.secret_key_bytes() if _signer else None
                                 if _secret and thought is not None:

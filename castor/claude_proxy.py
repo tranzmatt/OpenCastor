@@ -98,6 +98,7 @@ class ClaudeOAuthClient:
                             if src.get("type") == "base64":
                                 import base64 as _b64
                                 import tempfile as _tmp
+
                                 ext = "jpg" if "jpeg" in src.get("media_type", "") else "png"
                                 tf = _tmp.NamedTemporaryFile(
                                     suffix=f".{ext}", delete=False, prefix="castor_frame_"
@@ -168,6 +169,7 @@ class ClaudeOAuthClient:
             if _image_path:
                 try:
                     import os as _os
+
                     _os.unlink(_image_path)
                 except Exception:
                     pass
