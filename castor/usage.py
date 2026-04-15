@@ -42,6 +42,8 @@ _COST_TABLE: dict[str, dict[str, tuple]] = {
     "google": {
         "gemini-2.5-flash": (0.0, 0.0),
         "gemini-2.5-flash-lite": (0.0, 0.0),
+        "gemini-er-1.6": (0.002, 0.008),  # ER 1.6 — improved manipulation planning
+        "gemini-er-1.5": (0.002, 0.008),  # ER 1.5 — original embodied reasoning
         "default": (0.075, 0.30),  # gemini-2.5-pro-level fallback / 1M → /1k
     },
     "openai": {

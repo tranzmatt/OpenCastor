@@ -20,6 +20,9 @@ _AGENTIC_VISION_MODELS = {
     "gemini-3-flash",
     "gemini-3-pro-preview",
     "gemini-3-pro",
+    # Gemini Robotics ER series — embodied reasoning, spatial understanding
+    "gemini-er-1.6",
+    "gemini-er-1.5",
 }
 
 # System prompt addendum injected for Agentic Vision models so the robot

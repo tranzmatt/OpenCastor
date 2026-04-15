@@ -200,6 +200,12 @@ _MODELS: dict[str, list[dict[str, Any]]] = {
             "tags": ["reasoning", "multimodal", "production"],
         },
         {
+            "id": "gemini-2.5-flash-8b",
+            "label": "Gemini 2.5 Flash 8B",
+            "desc": "Ultra-fast 8B Gemini — minimal latency for reactive robot loops",
+            "tags": ["fast", "multimodal", "edge"],
+        },
+        {
             "id": "gemini-2.5-flash-preview",
             "label": "Gemini 2.5 Flash (Preview)",
             "desc": "Preview channel for Gemini 2.5 Flash with latest improvements",
@@ -228,6 +234,12 @@ _MODELS: dict[str, list[dict[str, Any]]] = {
             "label": "Gemini 3.1 Flash (Preview)",
             "desc": "Next-generation fast multimodal with strong tool use (preview)",
             "tags": ["fast", "multimodal", "tool-use", "preview"],
+        },
+        {
+            "id": "gemini-er-1.6",
+            "label": "Gemini Robotics ER 1.6",
+            "desc": "Improved embodied AI with better spatial reasoning and manipulation planning",
+            "tags": ["robotics", "physical-ai", "manipulation"],
         },
         {
             "id": "gemini-er-1.5",
@@ -296,7 +308,89 @@ _MODELS: dict[str, list[dict[str, Any]]] = {
             "tags": ["fast"],
         },
     ],
-    "ollama": [],
+    "ollama": [
+        # ── Vision-Language-Action models (VLA) — Brain 1 reactive layer ──
+        {
+            "id": "moondream:latest",
+            "label": "Moondream 2 (1.8B)",
+            "desc": "Tiny vision model — runs on Pi 5 / Hailo NPU, <200 ms latency. Best for reactive loop.",
+            "tags": ["vision", "vla", "edge", "fast", "recommended"],
+            "recommended": True,
+        },
+        {
+            "id": "smolvlm:500m",
+            "label": "SmolVLM 500M",
+            "desc": "500 M parameter vision model — fastest local option, great for Raspberry Pi",
+            "tags": ["vision", "vla", "edge", "fast"],
+        },
+        {
+            "id": "smolvlm:2.2b",
+            "label": "SmolVLM 2.2B",
+            "desc": "2.2 B parameter vision model — better scene understanding than 500M, still Pi-friendly",
+            "tags": ["vision", "vla", "edge"],
+        },
+        {
+            "id": "qwen2.5vl:3b",
+            "label": "Qwen 2.5 VL 3B",
+            "desc": "Alibaba's 3B vision-language model — strong grounding and manipulation planning",
+            "tags": ["vision", "vla", "edge", "grounding"],
+        },
+        {
+            "id": "qwen2.5vl:7b",
+            "label": "Qwen 2.5 VL 7B",
+            "desc": "7B vision-language model — best local quality for scene understanding and pick-and-place",
+            "tags": ["vision", "vla", "grounding"],
+        },
+        {
+            "id": "minicpm-v:8b",
+            "label": "MiniCPM-V 8B",
+            "desc": "Openbmb 8B vision model — strong OCR and spatial reasoning, good for manipulation tasks",
+            "tags": ["vision", "vla", "ocr", "spatial"],
+        },
+        {
+            "id": "granite3.2-vision:2b",
+            "label": "Granite 3.2 Vision 2B (IBM)",
+            "desc": "IBM's 2B edge vision model — designed for on-device deployment and structured output",
+            "tags": ["vision", "vla", "edge", "structured-output"],
+        },
+        {
+            "id": "llava:7b",
+            "label": "LLaVA 7B",
+            "desc": "Established vision-language model — reliable baseline for camera frame analysis",
+            "tags": ["vision", "vla", "stable"],
+        },
+        {
+            "id": "llava:13b",
+            "label": "LLaVA 13B",
+            "desc": "Larger LLaVA — better scene description, requires ~10 GB RAM",
+            "tags": ["vision", "vla"],
+        },
+        {
+            "id": "llava-llama3:8b",
+            "label": "LLaVA-LLaMA 3 8B",
+            "desc": "LLaVA with LLaMA 3 backbone — improved instruction following over base LLaVA",
+            "tags": ["vision", "vla", "instruction-following"],
+        },
+        # ── Text-only fast models (useful as fast/planner without vision) ──
+        {
+            "id": "llama3.2:3b",
+            "label": "LLaMA 3.2 3B",
+            "desc": "Very fast 3B text model — sub-100 ms on Pi 5, good for command parsing without camera",
+            "tags": ["fast", "edge", "text-only"],
+        },
+        {
+            "id": "phi4-mini:3.8b",
+            "label": "Phi-4 Mini 3.8B (Microsoft)",
+            "desc": "Microsoft's 3.8B reasoning model — punches above its weight for planning tasks",
+            "tags": ["fast", "reasoning", "edge"],
+        },
+        {
+            "id": "gemma3:4b",
+            "label": "Gemma 3 4B",
+            "desc": "Google's 4B open model — lightweight, multimodal (text+image), Pi-deployable",
+            "tags": ["fast", "edge", "multimodal"],
+        },
+    ],
     "llamacpp": [],
     "mlx": [
         {
@@ -406,6 +500,13 @@ _MODELS: dict[str, list[dict[str, Any]]] = {
 }
 
 _SECONDARY_MODELS: list[dict[str, Any]] = [
+    {
+        "provider": "google",
+        "id": "gemini-er-1.6",
+        "label": "Google Gemini Robotics ER 1.6",
+        "desc": "Improved embodied AI with better manipulation planning",
+        "tags": ["robotics", "physical-ai", "manipulation"],
+    },
     {
         "provider": "google",
         "id": "gemini-er-1.5",
