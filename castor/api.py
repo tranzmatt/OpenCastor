@@ -1944,7 +1944,7 @@ async def get_skills(request: Request):
     robot_rrn = cfg.get("metadata", {}).get("rrn") or cfg.get("metadata", {}).get(
         "robot_rrn", "RRN-000000000001"
     )
-    rcan_version = cfg.get("rcan_version", "1.6")
+    rcan_version = cfg.get("rcan_version", "3.0")
 
     return {
         "builtin_commands": _BUILTIN_CLI_COMMANDS,
@@ -2538,7 +2538,7 @@ async def rcan_receive_message(request: Request):
         response_payload["ruri"] = state.ruri or "rcan://opencastor.unknown.00000000"
         # v2.2 DISCOVER fields
         response_payload["supported_transports"] = ["http", "compact"]
-        response_payload["rcan_version"] = "2.2"
+        response_payload["rcan_version"] = "3.0"
         response_payload["loa_enforcement"] = cfg.get("loa_enforcement", True)
         response_payload["min_loa_for_control"] = cfg.get("min_loa_for_control", 1)
         response_payload["federation_enabled"] = False
@@ -2566,7 +2566,7 @@ async def rcan_receive_message(request: Request):
         cfg = state.config or {}
         response_payload["robot_name"] = cfg.get("robot_name", "opencastor")
         response_payload["version"] = _castor_pkg.__version__
-        response_payload["rcan_version"] = "2.2"
+        response_payload["rcan_version"] = "3.0"
         response_payload["ruri"] = state.ruri
 
     return JSONResponse(response_payload, status_code=200)

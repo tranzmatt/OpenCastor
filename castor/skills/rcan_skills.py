@@ -44,7 +44,7 @@ __all__ = [
 def _handle_rcan_status(config: dict, args: dict) -> dict:  # noqa: ARG001
     """Return robot identity, RCAN version, LoA, and revocation status."""
     rrn = config.get("rcan_protocol", {}).get("rrn") or config.get("rrn", "unknown")
-    rcan_version = config.get("rcan_protocol", {}).get("version", "1.0")
+    rcan_version = config.get("rcan_protocol", {}).get("version", "3.0")
     loa = config.get("rcan_protocol", {}).get("loa", 0)
     revoked = config.get("rcan_protocol", {}).get("revoked", False)
 

@@ -179,7 +179,7 @@ class TestSkillsAPIStructure:
 
     def test_rcan_version_default_when_no_config(self, client):
         body = client.get("/api/skills").json()
-        assert body["rcan_version"] == "1.6"  # default
+        assert body["rcan_version"] == "3.0"  # default
 
     def test_robot_rrn_from_metadata_rrn(self, client, api_mod):
         api_mod.state.config = copy.deepcopy(_CONFIG_BUILTIN_SKILLS_LIST)

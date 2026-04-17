@@ -66,7 +66,7 @@ def generate_config(
 # SO-ARM101: https://huggingface.co/docs/lerobot/so101
 
 robot_name: "{robot_name}"
-rcan_version: "1.4"
+rcan_version: "3.0"
 {rrn_line}
 
 # ── Hardware ──────────────────────────────────────────────────────────────────

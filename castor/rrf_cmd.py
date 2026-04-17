@@ -153,7 +153,7 @@ def cmd_rrf_register(args) -> None:
     manufacturer = meta.get("manufacturer", "unknown")
     model = meta.get("model", "unknown")
     firmware_version = meta.get("version", meta.get("firmware_version", "v1"))
-    rcan_version = cfg.get("rcan_version", "2.2")
+    rcan_version = cfg.get("rcan_version", "3.0")
     pq_kid = cfg.get("agent", {}).get("signing", {}).get("pq_kid") or meta.get("pq_kid")
     pq_pub = _load_pq_pub()
     token = _load_token(getattr(args, "token", None))
