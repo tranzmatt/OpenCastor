@@ -4,10 +4,10 @@
 
 ## What Is OpenCastor?
 
-OpenCastor is the open-source **reference implementation of the RCAN protocol** (v1.9.0)). It connects LLM "brains" to robot "bodies" through a plug-and-play architecture and exposes them to messaging platforms for remote control.
+OpenCastor is the open-source **reference implementation of the RCAN protocol** (v3.0). It connects LLM "brains" to robot "bodies" through a plug-and-play architecture and exposes them to messaging platforms for remote control.
 
 - **Version**: 2026.4.15.0 (date-based: `YYYY.MM.DD.patch`)
-- **RCAN**: v1.9.0 — see [rcan.dev/spec](https://rcan.dev/spec/)
+- **RCAN**: v3.0 — see [rcan.dev/spec](https://rcan.dev/spec/)
 - **License**: Apache 2.0 | **Python**: 3.10+ | **Tests**: 7804+ passing
 
 ## Quick Start
@@ -146,7 +146,7 @@ move(cmd)  ──►  SafetyLayer.check(cmd)  ──►  _move(cmd)  ──►  
 | `GET` | `/api/contribute` | Idle compute contribution status |
 | `GET` | `/api/harness` | Current harness configuration |
 
-## RCAN Protocol (v1.9.0)
+## RCAN Protocol (v3.0)
 
 ### MessageTypes
 ```python
@@ -189,10 +189,10 @@ VISION       → planner preferred
 SEARCH       → planner preferred
 ```
 
-## RCAN Config Format (v1.9.0)
+## RCAN Config Format (v3.0)
 
 ```yaml
-rcan_version: "1.6.1"
+rcan_version: "3.0"
 metadata:
   robot_name: my-robot
   rrn: RRN-000000000001
