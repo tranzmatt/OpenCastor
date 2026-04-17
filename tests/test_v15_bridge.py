@@ -487,5 +487,5 @@ class TestVersionNegotiation:
         bridge._register()
 
         call_args = robot_ref.set.call_args[0][0]
-        # RCAN v2.2 as of OpenCastor v2026.3.27.0
-        assert call_args.get("rcan_version") in ("1.5", "1.6", "2.1", "2.2")
+        # RCAN v3.0 as of OpenCastor v2026.4.17.0
+        assert call_args.get("rcan_version") in ("1.5", "1.6", "2.1", "2.2", "3.0")

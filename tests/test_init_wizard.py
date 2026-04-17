@@ -151,7 +151,7 @@ def test_rcan_protocol_section():
     config, _, _ = generate_wizard_config(robot_name="r", provider="google")
     rcan = config["rcan_protocol"]
     assert rcan["enable_mdns"] is True
-    assert rcan["version"] == "1.6"
+    assert rcan["version"] == "3.0"
 
 
 def test_memory_section():

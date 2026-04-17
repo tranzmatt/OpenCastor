@@ -64,7 +64,7 @@ def test_generate_config_single_arm():
     assert "feetech" in yaml
     assert "/dev/ttyACM0" in yaml
     assert "rcan_version" in yaml
-    assert "1.4" in yaml
+    assert "3.0" in yaml
 
 
 def test_generate_config_bimanual():
