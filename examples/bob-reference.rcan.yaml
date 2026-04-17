@@ -1,117 +1,99 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# OpenCastor v2026.3.27.1 — Reference robot config (RCAN v2.2)
+# OpenCastor v2026.4.17.0 — Reference robot config (RCAN v3.0)
 # Copy this file and customize for your robot.
 #
 # Registration: Bob (RRN-000000000001) — fully registered, L5 compliant
-# Generated:    2026-03-27
+# Generated:    2026-04-17
 #
-# RCAN v2.2 highlights:
-#   - ML-DSA-65 primary signing (Ed25519 removed)
-#   - dual-brain: VLA reactive + LLM planning
-#   - M2M_TRUSTED with explicit fleet_rrns, ≤60s revocation polling
-#   - EU AI Act Art. 11/12 compliance blocks
+# RCAN v3.0 highlights (new vs v2.2):
+#   - EU AI Act compliance schemas are first-class protocol citizens (§23–§27)
+#   - fria_ref REQUIRED for Annex III high-risk systems — run `castor fria generate`
+#   - Mandatory pqc-hybrid-v1 signatures at L2+; Ed25519-only profiles rejected
+#   - §23 Safety Benchmark, §24 Instructions for Use, §25 Post-Market Monitoring,
+#     §26 EU Register Submission, §27 FRIA Protocol
 # ─────────────────────────────────────────────────────────────────────────────
 
-rcan_version: '2.2'
-
-# ── EU AI Act compliance ──────────────────────────────────────────────────────
-authority_handler_enabled: true       # AUTHORITY_ACCESS (41) handler
-audit_retention_days: 3650            # 10yr — EU AI Act Art. 12
-
-# ── Robot identity ─────────────────────────────────────────────────────────────
+rcan_version: '3.0'
+authority_handler_enabled: true
+audit_retention_days: 3650
 metadata:
   robot_name: bob
   author: craigm26
   manufacturer: craigm26
   model: opencastor-rpi5-hailo
-  version: '2026.3.27.1'
-  robot_uuid: '1c8977ac-7883-45f7-8be7-650accec1d7b'
+  version: 2026.3.27.1
+  robot_uuid: 1c8977ac-7883-45f7-8be7-650accec1d7b
   rrn: RRN-000000000001
   rrn_uri: rrn://craigm26/robot/opencastor-rpi5-hailo/bob-001
-
 port: 8000
 host: 0.0.0.0
-
-# ── Agent (LLM planning brain) ────────────────────────────────────────────────
-# RCAN v2.2: agent is the planning brain; brain_reactive is the VLA/reactive layer
 agent:
   model: anthropic/claude-sonnet-4-6
   provider: anthropic
   confidence_gates:
-    - scope: control
-      min_confidence: 0.70
-      on_fail: escalate
-    - scope: system
-      min_confidence: 0.90
-      on_fail: block
-
-# ── Dual-brain (RCAN v2.2) ───────────────────────────────────────────────────
-brain_reactive: vla/openvla-7b      # reactive/VLA layer — runs at ≤50ms
-brain_planning: anthropic/claude-sonnet-4-6  # planning layer — runs at human timescale
-brain_confidence_gate: 0.60         # reactive confidence below this escalates to planning
-
-# ── PQ signing (RCAN v2.2 mandatory) ─────────────────────────────────────────
+  - scope: control
+    min_confidence: 0.7
+    on_fail: escalate
+  - scope: system
+    min_confidence: 0.9
+    on_fail: block
+brain_reactive: vla/openvla-7b
+brain_planning: anthropic/claude-sonnet-4-6
+brain_confidence_gate: 0.6
 rcan_protocol:
-  signing_alg: ml-dsa-65            # ML-DSA-65 is PRIMARY (Ed25519 removed in v2.2)
+  signing_alg: ml-dsa-65
   require_pq: true
   pq_key_path: ~/.opencastor/pq_signing.key
   pq_pub_path: ~/.opencastor/pq_signing.pub
-
-# ── Physics ───────────────────────────────────────────────────────────────────
 physics:
   type: ackermann
   dof: 2
-
-# ── Drivers ───────────────────────────────────────────────────────────────────
 drivers:
-  - type: camera
-    name: oak-d-lite
-    protocol: usb3
-    enabled: true
-  - type: motor
-    name: base-controller
-    protocol: serial
-    enabled: true
-
-# ── Network ───────────────────────────────────────────────────────────────────
+- type: camera
+  name: oak-d-lite
+  protocol: usb3
+  enabled: true
+- type: motor
+  name: base-controller
+  protocol: serial
+  enabled: true
 network:
   mdns: true
   mdns_service: _opencastor._tcp
   rrf_endpoint: https://robot-registry-foundation.pages.dev
-  revocation_poll_interval_s: 60    # ≤60s required by RCAN v2.2 M2M_TRUSTED spec
-
-# ── Safety ────────────────────────────────────────────────────────────────────
+  revocation_poll_interval_s: 60
 safety:
   local_safety_wins: true
   min_obstacle_m: 0.3
   latency_budget_ms: 3000
   watchdog:
     timeout_s: 10
-
 hardware_safety:
   hardware_estop: false
   hardware_watchdog: false
-
-# ── HITL gates ────────────────────────────────────────────────────────────────
 hitl_gates:
-  - scope: destructive
-    action_types: [delete, irreversible]
-    require_auth: true
-    on_fail: block
-
-# ── Capabilities ─────────────────────────────────────────────────────────────
+- scope: destructive
+  action_types:
+  - delete
+  - irreversible
+  require_auth: true
+  on_fail: block
 capabilities:
-  - status
-  - nav
-  - teleop
-  - vision
-  - chat
-  - fleet                           # v2.2: M2M multi-robot delegation
-
-# ── ISO 42001 conformance (RCAN v2.2) ─────────────────────────────────────────
+- status
+- nav
+- teleop
+- vision
+- chat
+- fleet
 iso_conformance:
   iso_42001: true
   self_assessed: true
   conformance_level: 5
   last_assessed: '2026-03-27'
-  notes: 'Self-assessment. See castor compliance for details.'
+  notes: Self-assessment. See castor compliance for details.
+fria_ref: null
+_migration_warnings:
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
