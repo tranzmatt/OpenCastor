@@ -241,6 +241,49 @@ def _migrate_2_1_to_2_2(config: dict) -> dict:
     return config
 
 
+@_register_migration("2.2", "3.0")
+def _migrate_2_2_to_3_0(config: dict) -> dict:
+    """Migrate from 2.2 to 3.0 — RCAN v3.0 EU AI Act compliance bump.
+
+    v3.0 breaking changes:
+      - Signatures mandatory at L2+ conformance; Ed25519-only rejected under
+        the pqc-hybrid-v1 profile (§9).
+      - ``fria_ref`` required in /.well-known/rcan-node.json for all Annex III
+        high-risk systems (§22, §27).
+      - New sections §23 (Safety Benchmark), §24 (Instructions for Use),
+        §25 (Post-Market Monitoring), §26 (EU Register Submission),
+        §27 (FRIA Protocol).
+
+    Migration does NOT fabricate FRIA documents. Operators must run
+    ``castor fria generate`` and sign the result separately. This migrator
+    adds a ``fria_ref: None`` placeholder and emits a loud warning.
+    """
+    config["rcan_version"] = "3.0"
+
+    # fria_ref placeholder — operator must populate via `castor fria generate`
+    if "fria_ref" not in config:
+        config["fria_ref"] = None
+        config.setdefault("_migration_warnings", []).append(
+            "fria_ref not set — v3.0 REQUIRES fria_ref for Annex III high-risk "
+            "systems (RCAN §22, §27). Run `castor fria generate` to produce a "
+            "Fundamental Rights Impact Assessment document, then set "
+            "fria_ref to its URI. Without this, your node will be rejected "
+            "at registration under L2+ conformance."
+        )
+
+    # Ed25519-only sunset check
+    signing_alg = config.get("signing_alg") or config.get("network", {}).get("signing_alg")
+    if signing_alg == "ed25519":
+        config.setdefault("_migration_warnings", []).append(
+            "signing_alg='ed25519' — v3.0 REJECTS Ed25519-only profiles at L2+. "
+            "Switch to 'ml-dsa-65' or 'pqc-hybrid-v1' (recommended). The ed25519 "
+            "key may remain as a secondary key inside a pqc-hybrid-v1 keyset, "
+            "but must not be the primary."
+        )
+
+    return config
+
+
 def get_version(config: dict) -> str:
     """Extract the RCAN version from a config dict."""
     return config.get("rcan_version", "unknown")
