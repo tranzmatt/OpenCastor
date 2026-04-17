@@ -13,10 +13,12 @@ metadata:
   - ble
   - stem
   - second-hand
-  description: "LEGO SPIKE Prime \u2014 the modern classroom successor to Mindstorms\
-    \ EV3. Increasingly common in school donations and STEM lab surplus (~$320 new).\
-    \ Hub connects via USB or BLE; runs MicroPython. Angular/medium motors on ports\
-    \ A-F; force, color, distance sensors on same ports.\n"
+  description: 'LEGO SPIKE Prime — the modern classroom successor to Mindstorms EV3.
+    Increasingly common in school donations and STEM lab surplus (~$320 new). Hub
+    connects via USB or BLE; runs MicroPython. Angular/medium motors on ports A-F;
+    force, color, distance sensors on same ports.
+
+    '
   rrn: RRN-782008841781
   rrn_uri: rrn://community/robot/opencastor/lego-spike-prime/lego_spike_prime
 agent:
@@ -92,12 +94,16 @@ rcan_protocol:
   enable_mdns: false
   enable_jwt: false
 notes:
-  setup: "1. Connect SPIKE Prime hub via USB-C cable. 2. Put hub in REPL/shell mode\
-    \ via LEGO Education SPIKE app \u2192 advanced \u2192 REPL. 3. Or use the spike-prime-tools\
-    \ Python package: pip install spike-prime 4. castor run --config config/presets/lego_spike_prime.rcan.yaml\n"
-  second_hand_tips: "Often found in school auction lots or STEM program surplus. Check\
-    \ hub battery health (charge fully before testing). All 6 ports are multi-function\
-    \ \u2014 same cable works for motors and sensors.\n"
+  setup: '1. Connect SPIKE Prime hub via USB-C cable. 2. Put hub in REPL/shell mode
+    via LEGO Education SPIKE app → advanced → REPL. 3. Or use the spike-prime-tools
+    Python package: pip install spike-prime 4. castor run --config config/presets/lego_spike_prime.rcan.yaml
+
+    '
+  second_hand_tips: 'Often found in school auction lots or STEM program surplus. Check
+    hub battery health (charge fully before testing). All 6 ports are multi-function
+    — same cable works for motors and sensors.
+
+    '
 tiered_brain:
   fast_provider: ollama
   fast_model: gemma3:1b
@@ -178,12 +184,4 @@ federation:
   consent_bridge: false
 firmware_hash: null
 attestation_ref: null
-_migration_warnings:
-- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
-  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
-  \ rejects Ed25519-only profiles at L2+."
-- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
-  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
-  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
-  \ will be rejected at registration under L2+ conformance."
 fria_ref: null

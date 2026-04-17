@@ -1,8 +1,4 @@
-# Minimal OpenCastor config — copy and edit this.
-# Full docs: https://docs.opencastor.com/runtime/overview/
-
-rcan_version: "1.3"
-
+rcan_version: '3.0'
 metadata:
   robot_name: my-robot
   robot_uuid: 00000000-0000-0000-0000-000000000000
@@ -11,25 +7,22 @@ metadata:
   manufacturer: custom
   model: custom-v1
   version: v1
-
 agent:
-  provider: anthropic           # or: google, openai, mock
-  model: claude-sonnet-4-5      # or: gemini-2.5-flash, gpt-4o
-
+  provider: anthropic
+  model: claude-sonnet-4-5
 drivers:
-  - protocol: mock
-
+- protocol: mock
 physics:
   type: custom
   dof: 2
-
 network:
   telemetry_stream: false
-
 safety:
   max_linear_velocity_ms: 0.5
   max_angular_velocity_rads: 1.0
   estop_enabled: true
-
 rcan_protocol:
   port: 8000
+firmware_hash: null
+attestation_ref: null
+fria_ref: null

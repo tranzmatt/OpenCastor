@@ -1,48 +1,45 @@
-rcan_version: "2.2"
-
+rcan_version: '3.0'
 metadata:
   robot_name: opencastor-default
-  robot_uuid: "00000000-0000-4000-8000-000000000000"
+  robot_uuid: 00000000-0000-4000-8000-000000000000
   author: OpenCastor Team
   license: Apache-2.0
-  description: >
-    The default OpenCastor agent harness. Shows the full Tiered Brain
-    (fast local + slow cloud), 5 harness skill layers, memory
-    consolidation, and RCAN v2.2 safety invariants. Includes ML-DSA-65
-    PQ signing, EU AI Act compliance, and dual-brain architecture.
-    Fork this as your starting point. The code-reviewer skill is registered
-    via the skill registry, not as a harness layer.
-  tags:
-    - official
-    - harness
-    - starter
-    - two-tier-brain
-  builtin_skills:
-    - navigate-to
-    - camera-describe
-    - arm-manipulate
-    - web-lookup
-    - peer-coordinate
-    - code-reviewer
-  public_profile: true
+  description: 'The default OpenCastor agent harness. Shows the full Tiered Brain
+    (fast local + slow cloud), 5 harness skill layers, memory consolidation, and RCAN
+    v2.2 safety invariants. Includes ML-DSA-65 PQ signing, EU AI Act compliance, and
+    dual-brain architecture. Fork this as your starting point. The code-reviewer skill
+    is registered via the skill registry, not as a harness layer.
 
+    '
+  tags:
+  - official
+  - harness
+  - starter
+  - two-tier-brain
+  builtin_skills:
+  - navigate-to
+  - camera-describe
+  - arm-manipulate
+  - web-lookup
+  - peer-coordinate
+  - code-reviewer
+  public_profile: true
 agent:
   provider: google
   model: gemini-2.5-flash
   temperature: 0.7
-  system_prompt: >
-    You are an OpenCastor robot agent. You are helpful, safety-conscious,
-    and follow RCAN protocol scope constraints. Use your skills when
-    relevant. Always respect the P66 safety invariants.
+  system_prompt: 'You are an OpenCastor robot agent. You are helpful, safety-conscious,
+    and follow RCAN protocol scope constraints. Use your skills when relevant. Always
+    respect the P66 safety invariants.
+
+    '
   vision_enabled: true
   safety_stop: true
-
 tiered_brain:
   fast_provider: ollama
   fast_model: gemma3:1b
   slow_provider: google
   slow_model: gemini-2.5-flash
-
 cloud:
   skills_enabled: true
   memory:
@@ -50,35 +47,28 @@ cloud:
     consolidation:
       enabled: true
       interval_hours: 24
-
 physics:
   type: differential
   dof: 2
-
 drivers:
-  - id: main_drive
-    protocol: gpio
-
+- id: main_drive
+  protocol: gpio
 network:
   allow_remote_override: false
-
 rcan_protocol:
   enable_mdns: true
-
 loa:
   enforcement: true
   min_loa_for_control: 1
-
 federation:
   enabled: false
   require_federation_trust: false
-
 safety:
   p66_enabled: true
   local_safety_wins: true
   emergency_stop_distance: 0.4
-
 p66:
   enabled: true
   loa_enforcement: true
   consent_required: true
+fria_ref: null

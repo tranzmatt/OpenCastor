@@ -1,5 +1,4 @@
-rcan_version: '1.6'
-
+rcan_version: '3.0'
 metadata:
   robot_name: Alex
   robot_uuid: 00000005-0000-4000-8000-000000000005
@@ -7,12 +6,10 @@ metadata:
   author: craigm26
   rrn: RRN-000000000005
   rrn_uri: rrn://craigm26/robot/opencastor-pi5-arm/alex-001
-  # §2 required fields for L1 conformance
   manufacturer: OpenCastor
   model: SO-ARM101-Pi5
   version: '1.0'
   device_id: alex-001
-
 agent:
   provider: google
   model: gemini-2.5-flash
@@ -22,87 +19,77 @@ agent:
   latency_budget_ms: 3000
   offline_provider: ollama
   confidence_gates:
-    - scope: control
-      min_confidence: 0.75
-      on_fail: block
-    - scope: safety
-      min_confidence: 0.90
-      on_fail: block
-  # §16 L3 conformance — human-in-the-loop gates for physical actions
+  - scope: control
+    min_confidence: 0.75
+    on_fail: block
+  - scope: safety
+    min_confidence: 0.9
+    on_fail: block
   hitl_gates:
-    - action_types:
-        - move
-        - actuate
-        - grip
-        - rotate
-        - extend
-        - retract
-      require_auth: true
-      on_fail: block
-      timeout_s: 30
-
+  - action_types:
+    - move
+    - actuate
+    - grip
+    - rotate
+    - extend
+    - retract
+    require_auth: true
+    on_fail: block
+    timeout_s: 30
 tiered_brain:
   fast_provider: ollama
   fast_model: gemma3:1b
   slow_provider: google
   slow_model: gemini-2.5-flash
   planner_interval: 10
-  _note: "Fast tier handles quick status/nav. Slow tier handles complex reasoning and vision."
-
+  _note: Fast tier handles quick status/nav. Slow tier handles complex reasoning and
+    vision.
 agent_roster:
-  - id: nav_specialist
-    provider: ollama
-    model: gemma3:4b
-    scope: nav
-  - id: arm_specialist
-    provider: google
-    model: gemini-2.5-flash
-    scope: control
-
+- id: nav_specialist
+  provider: ollama
+  model: gemma3:4b
+  scope: nav
+- id: arm_specialist
+  provider: google
+  model: gemini-2.5-flash
+  scope: control
 geofence:
   enabled: false
-  _note: "Set enabled: true and define boundary polygon when deploying in a bounded space."
+  _note: 'Set enabled: true and define boundary polygon when deploying in a bounded
+    space.'
   boundary:
     type: none
-
 physics:
   type: ackermann
   dof: 2
-
 drivers:
-  - id: main_drive
-    protocol: gpio
-  - id: arm_controller
-    protocol: feetech_sts3215
-
+- id: main_drive
+  protocol: gpio
+- id: arm_controller
+  protocol: feetech_sts3215
 reactive:
   min_obstacle_m: 0.3
   fallback_provider: ollama
-
 safety:
   local_safety_wins: true
   emergency_stop_distance: 0.4
   estop_bypass_rate_limit: true
   watchdog:
     timeout_s: 10
-
 hardware_safety:
   physical_estop: false
   hardware_watchdog_mcu: false
-  _note: "Software-only safety layer. Physical ESTOP + STM32 watchdog planned (HARDWARE_001)."
-
+  _note: Software-only safety layer. Physical ESTOP + STM32 watchdog planned (HARDWARE_001).
 p66:
   enabled: true
   loa_enforcement: true
   consent_required: true
   manifest:
     estop_qos_bypass: true
-
 consent:
   required: true
   mode: explicit
   scope_threshold: control
-
 security:
   replay_protection:
     enabled: true
@@ -110,118 +97,99 @@ security:
   signing:
     enabled: false
     algorithm: Ed25519
-    _note: "Message signing enabled when key pair provisioned via 'castor keygen'"
-
+    _note: Message signing enabled when key pair provisioned via 'castor keygen'
 loa:
   enforcement: true
   min_loa_for_control: 1
-  _note: "LoA enforcement enabled. Requires LoA ≥ 1 (authenticated) for control commands."
-
+  _note: LoA enforcement enabled. Requires LoA ≥ 1 (authenticated) for control commands.
 human_identity:
   loa_required: 1
-  _note: "LoA 1 = authenticated user. Upgrade to 2 (verified) for physical commands in production."
-
+  _note: LoA 1 = authenticated user. Upgrade to 2 (verified) for physical commands
+    in production.
 federation:
   enabled: true
   consent_bridge: false
   peer_rrns:
-    - RRN-000000000001
-
+  - RRN-000000000001
 transport:
   supported:
-    - http
-    - mqtt
+  - http
+  - mqtt
   constrained_enabled: false
-  _note: "MQTT support via paho-mqtt bridge. CoAP planned for v1.7."
-
+  _note: MQTT support via paho-mqtt bridge. CoAP planned for v1.7.
 multimodal:
   enabled: true
   max_chunk_bytes: 1048576
-
 offline:
   enabled: true
   fallback_provider: ollama
-
 cameras:
   oak_d:
     type: http
     url: http://127.0.0.1:8765/snapshot
-    _note: "OAK-D camera proxy — start with: sudo systemctl start oak-camera-proxy"
-
+    _note: 'OAK-D camera proxy — start with: sudo systemctl start oak-camera-proxy'
 network:
   allow_remote_override: false
-
 rcan_protocol:
   port: 8000
   capabilities:
-    - status
-    - nav
-    - teleop
-    - vision
-    - chat
-    - arm
-    - gripper
+  - status
+  - nav
+  - teleop
+  - vision
+  - chat
+  - arm
+  - gripper
   enable_mdns: true
   enable_jwt: false
-  # §8 L2 conformance — JWT validation mode (enforcement in rcan_bridge)
   jwt_auth:
     enabled: true
     algorithm: HS256
     require_rrn_claim: true
-
 r2ram:
   scopes:
-    - discover
-    - status
-    - chat
-    - control
-    - safety
-
+  - discover
+  - status
+  - chat
+  - control
+  - safety
 owner: rrn://craigm26/robot/opencastor-pi5-arm/alex-001
 firebase_uid: '104403823389784903319'
-
 cloud:
   firebase_project: opencastor
   gateway_url: http://127.0.0.1:8000
   credentials: /home/craigm26/.config/opencastor/firebase-sa-key.json
   telemetry_interval_s: 30
   poll_interval_s: 5
-
-# ── Production-grade harness components (all opt-in) ──────────────────────────
-
 circuit_breaker:
   enabled: true
   failure_threshold: 3
   cooldown_s: 300
   half_open_probe: true
-
 rollback:
   enabled: true
-
 dlq:
   enabled: true
-
 prompt_guard:
   enabled: true
   block_threshold: 0.5
-
 context_compressor:
-  enabled: false  # enable when history gets long
+  enabled: false
   trigger_at: 0.8
   summary_model: gemma3:1b
   keep_recent: 5
-
 working_memory:
   enabled: true
   max_keys: 50
   log_to_trajectory: true
-
 span_tracer:
   enabled: true
   max_trace_age_days: 7
-
 cost_meter:
   enabled: true
   budget_usd: 0.05
   alert_at: 0.8
   model: gemini-2.5-flash
+firmware_hash: null
+attestation_ref: null
+fria_ref: null

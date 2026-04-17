@@ -114,10 +114,14 @@ safety:
   watchdog:
     timeout_s: 10
 notes:
-  wiring: "TB6612FNG wired to Raspberry Pi GPIO header. Power: VM pin to battery (5\u2013\
-    15V), VCC to 5V, GND shared. Motor A = left track, Motor B = right track.\n"
-  camera_setup: "Enable Pi Camera via raspi-config \u2192 Interface Options \u2192\
-    \ Camera. Install picamera2: sudo apt install python3-picamera2\n"
+  wiring: 'TB6612FNG wired to Raspberry Pi GPIO header. Power: VM pin to battery (5–15V),
+    VCC to 5V, GND shared. Motor A = left track, Motor B = right track.
+
+    '
+  camera_setup: 'Enable Pi Camera via raspi-config → Interface Options → Camera. Install
+    picamera2: sudo apt install python3-picamera2
+
+    '
   gpio_library: 'Uses RPi.GPIO or pigpio for direct motor control. Install: sudo apt
     install python3-rpi.gpio pigpio alternative: sudo apt install pigpio python3-pigpio
 
@@ -197,12 +201,4 @@ federation:
   consent_bridge: false
 firmware_hash: null
 attestation_ref: null
-_migration_warnings:
-- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
-  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
-  \ rejects Ed25519-only profiles at L2+."
-- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
-  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
-  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
-  \ will be rejected at registration under L2+ conformance."
 fria_ref: null

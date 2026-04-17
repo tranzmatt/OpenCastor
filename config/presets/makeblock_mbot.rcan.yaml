@@ -12,12 +12,13 @@ metadata:
   - arduino
   - stem
   - second-hand
-  description: "Makeblock mBot \u2014 one of the most popular STEM toy robots ever\
-    \ made (~$50 new). Abundantly available on eBay, Amazon Warehouse, and Goodwill.\
-    \ Based on the Makeblock Orion board (Arduino Mega-compatible) with integrated\
-    \ TB6612FNG dual motor driver. Connects via USB serial, 2.4GHz wireless module,\
-    \ or BLE dongle. Two DC gearmotors (6V, 200 RPM), ultrasonic sensor, line-follower\
-    \ sensor, buzzer.\n"
+  description: 'Makeblock mBot — one of the most popular STEM toy robots ever made
+    (~$50 new). Abundantly available on eBay, Amazon Warehouse, and Goodwill. Based
+    on the Makeblock Orion board (Arduino Mega-compatible) with integrated TB6612FNG
+    dual motor driver. Connects via USB serial, 2.4GHz wireless module, or BLE dongle.
+    Two DC gearmotors (6V, 200 RPM), ultrasonic sensor, line-follower sensor, buzzer.
+
+    '
   rrn: RRN-561092813372
   rrn_uri: rrn://community/robot/opencastor/makeblock-mbot/makeblock_mbot
 agent:
@@ -97,10 +98,12 @@ notes:
     \ \"Makeblock default firmware\" (Scratch firmware) to the mCore.\n   This firmware\
     \ accepts the serial command protocol OpenCastor uses.\n3. pip install pyserial\
     \ makeblock (community Python library) 4. castor run --config makeblock_mbot.rcan.yaml\n"
-  second_hand_tips: "Check that the USB-B port on the mCore board is not damaged (very\
-    \ common). The Orion board is the older larger version; mCore is the integrated\
-    \ newer one. Both are compatible with this preset. BLE 2.4G modules can be missing\
-    \ \u2014 USB serial always works as a fallback.\n"
+  second_hand_tips: 'Check that the USB-B port on the mCore board is not damaged (very
+    common). The Orion board is the older larger version; mCore is the integrated
+    newer one. Both are compatible with this preset. BLE 2.4G modules can be missing
+    — USB serial always works as a fallback.
+
+    '
 tiered_brain:
   fast_provider: ollama
   fast_model: gemma3:1b
@@ -181,12 +184,4 @@ federation:
   consent_bridge: false
 firmware_hash: null
 attestation_ref: null
-_migration_warnings:
-- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
-  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
-  \ rejects Ed25519-only profiles at L2+."
-- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
-  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
-  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
-  \ will be rejected at registration under L2+ conformance."
 fria_ref: null

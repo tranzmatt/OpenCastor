@@ -12,10 +12,12 @@ metadata:
   - research
   - outdoor
   - lidar
-  description: "Unitree Go2 \u2014 a dynamic quadruped research platform with 12-DOF\
-    \ legged locomotion, Hesai XT16 3D lidar, and stereo depth camera. Capable of\
-    \ traversing complex terrain indoors and outdoors. Controlled via Unitree SDK2\
-    \ (Python/C++) over Ethernet or WiFi. Max speed ~3.7 m/s.\n"
+  description: 'Unitree Go2 — a dynamic quadruped research platform with 12-DOF legged
+    locomotion, Hesai XT16 3D lidar, and stereo depth camera. Capable of traversing
+    complex terrain indoors and outdoors. Controlled via Unitree SDK2 (Python/C++)
+    over Ethernet or WiFi. Max speed ~3.7 m/s.
+
+    '
   rrn: RRN-503513744940
   rrn_uri: rrn://community/robot/opencastor/unitree-go2/unitree_go2
 agent:
@@ -116,12 +118,14 @@ notes:
 
     '
   hardware:
-    compute: "Unitree internal PC (Intel\xAE RealSense\u2122 Vision)"
+    compute: Unitree internal PC (Intel® RealSense™ Vision)
     lidar: Hesai XT16 (16-channel 3D, 120m range)
     battery: 5200mAh (approx 1-2h runtime)
     max_payload_kg: 5.0
-  warning: "High-power legged robot \u2014 clear the area before operation. Always\
-    \ engage e-stop when near people. Never operate at full speed (3.7 m/s) indoors.\n"
+  warning: 'High-power legged robot — clear the area before operation. Always engage
+    e-stop when near people. Never operate at full speed (3.7 m/s) indoors.
+
+    '
 tiered_brain:
   fast_provider: ollama
   fast_model: gemma3:1b
@@ -192,12 +196,4 @@ federation:
   consent_bridge: false
 firmware_hash: null
 attestation_ref: null
-_migration_warnings:
-- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
-  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
-  \ rejects Ed25519-only profiles at L2+."
-- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
-  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
-  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
-  \ will be rejected at registration under L2+ conformance."
 fria_ref: null

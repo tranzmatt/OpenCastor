@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: PiCar
   robot_uuid: 00000010-0000-4000-8000-000000000001
@@ -109,3 +109,6 @@ cameras:
   main:
     type: http
     url: http://127.0.0.1:8765/snapshot
+firmware_hash: null
+attestation_ref: null
+fria_ref: null

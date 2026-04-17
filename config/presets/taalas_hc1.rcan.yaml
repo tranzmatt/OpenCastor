@@ -28,12 +28,4 @@ tiered_brain:
   planner_interval: 999999
 firmware_hash: null
 attestation_ref: null
-_migration_warnings:
-- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
-  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
-  \ rejects Ed25519-only profiles at L2+."
-- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
-  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
-  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
-  \ will be rejected at registration under L2+ conformance."
 fria_ref: null

@@ -12,10 +12,12 @@ metadata:
   - arduino
   - esp32
   - beginner
-  description: "Freenove 4WD Smart Car Kit \u2014 a popular STEM robot available in\
-    \ Arduino Uno and ESP32 variants. Four DC motors with differential drive, HC-SR04\
-    \ ultrasonic obstacle avoidance, IR line-following sensors, and optional servo\
-    \ pan camera. Arduino variant controlled via serial JSON; ESP32 variant via WebSocket.\n"
+  description: 'Freenove 4WD Smart Car Kit — a popular STEM robot available in Arduino
+    Uno and ESP32 variants. Four DC motors with differential drive, HC-SR04 ultrasonic
+    obstacle avoidance, IR line-following sensors, and optional servo pan camera.
+    Arduino variant controlled via serial JSON; ESP32 variant via WebSocket.
+
+    '
   rrn: RRN-610516058522
   rrn_uri: rrn://community/robot/opencastor/freenove-4wd-smart-car/freenove_4wd
 agent:
@@ -118,10 +120,12 @@ notes:
     mcu_option_2: ESP32-WROOM-32 (WiFi WebSocket)
     motor_driver: L298N dual H-bridge
     ultrasonic: HC-SR04
-    line_sensors: "3\xD7 IR reflective sensor (TCRT5000)"
-    battery: "7.4V 2S LiPo or 6\xD7 AA"
-  purchase: "Kit available on Amazon (~$30\u201350). Includes all hardware, chassis,\
-    \ Freenove tutorial code, and detailed PDF guide. Great first robot.\n"
+    line_sensors: 3× IR reflective sensor (TCRT5000)
+    battery: 7.4V 2S LiPo or 6× AA
+  purchase: 'Kit available on Amazon (~$30–50). Includes all hardware, chassis, Freenove
+    tutorial code, and detailed PDF guide. Great first robot.
+
+    '
 tiered_brain:
   fast_provider: ollama
   fast_model: gemma3:1b
@@ -196,12 +200,4 @@ federation:
   consent_bridge: false
 firmware_hash: null
 attestation_ref: null
-_migration_warnings:
-- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
-  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
-  \ rejects Ed25519-only profiles at L2+."
-- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
-  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
-  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
-  \ will be rejected at registration under L2+ conformance."
 fria_ref: null

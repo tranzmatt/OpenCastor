@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: Alex
   robot_uuid: 00000005-0000-4000-8000-000000000005
@@ -122,3 +122,6 @@ rcan_protocol:
   - gripper
   enable_mdns: true
   enable_jwt: false
+firmware_hash: null
+attestation_ref: null
+fria_ref: null
