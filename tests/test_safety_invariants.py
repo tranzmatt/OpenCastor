@@ -687,7 +687,7 @@ class TestV15SafetyInvariants:
         """castor.rcan.message declares RCAN_SPEC_VERSION (2.2 as of v2026.3.27.0)."""
         from castor.rcan.message import RCAN_SPEC_VERSION
 
-        assert RCAN_SPEC_VERSION in ("2.2", "2.2.0", "2.1", "2.1.0", "1.9"), (
+        assert RCAN_SPEC_VERSION in ("3.0", "2.2", "2.2.0", "2.1", "2.1.0", "1.9"), (
             f"RCAN_SPEC_VERSION is {RCAN_SPEC_VERSION!r}, expected 2.2"
         )
 
@@ -697,10 +697,10 @@ class TestV15SafetyInvariants:
 
         manifest = build_manifest()
         # v1.8: canonical MessageType table
-        assert manifest.get("rcan_version") in ("1.5", "1.6", "1.8", "1.9", "2.1", "2.2"), (
+        assert manifest.get("rcan_version") in ("1.5", "1.6", "1.8", "1.9", "2.1", "2.2", "3.0"), (
             f"rcan_version in P66 manifest, got {manifest.get('rcan_version')!r}"
         )
-        assert manifest.get("rcan_spec_version") in ("1.5", "1.6", "1.8", "1.9", "2.1", "2.2")
+        assert manifest.get("rcan_spec_version") in ("1.5", "1.6", "1.8", "1.9", "2.1", "2.2", "3.0")
 
     def test_outgoing_message_includes_rcan_version(self):
         """RCANMessage.to_dict() includes rcan_version field."""
@@ -714,7 +714,7 @@ class TestV15SafetyInvariants:
         )
         d = msg.to_dict()
         assert "rcan_version" in d, "rcan_version field must be present in outgoing message"
-        assert d["rcan_version"] in ("2.2", "2.2.0", "2.1", "2.1.0", "1.9"), (
+        assert d["rcan_version"] in ("3.0", "2.2", "2.2.0", "2.1", "2.1.0", "1.9"), (
             f"rcan_version in outgoing message is {d['rcan_version']!r}, expected 2.2"
         )
 
