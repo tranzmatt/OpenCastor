@@ -6,6 +6,40 @@ Versions use date-based scheme: `YYYY.MM.DD.patch`.
 
 ---
 
+## [2026.4.17.0] - 2026-04-17
+
+### Changed — RCAN 3.0 alignment
+- Bumped `castor.rcan.message.RCAN_SPEC_VERSION` and `castor.migrate.CURRENT_VERSION`
+  to "3.0", matching the already-bumped `castor.compliance.SPEC_VERSION`.
+- Added migration chain `2.1 → 2.2 → 3.0`. Operators can upgrade old configs with
+  `castor migrate --config path/to/bot.rcan.yaml`.
+- Migrated all 21 hardware presets (`config/presets/*.yaml`) and
+  `examples/bob-reference.rcan.yaml` to `rcan_version: '3.0'` with `fria_ref`
+  placeholders.
+- Swept hardcoded `rcan_version` defaults across `api.py`, `rrf_cmd.py`,
+  `skills/rcan_skills.py`, `rcan_generator.py`, `init_config.py`,
+  `web_wizard/server.py`, `hardware/so_arm101/config_generator.py`,
+  `safety/p66_manifest.py`, `cli.py`, `wizard.py`, `init_wizard.py`,
+  `setup_service.py`, `mcp_server.py`, and `cloud/bridge.py`.
+- `cli.py` ISO 42001 conformance check ("RCAN version ≥ 2.0") made
+  version-agnostic so it passes for v3.0.
+- `CLAUDE.md` now declares v3.0 instead of the stale v1.9.0 claim.
+
+### Added
+- `tests/test_rcan_version_alignment.py` — regression test that locks the
+  invariant that `compliance.SPEC_VERSION`, `rcan.message.RCAN_SPEC_VERSION`,
+  and `migrate.CURRENT_VERSION` agree. Future drift is caught in CI.
+- `tests/test_migrate_3_0.py` — covers the new 2.1→2.2 and 2.2→3.0 migrations.
+
+### Operator action required
+- Configs upgraded to v3.0 include a `fria_ref: null` placeholder. Annex III
+  high-risk deployments MUST run `castor fria generate` and populate
+  `fria_ref` with the signed FRIA document URI before L2+ registration.
+- Configs using `signing_alg: ed25519` must switch to `ml-dsa-65` or
+  `pqc-hybrid-v1` — v3.0 rejects Ed25519-only profiles at L2+ (§9).
+
+---
+
 ## [2026.4.15.0] - 2026-04-15
 
 ### Added
