@@ -272,10 +272,10 @@ class TestRCANv12Messages:
 
 
 class TestRCANv22EnvelopeFields:
-    """RCAN v2.2 — new envelope fields, DelegationHop, MediaChunk."""
+    """RCAN v3.0 — EU AI Act compliance (§23-§27), fria_ref, mandatory pqc-hybrid-v1."""
 
     def test_spec_version_is_2_2(self):
-        assert RCAN_SPEC_VERSION == "2.2"
+        assert RCAN_SPEC_VERSION == "3.0"
 
     def test_rcan_message_has_new_fields_with_defaults(self):
         msg = RCANMessage(

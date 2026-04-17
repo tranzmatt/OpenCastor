@@ -42,7 +42,7 @@ from typing import Any, Optional
 log = logging.getLogger(__name__)
 
 # RCAN spec version implemented by this module
-RCAN_SPEC_VERSION = "2.2"
+RCAN_SPEC_VERSION = "3.0"
 
 
 class MessageType(IntEnum):
