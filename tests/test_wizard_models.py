@@ -109,10 +109,13 @@ class TestChooseModel:
         m = choose_model("openai")
         assert m["id"] == "gpt-4o"
 
+    @patch("castor.wizard._choose_model_dynamic", return_value=None)
     @patch("builtins.input", return_value="99")
-    def test_invalid_defaults_to_first(self, _):
+    def test_invalid_defaults_to_first(self, _input, _fetch):
+        # Force the static-fallback path so we test "invalid choice → MODELS[0]"
+        # without the dynamic-fetch menu shuffling which model is at index 0.
         m = choose_model("anthropic")
-        assert m["id"] == "claude-opus-4-6"
+        assert m["id"] == MODELS["anthropic"][0]["id"]
 
 
 class TestBuildAgentConfig:
