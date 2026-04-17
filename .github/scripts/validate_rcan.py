@@ -31,6 +31,8 @@ ACCEPTED_RCAN_VERSIONS = {
     "2.2",  # RCAN v2.2 — ML-DSA-65 primary, dual-brain, fleet scope
     "2.2.0",
     "2.2.1",
+    "3.0",  # RCAN v3.0 — current spec; FRIA, SafetyBenchmark, rcan-py 2.0
+    "3.0.0",
 }
 
 
