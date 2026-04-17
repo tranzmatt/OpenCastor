@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: TurtleBot3_Burger
   robot_uuid: bc7bfa45-e015-4c1d-a371-f494bb180dea
@@ -12,12 +12,10 @@ metadata:
   - educational
   - indoor
   - lidar
-  description: 'TurtleBot3 Burger by ROBOTIS — the canonical entry-level ROS2 mobile
-    robot. Differential drive on two wheels, Raspberry Pi 4 running ROS2, OpenCR MCU
-    for motor/sensor control, LDS-01 360° lidar, and an IMU. Used worldwide in robotics
-    courses and research labs.
-
-    '
+  description: "TurtleBot3 Burger by ROBOTIS \u2014 the canonical entry-level ROS2\
+    \ mobile robot. Differential drive on two wheels, Raspberry Pi 4 running ROS2,\
+    \ OpenCR MCU for motor/sensor control, LDS-01 360\xB0 lidar, and an IMU. Used\
+    \ worldwide in robotics courses and research labs.\n"
   rrn: RRN-095398009948
   rrn_uri: rrn://community/robot/opencastor/turtlebot3-burger/turtlebot3_burger
 agent:
@@ -98,7 +96,7 @@ notes:
   hardware:
     compute: Raspberry Pi 4 (2GB+ recommended)
     mcu: OpenCR 1.0 (STM32F746)
-    lidar: ROBOTIS LDS-01 (360° 2D, 3.5m range)
+    lidar: "ROBOTIS LDS-01 (360\xB0 2D, 3.5m range)"
     battery: Li-Po 11.1V 1800mAh
 tiered_brain:
   fast_provider: ollama
@@ -172,3 +170,14 @@ r2ram:
 federation:
   enabled: true
   consent_bridge: false
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null

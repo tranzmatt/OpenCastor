@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: Yahboom_ROSMASTER_X3
   robot_uuid: ae5ee266-f9dd-4025-8eb9-2e0cff2ebfbf
@@ -12,12 +12,10 @@ metadata:
   - raspberry-pi
   - stem
   - amazon
-  description: 'Yahboom ROSMASTER X3 — a popular ROS2 learning kit (~$150-200 on Amazon).
-    Features mecanum wheels for holonomic motion, Raspberry Pi 4/5 host, and a Yahboom
-    expansion board with PCA9685 PWM controller. Comes with RGB LEDs, ultrasonic sensor,
-    and optional camera/LiDAR. Excellent for learning ROS2.
-
-    '
+  description: "Yahboom ROSMASTER X3 \u2014 a popular ROS2 learning kit (~$150-200\
+    \ on Amazon). Features mecanum wheels for holonomic motion, Raspberry Pi 4/5 host,\
+    \ and a Yahboom expansion board with PCA9685 PWM controller. Comes with RGB LEDs,\
+    \ ultrasonic sensor, and optional camera/LiDAR. Excellent for learning ROS2.\n"
   rrn: RRN-236080450958
   rrn_uri: rrn://community/robot/opencastor/yahboom-rosmaster-x3/yahboom_rosmaster
 agent:
@@ -111,7 +109,7 @@ rcan_protocol:
 notes:
   setup: "1. Flash Yahboom's official Raspberry Pi image (Ubuntu 22.04 + ROS2 Humble),\n\
     \   or install OpenCastor on a stock Raspberry Pi OS.\n2. Enable I2C: sudo raspi-config\
-    \ → Interfaces → I2C → Enable 3. pip install opencastor adafruit-circuitpython-pca9685\
+    \ \u2192 Interfaces \u2192 I2C \u2192 Enable 3. pip install opencastor adafruit-circuitpython-pca9685\
     \ 4. castor run --config yahboom_rosmaster.rcan.yaml\n"
   second_hand_tips: 'The ROSMASTER appears on Amazon Warehouse deals, eBay, and occasionally
     in university robotics lab surplus. Check that the Raspberry Pi is included (sometimes
@@ -196,3 +194,14 @@ r2ram:
 federation:
   enabled: true
   consent_bridge: false
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null

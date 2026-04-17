@@ -1,5 +1,4 @@
-rcan_version: "1.6.1"
-
+rcan_version: '3.0'
 metadata:
   robot_name: taalas-demo
   robot_uuid: a7d3c821-4f9e-4b1e-b5e2-8f0e6c2d1a93
@@ -8,24 +7,33 @@ metadata:
   author: OpenCastor Default
   license: Apache-2.0
   tags:
-    - high-hz
-    - asic
-    - inference
-    - closed-loop
-  description: >
-    High-Hz preset for Taalas HC1 ASIC inference (17K tokens/sec
-    on Llama 3.1 8B).  Designed for closed-loop motor control at
-    50-100+ Hz when paired with a fast camera and low-latency driver.
+  - high-hz
+  - asic
+  - inference
+  - closed-loop
+  description: 'High-Hz preset for Taalas HC1 ASIC inference (17K tokens/sec on Llama
+    3.1 8B).  Designed for closed-loop motor control at 50-100+ Hz when paired with
+    a fast camera and low-latency driver.
 
+    '
 agent:
   provider: taalas
   model: llama-3.1-8b
-  endpoint_url: "http://localhost:8000"
+  endpoint_url: http://localhost:8000
   latency_budget_ms: 10
   loop_sleep_s: 0
-
 safety:
   motor_rate_hz: 100
-
 tiered_brain:
-  planner_interval: 999999  # effectively disabled — fast-only, no planner escalation
+  planner_interval: 999999
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null

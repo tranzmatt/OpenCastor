@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: Arduino_L298N_Generic
   robot_uuid: 0f434900-cfba-4fe2-8803-d2bf5ee969d0
@@ -13,13 +13,11 @@ metadata:
   - stem
   - second-hand
   - generic
-  description: 'Generic Arduino (Uno/Mega/Nano) + L298N dual H-bridge motor driver
-    — the most common DIY robotics combo in the world. Found at every makerspace,
-    hackerspace, school electronics lab, and Goodwill bin. Communicates via USB serial
-    using a simple JSON or line-protocol firmware. Supports 2-4 DC motors, servo,
-    and analog/digital sensors.
-
-    '
+  description: "Generic Arduino (Uno/Mega/Nano) + L298N dual H-bridge motor driver\
+    \ \u2014 the most common DIY robotics combo in the world. Found at every makerspace,\
+    \ hackerspace, school electronics lab, and Goodwill bin. Communicates via USB\
+    \ serial using a simple JSON or line-protocol firmware. Supports 2-4 DC motors,\
+    \ servo, and analog/digital sensors.\n"
   rrn: RRN-229395354707
   rrn_uri: rrn://community/robot/opencastor/arduino-l298n-generic/arduino_l298n
 agent:
@@ -100,14 +98,14 @@ rcan_protocol:
 notes:
   firmware: "Flash firmware/arduino_l298n_bridge.ino with Arduino IDE. The sketch\
     \ reads JSON commands on Serial and replies with sensor JSON:\n  {\"cmd\":\"drive\"\
-    ,\"left\":150,\"right\":150}  → move\n  {\"cmd\":\"stop\"}                   \
-    \        → emergency stop\n  {\"cmd\":\"sensor\",\"id\":\"hcsr04\"}          \
-    \ → get distance\n"
+    ,\"left\":150,\"right\":150}  \u2192 move\n  {\"cmd\":\"stop\"}              \
+    \             \u2192 emergency stop\n  {\"cmd\":\"sensor\",\"id\":\"hcsr04\"}\
+    \           \u2192 get distance\n"
   wiring_cheatsheet:
     l298n_power: Connect 12V to L298N VCC, GND to L298N GND and Arduino GND.
-    motor_a: Motor A → OUT1 and OUT2 on L298N
-    motor_b: Motor B → OUT3 and OUT4 on L298N
-    logic: L298N 5V → Arduino 5V (if jumper present, else skip)
+    motor_a: "Motor A \u2192 OUT1 and OUT2 on L298N"
+    motor_b: "Motor B \u2192 OUT3 and OUT4 on L298N"
+    logic: "L298N 5V \u2192 Arduino 5V (if jumper present, else skip)"
   second_hand_tips: 'Arduino Uno clones with CH340 USB chip are everywhere and cost
     ~$3. The L298N module (blue or red board) is ~$2. Total BOM under $15 including
     chassis. Check eBay, AliExpress, and school makerspace scrap bins.
@@ -191,3 +189,14 @@ r2ram:
 federation:
   enabled: true
   consent_bridge: false
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null

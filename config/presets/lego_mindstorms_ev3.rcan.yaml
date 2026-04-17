@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: LEGO_Mindstorms_EV3
   robot_uuid: 41d2f29e-6c70-4d56-b85f-c32472f0b842
@@ -12,12 +12,10 @@ metadata:
   - ev3
   - stem
   - second-hand
-  description: 'LEGO Mindstorms EV3 — extremely common in school surplus sales and
-    donations. Uses the ev3dev Linux OS with Python driver. Large motors on output
-    ports A/D (drive), medium motor on B (arm/gripper). Touch, color, and ultrasonic
-    sensors on input ports 1-4.
-
-    '
+  description: "LEGO Mindstorms EV3 \u2014 extremely common in school surplus sales\
+    \ and donations. Uses the ev3dev Linux OS with Python driver. Large motors on\
+    \ output ports A/D (drive), medium motor on B (arm/gripper). Touch, color, and\
+    \ ultrasonic sensors on input ports 1-4.\n"
   rrn: RRN-894461094746
   rrn_uri: rrn://community/robot/opencastor/lego-mindstorms-ev3/lego_mindstorms_ev3
 agent:
@@ -187,3 +185,14 @@ r2ram:
 federation:
   enabled: true
   consent_bridge: false
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null

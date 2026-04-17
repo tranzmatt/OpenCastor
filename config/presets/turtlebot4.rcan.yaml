@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: TurtleBot4
   robot_uuid: 69d9bcc4-a71f-4b5b-adfe-cf7429598186
@@ -12,12 +12,10 @@ metadata:
   - research
   - indoor
   - oak-d
-  description: 'TurtleBot4 — co-developed by iRobot and ROBOTIS. Built on the iRobot
-    Create3 mobile base with a Raspberry Pi 4 and OAK-D Lite stereo depth camera +
-    360° lidar. The flagship ROS2 research and teaching platform with integrated autonomous
-    charging via the Create3 home base.
-
-    '
+  description: "TurtleBot4 \u2014 co-developed by iRobot and ROBOTIS. Built on the\
+    \ iRobot Create3 mobile base with a Raspberry Pi 4 and OAK-D Lite stereo depth\
+    \ camera + 360\xB0 lidar. The flagship ROS2 research and teaching platform with\
+    \ integrated autonomous charging via the Create3 home base.\n"
   rrn: RRN-498477532735
   rrn_uri: rrn://community/robot/opencastor/turtlebot4/turtlebot4
 agent:
@@ -111,16 +109,14 @@ safety:
   watchdog:
     timeout_s: 10
 notes:
-  setup: 'Requires ROS2 Humble on Raspberry Pi 4. Create3 firmware must be ≥ G.4.1
-    for full ROS2 support. Install turtlebot4 packages: sudo apt install ros-humble-turtlebot4-robot
-    Launch: ros2 launch turtlebot4_bringup standard.launch.py
-
-    '
+  setup: "Requires ROS2 Humble on Raspberry Pi 4. Create3 firmware must be \u2265\
+    \ G.4.1 for full ROS2 support. Install turtlebot4 packages: sudo apt install ros-humble-turtlebot4-robot\
+    \ Launch: ros2 launch turtlebot4_bringup standard.launch.py\n"
   hardware:
     compute: Raspberry Pi 4 (4GB recommended)
     base: iRobot Create3 (autonomous charging)
     camera: Luxonis OAK-D Lite (RGB + stereo depth)
-    lidar: RPLIDAR A1M8 (360°, 12m range)
+    lidar: "RPLIDAR A1M8 (360\xB0, 12m range)"
 tiered_brain:
   fast_provider: ollama
   fast_model: gemma3:1b
@@ -189,3 +185,14 @@ r2ram:
 federation:
   enabled: true
   consent_bridge: false
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null

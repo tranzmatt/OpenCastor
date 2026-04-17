@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: SunFounder_PiCar-X
   robot_uuid: 4a10cef1-a7b0-4e09-a3b5-fc37016edf11
@@ -11,12 +11,10 @@ metadata:
   - stem
   - raspberry-pi
   - beginner
-  description: 'SunFounder PiCar-X — a Raspberry Pi-based Ackermann-steering robot
-    car for STEM learning. Features front-wheel servo steering, rear-wheel DC motor
-    drive, servo-mounted Pi Camera for pan/tilt vision, and HC-SR04 ultrasonic sensor.
-    Controlled via SunFounder''s picar-x Python library over GPIO/I2C.
-
-    '
+  description: "SunFounder PiCar-X \u2014 a Raspberry Pi-based Ackermann-steering\
+    \ robot car for STEM learning. Features front-wheel servo steering, rear-wheel\
+    \ DC motor drive, servo-mounted Pi Camera for pan/tilt vision, and HC-SR04 ultrasonic\
+    \ sensor. Controlled via SunFounder's picar-x Python library over GPIO/I2C.\n"
   rrn: RRN-421410179406
   rrn_uri: rrn://community/robot/opencastor/sunfounder-picar-x/sunfounder_picar_x
 agent:
@@ -118,11 +116,9 @@ safety:
   watchdog:
     timeout_s: 10
 notes:
-  setup: 'Install picar-x library: pip3 install picar-x Enable I2C on Pi: sudo raspi-config
-    → Interfaces → I2C → Enable Run calibration: cd /opt/picar-x && python3 calibration.py
-    Library docs: https://docs.sunfounder.com/projects/picar-x
-
-    '
+  setup: "Install picar-x library: pip3 install picar-x Enable I2C on Pi: sudo raspi-config\
+    \ \u2192 Interfaces \u2192 I2C \u2192 Enable Run calibration: cd /opt/picar-x\
+    \ && python3 calibration.py Library docs: https://docs.sunfounder.com/projects/picar-x\n"
   hardware:
     compute: Raspberry Pi 4 or 3B+
     camera: Raspberry Pi Camera Module v2 (5MP)
@@ -197,3 +193,14 @@ r2ram:
 federation:
   enabled: true
   consent_bridge: false
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null

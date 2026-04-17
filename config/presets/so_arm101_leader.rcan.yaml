@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: SO-ARM101_Leader
   robot_uuid: e7cf3975-06a4-47de-a6c6-db9df0f17dff
@@ -12,15 +12,13 @@ metadata:
   - leader-follower
   - so-arm101
   - lerobot
-  description: 'SO-ARM101 Leader Arm — the leader (input) unit in a leader-follower
-    teleoperation pair using Feetech STS3215 serial bus servos. The operator physically
-    moves this arm; joint positions are streamed to a follower arm for imitation learning
-    and teleoperation (e.g., HuggingFace LeRobot, ACT, Diffusion Policy). 6-DOF: shoulder_pan,
-    shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper. No independent locomotion.
-    Motor IDs: shoulder_pan=1, shoulder_lift=2, elbow_flex=3, wrist_flex=4, wrist_roll=5,
-    gripper=6.
-
-    '
+  description: "SO-ARM101 Leader Arm \u2014 the leader (input) unit in a leader-follower\
+    \ teleoperation pair using Feetech STS3215 serial bus servos. The operator physically\
+    \ moves this arm; joint positions are streamed to a follower arm for imitation\
+    \ learning and teleoperation (e.g., HuggingFace LeRobot, ACT, Diffusion Policy).\
+    \ 6-DOF: shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper.\
+    \ No independent locomotion. Motor IDs: shoulder_pan=1, shoulder_lift=2, elbow_flex=3,\
+    \ wrist_flex=4, wrist_roll=5, gripper=6.\n"
   rrn: RRN-080494819323
   rrn_uri: rrn://community/robot/opencastor/so-arm101-leader/so_arm101_leader
 agent:
@@ -173,18 +171,16 @@ notes:
     gripper=6
 
     '
-  role: 'LEADER arm only — this config is for the human-operated input arm. Deploy
-    a separate so_arm101_follower.rcan.yaml on the follower unit. Teleoperation stream:
-    joint positions broadcast at ~50Hz to follower.
-
-    '
+  role: "LEADER arm only \u2014 this config is for the human-operated input arm. Deploy\
+    \ a separate so_arm101_follower.rcan.yaml on the follower unit. Teleoperation\
+    \ stream: joint positions broadcast at ~50Hz to follower.\n"
   lerobot_setup: "Compatible with HuggingFace LeRobot for data collection and policy\
     \ training. Install: pip install lerobot Calibrate servos before first use:\n\
     \  python -m lerobot.scripts.control_robot calibrate --robot-path so_arm101\n\
     Record dataset:\n  python -m lerobot.scripts.control_robot record --robot-path\
     \ so_arm101 \\\n    --repo-id my_dataset --num-episodes 50\n"
   hardware:
-    servos: 6× Feetech STS3215 (30kg·cm, magnetic encoder, RS-485)
+    servos: "6\xD7 Feetech STS3215 (30kg\xB7cm, magnetic encoder, RS-485)"
     interface: Feetech USB-RS485 adapter or SCServo SDK board
     supply: 12V 3A (regulated) for all servos
     build_guide: https://github.com/TheRobotStudio/SO-ARM100
@@ -260,3 +256,14 @@ r2ram:
 federation:
   enabled: true
   consent_bridge: false
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null

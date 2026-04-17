@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: ESP32_Generic_WiFi_Bot
   robot_uuid: 6c48f58e-0b28-4e7e-8008-769cd9ebb4b8
@@ -13,12 +13,11 @@ metadata:
   - makerspace
   - stem
   - generic
-  description: 'Generic ESP32 development board + motor driver — the WiFi-native evolution
-    of the Arduino L298N combo. The ESP32 runs a WebSocket/REST server firmware that
-    OpenCastor controls over the local network. Supports L298N, L293D, DRV8833, TB6612,
-    or any PWM-based motor driver. Sub-$10 hardware, massive user base.
-
-    '
+  description: "Generic ESP32 development board + motor driver \u2014 the WiFi-native\
+    \ evolution of the Arduino L298N combo. The ESP32 runs a WebSocket/REST server\
+    \ firmware that OpenCastor controls over the local network. Supports L298N, L293D,\
+    \ DRV8833, TB6612, or any PWM-based motor driver. Sub-$10 hardware, massive user\
+    \ base.\n"
   rrn: RRN-312118357608
   rrn_uri: rrn://community/robot/opencastor/esp32-generic-wifi-bot/esp32_generic
 agent:
@@ -107,7 +106,7 @@ notes:
   motor_driver_options:
     l298n: Most common. Needs separate 12V supply. Add flyback diodes.
     l293d: DIP chip. Lower current (600mA). Good for tiny motors.
-    tb6612fng: Preferred — efficient, low heat, 1.2A/ch.
+    tb6612fng: "Preferred \u2014 efficient, low heat, 1.2A/ch."
     drv8833: Tiny, efficient, 1.5A/ch. Best for small bots.
   second_hand_tips: 'ESP32 dev boards are ~$3-6 on AliExpress. ESP32-WROOM-32 and
     ESP32-S3 are the most common variants. Check makerspace scrap bins, STEM lab donations,
@@ -192,3 +191,14 @@ r2ram:
 federation:
   enabled: true
   consent_bridge: false
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null

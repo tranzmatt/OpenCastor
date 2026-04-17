@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: Elegoo_Tumbller_Smart_Car
   robot_uuid: 582f6e7c-d220-4cb2-94b6-15826a56dac8
@@ -12,12 +12,10 @@ metadata:
   - stem
   - amazon
   - second-hand
-  description: 'Elegoo Tumbller / Elegoo Smart Robot Car — among the most popular
-    sub-$40 Arduino-based kits on Amazon. The Tumbller is a self-balancing two-wheel
-    robot (MPU6050 IMU + TB6612FNG motors). The Smart Car kit is a 4-wheel line-follower/
-    obstacle-avoidance car. Both use Arduino Uno/Nano + USB serial.
-
-    '
+  description: "Elegoo Tumbller / Elegoo Smart Robot Car \u2014 among the most popular\
+    \ sub-$40 Arduino-based kits on Amazon. The Tumbller is a self-balancing two-wheel\
+    \ robot (MPU6050 IMU + TB6612FNG motors). The Smart Car kit is a 4-wheel line-follower/\
+    \ obstacle-avoidance car. Both use Arduino Uno/Nano + USB serial.\n"
   rrn: RRN-221530923640
   rrn_uri: rrn://community/robot/opencastor/elegoo-tumbller-smart-car/elegoo_tumbller
 agent:
@@ -109,11 +107,10 @@ notes:
   variants:
     tumbller: 2-wheel self-balancing. Uses MPU6050 PID. Requires balancing firmware.
     smart_car_v4: 4-wheel differential drive. Set physics.type to differential_drive.
-  second_hand_tips: 'Extremely common on Amazon Warehouse, eBay (~$15-25 used), and
-    school donations. The CH340 USB chip may need a driver on Windows: install CH341SER.exe.
-    Check all header pins are soldered — the Elegoo PCBs are sometimes poorly soldered.
-
-    '
+  second_hand_tips: "Extremely common on Amazon Warehouse, eBay (~$15-25 used), and\
+    \ school donations. The CH340 USB chip may need a driver on Windows: install CH341SER.exe.\
+    \ Check all header pins are soldered \u2014 the Elegoo PCBs are sometimes poorly\
+    \ soldered.\n"
 tiered_brain:
   fast_provider: ollama
   fast_model: gemma3:1b
@@ -192,3 +189,14 @@ r2ram:
 federation:
   enabled: true
   consent_bridge: false
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null

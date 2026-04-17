@@ -1,4 +1,4 @@
-rcan_version: '1.6'
+rcan_version: '3.0'
 metadata:
   robot_name: VEX_IQ
   robot_uuid: d9425b40-7524-40f2-a4a4-b311e06fa1c2
@@ -11,12 +11,10 @@ metadata:
   - vex-iq
   - stem
   - second-hand
-  description: 'VEX IQ robotics system — one of the most donated platforms from school
-    robotics programs. Smart motors and sensors share the same 4-pin RJ11-style ports
-    and communicate over a proprietary VEX serial/I2C protocol. Brain connects via
-    USB. Typical kit: 2 drive motors, 1 arm motor, distance + color + gyro sensors.
-
-    '
+  description: "VEX IQ robotics system \u2014 one of the most donated platforms from\
+    \ school robotics programs. Smart motors and sensors share the same 4-pin RJ11-style\
+    \ ports and communicate over a proprietary VEX serial/I2C protocol. Brain connects\
+    \ via USB. Typical kit: 2 drive motors, 1 arm motor, distance + color + gyro sensors.\n"
   rrn: RRN-719372023557
   rrn_uri: rrn://community/robot/opencastor/vex-iq/vex_iq
 agent:
@@ -96,12 +94,10 @@ notes:
     \ Flash a \"pass-through serial\" program to the Brain that echoes OpenCastor\n\
     \   commands to the smart port bus.\n3. Connect Brain via USB-A to USB-A cable.\
     \ 4. castor run --config vex_iq.rcan.yaml\n"
-  second_hand_tips: 'VEX IQ sets are donated by middle/high school robotics teams
-    after seasons end. Check Facebook Marketplace, eBay, and school auction sites.
-    Smart motors are self-identifying — plug them in and the Brain auto-detects. Battery
-    packs are the most commonly dead component; replacements are ~$20.
-
-    '
+  second_hand_tips: "VEX IQ sets are donated by middle/high school robotics teams\
+    \ after seasons end. Check Facebook Marketplace, eBay, and school auction sites.\
+    \ Smart motors are self-identifying \u2014 plug them in and the Brain auto-detects.\
+    \ Battery packs are the most commonly dead component; replacements are ~$20.\n"
 tiered_brain:
   fast_provider: ollama
   fast_model: gemma3:1b
@@ -180,3 +176,14 @@ r2ram:
 federation:
   enabled: true
   consent_bridge: false
+firmware_hash: null
+attestation_ref: null
+_migration_warnings:
+- "signing_alg not set \u2014 v2.2 recommends 'ml-dsa-65' (post-quantum). Leaving\
+  \ implicit; operator should set 'signing_alg: ml-dsa-65' explicitly because v3.0\
+  \ rejects Ed25519-only profiles at L2+."
+- "fria_ref not set \u2014 v3.0 REQUIRES fria_ref for Annex III high-risk systems\
+  \ (RCAN \xA722, \xA727). Run `castor fria generate` to produce a Fundamental Rights\
+  \ Impact Assessment document, then set fria_ref to its URI. Without this, your node\
+  \ will be rejected at registration under L2+ conformance."
+fria_ref: null
