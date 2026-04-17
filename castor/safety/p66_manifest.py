@@ -430,8 +430,8 @@ def build_manifest(safety_layer: Any = None, hardware_caps: Optional[dict] = Non
     return {
         "manifest_version": "1.0",
         "protocol": "ContinuonOS Protocol 66 (OpenCastor independent implementation)",
-        "rcan_spec_version": "1.8",
-        "rcan_version": "1.8",  # v1.6: explicit rcan_version field
+        "rcan_spec_version": "3.0",
+        "rcan_version": "3.0",  # v1.6: explicit rcan_version field (bumped to 3.0)
         "replay_cache_enabled": True,  # v1.5: GAP-03 replay prevention active
         "sender_type_logged": True,  # v1.5: GAP-08 cloud relay audit trail
         "offline_mode_capable": True,  # v1.5: GAP-06 offline operation support
@@ -545,14 +545,14 @@ def build_manifest(safety_layer: Any = None, hardware_caps: Optional[dict] = Non
             },
             "rcan_version_negotiation": {
                 "description": (
-                    "Outgoing messages include rcan_version='1.8'. Incoming messages "
+                    "Outgoing messages include rcan_version='3.0'. Incoming messages "
                     "with different rcan_version log a WARNING (not error) and are "
                     "processed with forward/backward compatibility rules. "
                     "Implements RCAN §3.5 (GAP-12)."
                 ),
                 "status": "enforced",
                 "module": "castor.rcan.message.RCANMessage.from_dict",
-                "rcan_spec": "v1.6 §3.5",
+                "rcan_spec": "v3.0 §3.5",
             },
             "federation_trust": {
                 "description": (
