@@ -79,8 +79,10 @@ def test_migrate_2_2_to_3_0_warns_on_ed25519_only():
     }
     migrated, _ = migrate_config(config, dry_run=True)
     warnings = migrated.get("_migration_warnings", [])
-    assert any("ed25519" in w.lower() and ("reject" in w.lower() or "sunset" in w.lower())
-               for w in warnings), f"expected Ed25519 sunset warning; got {warnings!r}"
+    assert any(
+        "ed25519" in w.lower() and ("reject" in w.lower() or "sunset" in w.lower())
+        for w in warnings
+    ), f"expected Ed25519 sunset warning; got {warnings!r}"
 
 
 def test_migrate_full_chain_2_1_to_3_0():

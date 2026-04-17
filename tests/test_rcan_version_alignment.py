@@ -6,7 +6,6 @@ from castor.compliance import SPEC_VERSION as COMPLIANCE_SPEC_VERSION
 from castor.migrate import CURRENT_VERSION as MIGRATE_CURRENT_VERSION
 from castor.rcan.message import RCAN_SPEC_VERSION as MESSAGE_SPEC_VERSION
 
-
 EXPECTED = "3.0"
 
 

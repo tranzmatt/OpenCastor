@@ -700,7 +700,15 @@ class TestV15SafetyInvariants:
         assert manifest.get("rcan_version") in ("1.5", "1.6", "1.8", "1.9", "2.1", "2.2", "3.0"), (
             f"rcan_version in P66 manifest, got {manifest.get('rcan_version')!r}"
         )
-        assert manifest.get("rcan_spec_version") in ("1.5", "1.6", "1.8", "1.9", "2.1", "2.2", "3.0")
+        assert manifest.get("rcan_spec_version") in (
+            "1.5",
+            "1.6",
+            "1.8",
+            "1.9",
+            "2.1",
+            "2.2",
+            "3.0",
+        )
 
     def test_outgoing_message_includes_rcan_version(self):
         """RCANMessage.to_dict() includes rcan_version field."""
