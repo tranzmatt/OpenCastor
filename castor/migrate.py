@@ -214,6 +214,33 @@ def _migrate_1_10_to_2_1(config: dict) -> dict:
     return config
 
 
+@_register_migration("2.1", "2.2")
+def _migrate_2_1_to_2_2(config: dict) -> dict:
+    """Migrate from 2.1 to 2.2 — RCAN v2.2 additions.
+
+    v2.2 highlights:
+      - ML-DSA-65 becomes primary signing algorithm (Ed25519 deprecated but tolerated)
+      - Dual-brain pattern: ``brain_reactive`` (VLA) + ``brain_planning`` (LLM)
+      - M2M_TRUSTED trust mode with explicit ``fleet_rrns``
+      - ISO 42001 + EU AI Act Art. 11/12 audit blocks
+
+    Migration:
+      - Bump ``rcan_version`` to "2.2"
+      - If ``signing_alg`` absent, warn (operator should declare explicitly — ``ml-dsa-65``
+        recommended; ``ed25519`` tolerated in 2.2 but rejected in 3.0)
+    """
+    config["rcan_version"] = "2.2"
+
+    if not config.get("signing_alg") and not config.get("network", {}).get("signing_alg"):
+        config.setdefault("_migration_warnings", []).append(
+            "signing_alg not set — v2.2 recommends 'ml-dsa-65' (post-quantum). "
+            "Leaving implicit; operator should set 'signing_alg: ml-dsa-65' explicitly "
+            "because v3.0 rejects Ed25519-only profiles at L2+."
+        )
+
+    return config
+
+
 def get_version(config: dict) -> str:
     """Extract the RCAN version from a config dict."""
     return config.get("rcan_version", "unknown")
