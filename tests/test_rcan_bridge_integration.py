@@ -12,6 +12,11 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+# Read the installed rcan-py SDK's SPEC_VERSION at test time so the fixtures
+# track whichever version is pinned in the active env (avoids hardcoded-version
+# drift between local dev and CI when rcan-py is pip-installed unbounded).
+from rcan import SPEC_VERSION
+
 # ---------------------------------------------------------------------------
 # parse_inbound — spec vs internal format
 # ---------------------------------------------------------------------------
@@ -24,7 +29,7 @@ def test_parse_inbound_spec_format():
     from castor.rcan.sdk_bridge import parse_inbound
 
     body = {
-        "rcan": "2.2",
+        "rcan": SPEC_VERSION,
         "cmd": "status",
         "target": "rcan://registry.rcan.dev/acme/arm/v1/unit-001",
         "sender": "rcan://registry.rcan.dev/ops/console/v1/cli-001",
@@ -59,7 +64,7 @@ def test_parse_inbound_spec_returns_spec_object():
     from castor.rcan.sdk_bridge import parse_inbound
 
     body = {
-        "rcan": "2.2",
+        "rcan": SPEC_VERSION,
         "cmd": "arm_pose",
         "target": "rcan://registry.rcan.dev/acme/arm/v1/unit-001",
         "sender": "rcan://registry.rcan.dev/ops/console/v1/cli-001",
@@ -133,7 +138,7 @@ def test_send_message_success():
     mock_resp.read.return_value = mock_response_data
 
     with patch("urllib.request.urlopen", return_value=mock_resp):
-        result = send_message("robot.local", {"cmd": "status", "rcan": "2.2"})
+        result = send_message("robot.local", {"cmd": "status", "rcan": SPEC_VERSION})
 
     assert result is not None
     assert result["status"] == "ok"

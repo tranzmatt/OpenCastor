@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+# Read installed rcan-py SDK SPEC_VERSION at test time (avoids hardcoded drift
+# between local rcan==1.x (SPEC_VERSION="2.2.0") and CI rcan==2.x (SPEC_VERSION="3.0")).
+from rcan import SPEC_VERSION
+
 # ---------------------------------------------------------------------------
 # URI conversion
 # ---------------------------------------------------------------------------
@@ -74,7 +78,7 @@ def test_parse_inbound_spec_format():
     from castor.rcan.sdk_bridge import parse_inbound
 
     body = {
-        "rcan": "2.2",
+        "rcan": SPEC_VERSION,
         "cmd": "move_forward",
         "target": "rcan://registry.rcan.dev/acme/arm/v2/unit-001",
         "params": {"distance_m": 1.0},
