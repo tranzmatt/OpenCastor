@@ -40,11 +40,15 @@ def save_config(config: dict[str, Any], config_path: Path) -> None:
 
 def get_loa_status(config: dict[str, Any]) -> dict[str, Any]:
     """Return a status dict describing the current LoA enforcement state."""
+    # RCAN 3.0+ mandates LoA unconditionally. The previous lexical compare
+    # (rcan_version >= "1.6") was an artifact of the v1.6 era where LoA was
+    # first introduced as optional — under the 3.0 hard-cut policy, LoA is
+    # always required (is_accepted_version() already rejects 2.x).
     return {
         "loa_enforcement": bool(config.get("loa_enforcement", False)),
         "min_loa_for_control": int(config.get("min_loa_for_control", 1)),
         "rcan_version": config.get("rcan_version", "unknown"),
-        "loa_required": config.get("rcan_version", "0") >= "1.6",
+        "loa_required": True,
     }
 
 
