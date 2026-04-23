@@ -99,7 +99,7 @@ docker run -it \
 ## Features
 
 - **Protocol 66 safety** — ESTOP never blocked, local safety always wins, confidence gates run on-device
-- **RCAN v1.6** — replay prevention, federation, constrained transport (BLE/LoRa), multi-modal payloads, Level of Assurance
+- **RCAN 3.0** — hybrid signing (ML-DSA-65 + Ed25519), mandatory LoA, canonical JSON wire format, §22-26 compliance builders, BLE/LoRa/MQTT carriers
 - **Multi-provider AI** — Gemini, Claude, OpenAI, Ollama, MLX (Apple Silicon), Groq, DeepSeek, and 7 more; hot-swap via YAML
 - **Fleet UI** — real-time fleet dashboard at [app.opencastor.com](https://app.opencastor.com); no port forwarding needed
 - **SO-ARM101 arm support** — auto-detected via USB, guided setup for follower/leader/bimanual configurations
@@ -131,15 +131,14 @@ docker run -it \
    [ Robot Hardware ]             Pi / Jetson / Arduino / SO-ARM101 / …
 ```
 
-## RCAN v1.6 Features
+## RCAN 3.0 Features
 
-| Feature | Description |
-|---|---|
-| Replay prevention | Sliding-window `msg_id` cache; stale messages rejected |
-| Federation | Cross-registry consent, DNS trust anchors, JWT verification |
-| Constrained transport | Compact CBOR (512B), 32-byte ESTOP minimal for BLE/LoRa |
-| Multi-modal payloads | Inline or referenced media chunks; streaming sensor data |
-| Level of Assurance | LoA 1/2/3 on operator JWTs; configurable minimum per scope |
+- **Replay prevention** — hybrid signatures (ML-DSA-65 + Ed25519) over canonical JSON bodies
+- **Level of Assurance (LoA)** — mandatory under 3.0+; gates control-plane operations behind HiTL authorization
+- **Canonical JSON wire format** — `rcan.canonical_json(body)` produces byte-identical serialization across Python and TypeScript SDKs
+- **§22-26 compliance artifacts** — emit §23 safety benchmarks, §24 IFU, §25 post-market incident reports, §26 EU register entries via `rcan.build_*` builders
+- **Federation + constrained transport** — BLE / LoRa / MQTT carriers; RRN-based identity resolution via rcan.dev
+- **Post-quantum ready** — NIST FIPS 204 ML-DSA-65 is the primary signing scheme (Q-Day 2029 is NOW)
 
 ## castor CLI Reference
 
@@ -166,7 +165,7 @@ Full reference: [docs.opencastor.com/runtime/cli](https://docs.opencastor.com/ru
 Minimal `bob.rcan.yaml`:
 
 ```yaml
-rcan_version: "1.6"
+rcan_version: "3.0"
 metadata:
   robot_name: bob
 agent:
