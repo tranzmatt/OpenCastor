@@ -1655,12 +1655,18 @@ def cmd_memory(args) -> None:
 
 
 def cmd_migrate(args) -> None:
-    """castor migrate — migrate a RCAN config to the latest schema version."""
-    from castor.migrate import migrate_file
+    """castor migrate — one-shot .rcan.yaml → ROBOT.md conversion.
 
-    config = getattr(args, "config", "robot.rcan.yaml")
-    dry_run = getattr(args, "dry_run", False)
-    migrate_file(config, dry_run=dry_run)
+    Deprecated at ship (opencastor 3.0.0). Scheduled for removal in 3.1.0.
+    """
+    from castor.migrate import migrate_to_robot_md
+
+    src = getattr(args, "src", None) or getattr(args, "config", None)
+    if not src:
+        print("castor migrate: error: <src> (.rcan.yaml file) is required")
+        return
+    out = getattr(args, "out", None) or "ROBOT.md"
+    migrate_to_robot_md(src, out)
 
 
 def cmd_network(args) -> None:
@@ -6661,10 +6667,18 @@ def main() -> None:
         "--dry-run", action="store_true", help="List contents without extracting"
     )
 
-    # castor migrate
-    p_migrate = sub.add_parser("migrate", help="Migrate RCAN config to current schema version")
-    p_migrate.add_argument("--config", default="robot.rcan.yaml", help="RCAN config file")
-    p_migrate.add_argument("--dry-run", action="store_true", help="Show changes without modifying")
+    # castor migrate — one-shot .rcan.yaml → ROBOT.md converter (deprecated-at-ship, removed in 3.1.0)
+    p_migrate = sub.add_parser(
+        "migrate",
+        help="[deprecated] One-shot .rcan.yaml → ROBOT.md conversion (removed in 3.1.0)",
+    )
+    p_migrate.add_argument("src", nargs="?", help="Legacy .rcan.yaml source file")
+    p_migrate.add_argument(
+        "-o", "--out", default="ROBOT.md", help="Output ROBOT.md path (default: ROBOT.md)"
+    )
+    p_migrate.add_argument(
+        "--config", help="[deprecated] Alias for positional <src> argument"
+    )
 
     # castor upgrade
     p_upgrade = sub.add_parser("upgrade", help="Upgrade OpenCastor to latest version")

@@ -1,0 +1,30 @@
+---
+rcan_version: '3.2'
+metadata:
+  robot_name: bob
+  manufacturer: craigm26
+  model: so-arm101
+  version: 1.0.0
+  device_id: bob-001
+  rrn: RRN-000000000001
+network:
+  rrf_endpoint: https://rcan.dev
+  signing_alg: pqc-hybrid-v1
+agent:
+  runtimes:
+  - id: opencastor
+    harness: castor-default
+    default: true
+    models:
+    - provider: anthropic
+      model: claude-sonnet-4-6
+      role: primary
+safety:
+  estop:
+    software: true
+---
+
+# bob
+
+Migrated from legacy .rcan.yaml. This is a one-shot conversion; the
+legacy format is deprecated and will be removed in opencastor 3.1.0.

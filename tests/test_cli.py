@@ -33,7 +33,6 @@ from castor.cli import (
     cmd_plugins,
     cmd_privacy,
     cmd_profile,
-    cmd_quickstart,
     cmd_repl,
     cmd_replay,
     cmd_restore,
@@ -1416,19 +1415,31 @@ class TestCmdRestore:
 # cmd_migrate
 # =====================================================================
 class TestCmdMigrate:
-    def test_calls_migrate_file(self):
-        args = _make_args(config="robot.rcan.yaml", dry_run=False)
+    def test_calls_migrate_to_robot_md_positional(self):
+        args = _make_args(src="old.rcan.yaml", out="ROBOT.md", config=None)
         mock_migrate = MagicMock()
-        with patch.dict("sys.modules", {"castor.migrate": MagicMock(migrate_file=mock_migrate)}):
+        with patch.dict(
+            "sys.modules",
+            {"castor.migrate": MagicMock(migrate_to_robot_md=mock_migrate)},
+        ):
             cmd_migrate(args)
-        mock_migrate.assert_called_once_with("robot.rcan.yaml", dry_run=False)
+        mock_migrate.assert_called_once_with("old.rcan.yaml", "ROBOT.md")
 
-    def test_dry_run(self):
-        args = _make_args(config="robot.rcan.yaml", dry_run=True)
+    def test_calls_migrate_to_robot_md_config_alias(self):
+        args = _make_args(src=None, out="ROBOT.md", config="legacy.rcan.yaml")
         mock_migrate = MagicMock()
-        with patch.dict("sys.modules", {"castor.migrate": MagicMock(migrate_file=mock_migrate)}):
+        with patch.dict(
+            "sys.modules",
+            {"castor.migrate": MagicMock(migrate_to_robot_md=mock_migrate)},
+        ):
             cmd_migrate(args)
-        mock_migrate.assert_called_once_with("robot.rcan.yaml", dry_run=True)
+        mock_migrate.assert_called_once_with("legacy.rcan.yaml", "ROBOT.md")
+
+    def test_errors_without_src(self, capsys):
+        args = _make_args(src=None, out="ROBOT.md", config=None)
+        cmd_migrate(args)
+        out = capsys.readouterr().out
+        assert "error" in out.lower() and "src" in out.lower()
 
 
 # =====================================================================

@@ -462,3 +462,66 @@ def migrate_file(config_path: str, dry_run: bool = False, backup: bool = True) -
 
     print(f"  Updated: {config_path}\n")
     return True
+
+
+# ---------------------------------------------------------------------------
+# v3.0 one-shot converter: .rcan.yaml → ROBOT.md
+# Deprecated at ship (v3.0.0). Scheduled for removal in v3.1.0.
+# ---------------------------------------------------------------------------
+
+_ROBOT_MD_BODY = """\
+# {robot_name}
+
+Migrated from legacy .rcan.yaml. This is a one-shot conversion; the
+legacy format is deprecated and will be removed in opencastor 3.1.0.
+"""
+
+
+def _convert_to_v32(old: dict) -> dict:
+    """Translate a legacy .rcan.yaml dict to v3.2 ROBOT.md frontmatter."""
+    agent = old.get("agent") or {}
+    provider = agent.get("provider", "anthropic")
+    model = agent.get("model", "claude-sonnet-4-6")
+    return {
+        "rcan_version": "3.2",
+        "metadata": old.get("metadata") or {},
+        "network": old.get("network")
+        or {
+            "rrf_endpoint": "https://rcan.dev",
+            "signing_alg": "pqc-hybrid-v1",
+        },
+        "agent": {
+            "runtimes": [
+                {
+                    "id": "opencastor",
+                    "harness": "castor-default",
+                    "default": True,
+                    "models": [
+                        {"provider": provider, "model": model, "role": "primary"},
+                    ],
+                },
+            ],
+        },
+        "safety": old.get("safety") or {},
+    }
+
+
+def migrate_to_robot_md(src, dst) -> int:
+    """Convert ``src`` (.rcan.yaml) to ``dst`` (ROBOT.md v3.2). Returns exit code.
+
+    Deprecated at ship (opencastor 3.0.0). Scheduled for removal in 3.1.0.
+    """
+    import sys
+    from pathlib import Path
+
+    sys.stderr.write(
+        "[castor migrate] legacy .rcan.yaml is deprecated. Output ROBOT.md is "
+        "one-shot; future opencastor releases will remove this command.\n"
+    )
+    old = yaml.safe_load(Path(src).read_text()) or {}
+    fm = _convert_to_v32(old)
+    robot_name = (fm["metadata"] or {}).get("robot_name", "robot")
+    body = _ROBOT_MD_BODY.format(robot_name=robot_name)
+    serialized = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True)
+    Path(dst).write_text(f"---\n{serialized}---\n\n{body}")
+    return 0
