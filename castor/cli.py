@@ -387,7 +387,7 @@ def cmd_wizard(args) -> None:
 
 
 def cmd_init(args) -> None:
-    """Interactive setup wizard — generates a .rcan.yaml config (castor init)."""
+    """Interactive wizard — writes a v3.2 ROBOT.md (castor init)."""
     from castor.init_wizard import cmd_init as _wizard_init
 
     _wizard_init(args)
@@ -4255,14 +4255,66 @@ def cmd_ifu(args) -> None:
 
 
 def cmd_validate(args) -> None:
-    """castor validate — run RCAN conformance checks on a config file."""
+    """castor validate — run RCAN conformance checks on a ROBOT.md or .rcan.yaml."""
     import json as _json
     import os
 
-    config_path = getattr(args, "config", "robot.rcan.yaml")
+    # Positional <manifest> wins over --config so the v3.2 ROBOT.md flow can be
+    # invoked as `castor validate ROBOT.md`.
+    config_path = getattr(args, "manifest", None) or getattr(args, "config", "robot.rcan.yaml")
     if not os.path.exists(config_path):
         print(f"  Config not found: {config_path}")
         raise SystemExit(1)
+
+    # Detect v3.2 ROBOT.md (markdown with YAML frontmatter) vs legacy .rcan.yaml.
+    # Markdown is sniffed by extension OR by the leading "---" fence, since
+    # users sometimes drop the .md extension.
+    _is_robot_md = config_path.endswith(".md")
+    if not _is_robot_md:
+        try:
+            with open(config_path) as _f:
+                _is_robot_md = _f.readline().strip() == "---"
+        except OSError:
+            _is_robot_md = False
+
+    if _is_robot_md:
+        try:
+            from rcan import from_manifest
+        except ImportError as exc:
+            print(f"  rcan-py not installed or too old for ROBOT.md validation: {exc}")
+            raise SystemExit(1) from None
+        try:
+            info = from_manifest(config_path)
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"  invalid ROBOT.md: {exc}")
+            raise SystemExit(1) from None
+        runtimes = info.agent_runtimes or []
+        json_out = getattr(args, "json", False) or getattr(args, "json_out", False)
+        if json_out:
+            print(
+                _json.dumps(
+                    {
+                        "manifest": config_path,
+                        "rcan_version": info.rcan_version,
+                        "rrn": info.rrn,
+                        "agent_runtimes": runtimes,
+                        "ok": True,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(f"✓ {config_path}")
+            print(f"  rcan_version: {info.rcan_version}")
+            print(f"  rrn: {info.rrn or '(none — register with castor register)'}")
+            print(f"  runtimes: {[r.get('id') for r in runtimes] or '(none declared)'}")
+            default_entry = next((r for r in runtimes if r.get("default")), None)
+            if default_entry:
+                print(
+                    f"  default runtime: {default_entry.get('id')} "
+                    f"(harness={default_entry.get('harness')})"
+                )
+        return
 
     try:
         import yaml
@@ -7287,18 +7339,25 @@ def main() -> None:
     )
     p_ifu_gen.add_argument("--output", metavar="FILE", help="Output JSON path (default: stdout)")
 
-    # castor validate
+    # castor validate — accepts either a legacy .rcan.yaml (--config) or a v3.2 ROBOT.md (positional)
     p_validate = sub.add_parser(
         "validate",
-        help="Run RCAN conformance checks",
+        help="Run RCAN conformance checks against a ROBOT.md or .rcan.yaml",
         epilog=(
             "Examples:\n"
-            "  castor validate --config bot.rcan.yaml       # RCAN conformance check\n"
+            "  castor validate ROBOT.md                     # v3.2 ROBOT.md validation\n"
+            "  castor validate /path/to/ROBOT.md --json\n"
+            "  castor validate --config bot.rcan.yaml       # legacy yaml conformance check\n"
             "  castor validate --config bot.rcan.yaml --category safety\n"
-            "  castor validate --config bot.rcan.yaml --json\n"
             "  castor validate --config bot.rcan.yaml --strict\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_validate.add_argument(
+        "manifest",
+        nargs="?",
+        default=None,
+        help="Path to ROBOT.md (v3.2) or .rcan.yaml config. Overrides --config when given.",
     )
     p_validate.add_argument("--config", default="robot.rcan.yaml", help="RCAN config file")
     p_validate.add_argument(
@@ -8453,50 +8512,57 @@ def main() -> None:
         help="Model task filter for --list-models (default: text-generation)",
     )
 
-    # castor init — interactive setup wizard (zero-to-fleet onboarding)
+    # castor init — interactive wizard that writes a v3.2 ROBOT.md
     p_init = sub.add_parser(
         "init",
-        help="Interactive setup wizard — zero-to-fleet onboarding in under 5 minutes",
+        help="Interactive wizard — generates a v3.2 ROBOT.md with agent.runtimes[]",
         description=(
-            "Interactive wizard that generates a complete .rcan.yaml config.\n"
-            "Run without arguments for guided prompts.\n"
-            "Use --no-interactive for CI/scripted use."
+            "Interactive wizard that writes a v3.2 ROBOT.md (rcan-spec §8.6\n"
+            "agent.runtimes[]) to --path (default ./ROBOT.md).\n\n"
+            "Run without arguments for guided prompts. Use --non-interactive\n"
+            "to accept all defaults (required for CI and scripting)."
         ),
         epilog=(
             "Examples:\n"
             "  castor init\n"
-            "  castor init --name Bob --provider google --port 8080 --no-interactive\n"
-            "  castor init --output my-robot.rcan.yaml --overwrite\n"
+            "  castor init --robot-name bob --manufacturer SeeedStudio \\\n"
+            "              --model SO-ARM101 --non-interactive\n"
+            "  castor init --path /home/pi/bob/ROBOT.md --force\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_init.add_argument(
-        "--output", "-o", default=None, help="Output path (default: <robot-name>.rcan.yaml)"
+        "--path", default="ROBOT.md", help="Output ROBOT.md path (default: ROBOT.md)"
     )
-    p_init.add_argument("--name", "-n", default=None, help="Robot name (default: my-robot)")
+    p_init.add_argument("--robot-name", dest="robot_name", default=None, help="Robot name")
+    p_init.add_argument("--manufacturer", default=None, help="Manufacturer / vendor")
+    p_init.add_argument("--model", default=None, help="Hardware model")
+    p_init.add_argument("--version", default=None, help="Firmware / hardware revision")
+    p_init.add_argument(
+        "--device-id", dest="device_id", default=None, help="Per-instance device ID"
+    )
     p_init.add_argument(
         "--provider",
         default=None,
         choices=["google", "anthropic", "openai", "local"],
-        help="AI provider (default: google)",
+        help="LLM provider for the default runtime entry",
     )
-    p_init.add_argument("--port", type=int, default=None, help="Gateway port (default: 8080)")
-    p_init.add_argument("--api-key", default=None, dest="api_key", help="AI provider API key")
     p_init.add_argument(
-        "--firebase-project",
+        "--llm-model",
+        dest="llm_model",
         default=None,
-        dest="firebase_project",
-        help="Firebase project ID (default: opencastor)",
+        help="LLM model name (e.g. claude-sonnet-4-6, gemini-2.5-flash)",
     )
     p_init.add_argument(
-        "--no-interactive",
+        "--non-interactive",
         action="store_true",
-        dest="no_interactive",
+        dest="non_interactive",
         help="Skip all prompts — use defaults/flags (required for CI)",
     )
-    p_init.add_argument("--overwrite", action="store_true", help="Overwrite existing config file")
     p_init.add_argument(
-        "--print", action="store_true", help="Print config to stdout instead of writing to file"
+        "--force",
+        action="store_true",
+        help="Overwrite an existing ROBOT.md at --path",
     )
 
     # SO-ARM101 arm setup (issue #658)

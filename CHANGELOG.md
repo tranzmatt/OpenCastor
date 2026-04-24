@@ -7,6 +7,46 @@ Versions switched from date-based (`YYYY.MM.DD.patch`) to SemVer at
 
 ---
 
+## [3.0.1] - 2026-04-24
+
+### Fixed — R6 demo-day gaps
+
+Patch release surfacing two R4 CLI argparse gaps caught while recording
+the Bob peer-runtime hot-swap demo.
+
+- **`castor init` argparse** now matches `init_wizard.cmd_init`. The
+  v3.0 wizard writes a v3.2 ROBOT.md but the argparse registration was
+  still the legacy `--output` / `--name` / `--provider` / `--port` /
+  `--no-interactive` / `--api-key` / `--firebase-project` shape, which
+  didn't hit the wizard's expected attribute names. The flags are now
+  `--path`, `--robot-name`, `--manufacturer`, `--model`, `--version`,
+  `--device-id`, `--provider`, `--llm-model`, `--non-interactive`,
+  `--force`. Helptext and examples updated to reflect the ROBOT.md
+  output.
+- **`castor validate ROBOT.md`** now works. The old handler always
+  fed the target through `yaml.safe_load`, which errored on any ROBOT.md
+  because the frontmatter-markdown format contains two `---` documents.
+  The v3.0 code path: `castor validate` accepts a positional `<manifest>`
+  argument (or `--config` for the legacy yaml path); if the target ends
+  in `.md` or its first line is `---`, we delegate to
+  `rcan.from_manifest` and print a `✓` summary with rcan_version, rrn,
+  runtimes, and default-runtime selection. Legacy `--config foo.rcan.yaml`
+  still runs the old ConformanceChecker.
+
+### Tests
+
+- `tests/test_cli_init_validate_v3.py` — 5 new tests:
+  - `test_init_parses_new_flags` / `test_init_defaults` — full + default
+    `castor init` argparse shape roundtrips into the wizard.
+  - `test_positional_robot_md_validates` — `.md` extension hits the
+    rcan.from_manifest path.
+  - `test_extensionless_markdown_is_sniffed` — leading `---` fence
+    triggers the same path even without `.md`.
+  - `test_json_mode_emits_manifest_shape` — `--json` output is
+    machine-readable.
+
+---
+
 ## [3.0.0] - 2026-04-24
 
 ### BREAKING — ROBOT.md-native, full RCAN 3.x peer runtime
