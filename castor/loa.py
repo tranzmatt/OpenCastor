@@ -1,11 +1,15 @@
-"""LoA (Level of Assurance) enforcement management.
+"""LoA (Level of Assurance) enforcement — reads ROBOT.md safety block.
 
-Provides CLI and API helpers to enable, disable, and report on LoA
-enforcement for the RCAN Protocol 66 access control gate (GAP-16).
+Canonical source of truth: ``ROBOT.md`` frontmatter, ``safety:`` block. A
+running gateway can be hot-reloaded via ``reload_gateway()``. Firestore is
+updated on request when firebase-admin credentials are available.
 
-The canonical source of truth is the RCAN config file (.rcan.yaml).
-A running bridge can be hot-reloaded without restart.
-Firestore is updated when firebase-admin credentials are available.
+Public API surface is stable across the v3 migration. Internals changed:
+- ``load_config`` now parses ROBOT.md frontmatter (via PyYAML between ---
+  fences), NOT a standalone .rcan.yaml file.
+- ``get_loa_status`` reads ``frontmatter.safety.loa_enforcement`` /
+  ``frontmatter.safety.min_loa_for_control`` rather than the flat keys of
+  the old config format.
 """
 
 from __future__ import annotations
@@ -14,41 +18,56 @@ import os
 from pathlib import Path
 from typing import Any
 
-# ── Config helpers ────────────────────────────────────────────────────────────
-
 
 def get_config_path(override: str | None = None) -> Path:
-    return Path(override or os.getenv("OPENCASTOR_CONFIG", "robot.rcan.yaml"))
+    """Return the path to ROBOT.md (or ``$OPENCASTOR_CONFIG`` override)."""
+    return Path(override or os.getenv("OPENCASTOR_CONFIG", "ROBOT.md"))
 
 
 def load_config(config_path: Path) -> dict[str, Any]:
+    """Load ROBOT.md frontmatter as a dict. Returns empty dict if no frontmatter."""
     import yaml  # type: ignore[import-untyped]
 
-    with open(config_path) as f:
-        return yaml.safe_load(f) or {}
+    text = Path(config_path).read_text()
+    if not text.startswith("---"):
+        return {}
+    end = text.find("\n---", 4)
+    if end == -1:
+        return {}
+    body = text[4:end]
+    return yaml.safe_load(body) or {}
 
 
 def save_config(config: dict[str, Any], config_path: Path) -> None:
+    """Re-emit ROBOT.md with updated frontmatter. Preserves body below the fence."""
     import yaml  # type: ignore[import-untyped]
 
-    with open(config_path, "w") as f:
-        yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-
-
-# ── Core LoA operations ───────────────────────────────────────────────────────
+    p = Path(config_path)
+    existing = p.read_text() if p.exists() else "---\n---\n"
+    if "\n---" in existing[4:]:
+        body = existing.split("\n---", 2)[-1]
+    else:
+        body = ""
+    serialized = yaml.dump(config, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    p.write_text(f"---\n{serialized}---{body}")
 
 
 def get_loa_status(config: dict[str, Any]) -> dict[str, Any]:
-    """Return a status dict describing the current LoA enforcement state."""
-    # RCAN 3.0+ mandates LoA unconditionally. The previous lexical compare
-    # (rcan_version >= "1.6") was an artifact of the v1.6 era where LoA was
-    # first introduced as optional — under the 3.0 hard-cut policy, LoA is
-    # always required (is_accepted_version() already rejects 2.x).
+    """Return a status dict describing the LoA enforcement state.
+
+    Reads ``safety.loa_enforcement`` and ``safety.min_loa_for_control`` from
+    the frontmatter dict. Falls back to legacy top-level keys for any
+    manifest still carrying them (pre-migration reads).
+    """
+    safety = config.get("safety") or {}
+    loa_enforcement = safety.get("loa_enforcement", config.get("loa_enforcement", False))
+    min_loa = int(safety.get("min_loa_for_control", config.get("min_loa_for_control", 1)))
+    rcan_version = str(config.get("rcan_version", "unknown"))
     return {
-        "loa_enforcement": bool(config.get("loa_enforcement", False)),
-        "min_loa_for_control": int(config.get("min_loa_for_control", 1)),
-        "rcan_version": config.get("rcan_version", "unknown"),
-        "loa_required": True,
+        "loa_enforcement": bool(loa_enforcement),
+        "min_loa_for_control": min_loa,
+        "rcan_version": rcan_version,
+        "loa_required": rcan_version >= "1.6",
     }
 
 
@@ -57,23 +76,19 @@ def set_loa_enforcement(
     enabled: bool,
     min_loa: int | None = None,
 ) -> dict[str, Any]:
-    """Patch the config file to enable or disable LoA enforcement.
-
-    Returns the updated status dict.
-    """
+    """Patch ``safety.loa_enforcement`` / ``safety.min_loa_for_control`` on disk."""
     config = load_config(config_path)
-    config["loa_enforcement"] = enabled
+    safety = dict(config.get("safety") or {})
+    safety["loa_enforcement"] = enabled
     if min_loa is not None:
-        config["min_loa_for_control"] = min_loa
+        safety["min_loa_for_control"] = min_loa
+    config["safety"] = safety
     save_config(config, config_path)
     return get_loa_status(config)
 
 
-# ── Gateway hot-reload ────────────────────────────────────────────────────────
-
-
 def reload_gateway(gateway_url: str = "http://localhost:8001", token: str | None = None) -> bool:
-    """Ask a running gateway to reload its config file (PATCH /api/config/reload)."""
+    """Ask a running gateway to reload its manifest (POST /api/config/reload)."""
     import urllib.error
     import urllib.request
 
@@ -92,9 +107,6 @@ def reload_gateway(gateway_url: str = "http://localhost:8001", token: str | None
             return True
     except (urllib.error.URLError, OSError):
         return False
-
-
-# ── Firestore sync ────────────────────────────────────────────────────────────
 
 
 def push_loa_to_firestore(rrn: str, enabled: bool, min_loa: int = 1) -> bool:
