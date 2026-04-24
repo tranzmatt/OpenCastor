@@ -509,8 +509,12 @@ class TestParserEdgeCases:
         assert args.dry_run is True
         assert args.archive == "backup.tar.gz"
 
+    @pytest.mark.skip(
+        "v3.0 hard-cut: `castor migrate` is now a one-shot .rcan.yaml → ROBOT.md "
+        "converter and no longer accepts --dry-run (see R4 spec + CHANGELOG 3.0.0)"
+    )
     def test_migrate_dry_run(self):
-        """Migrate accepts --dry-run."""
+        """Legacy: Migrate accepted --dry-run in the 2.x version-string migrator."""
         args = self._dispatch_and_capture(
             "castor.cli.cmd_migrate",
             "castor",
@@ -904,8 +908,22 @@ class TestFriendlyErrorHandler:
 # cmd_run
 # =====================================================================
 class TestCmdRun:
+    """v3.0 cmd_run — legacy .rcan.yaml input is now rejected at ingress.
+
+    See tests/test_cli_v3_dispatch.py for the new v3.0 behavior assertions.
+    The previous suite below is retained (skipped) for historical provenance.
+    """
+
+    _LEGACY_SKIP = (
+        "v3.0 hard-cut: .rcan.yaml input is rejected by _legacy_rcan_yaml_guard "
+        "before cmd_run reaches its config-loading path. See "
+        "tests/test_cli_v3_dispatch.py::test_cmd_run_rejects_legacy_rcan_yaml_with_guidance "
+        "for the replacement assertion."
+    )
+
+    @pytest.mark.skip(_LEGACY_SKIP)
     def test_config_exists_calls_main(self, tmp_path):
-        """When config exists, cmd_run imports and calls castor.main.main."""
+        """Legacy: when config exists, cmd_run imports and calls castor.main.main."""
         config = tmp_path / "robot.rcan.yaml"
         config.write_text("rcan_version: 1.0\n")
         args = _make_args(config=str(config), simulate=False)
@@ -914,8 +932,9 @@ class TestCmdRun:
             cmd_run(args)
             mock_main_fn.assert_called_once()
 
+    @pytest.mark.skip(_LEGACY_SKIP)
     def test_config_exists_simulate(self, tmp_path):
-        """When --simulate is set, sys.argv should include --simulate."""
+        """Legacy: when --simulate is set, sys.argv should include --simulate."""
         config = tmp_path / "robot.rcan.yaml"
         config.write_text("rcan_version: 1.0\n")
         args = _make_args(config=str(config), simulate=True)
@@ -924,8 +943,9 @@ class TestCmdRun:
             cmd_run(args)
         assert "--simulate" in sys.argv
 
+    @pytest.mark.skip(_LEGACY_SKIP)
     def test_config_missing_no_rcan_files_wizard_decline(self, tmp_path, capsys):
-        """When config is missing and user declines wizard, print exit message."""
+        """Legacy: when config is missing and user declines wizard, print exit message."""
         args = _make_args(config=str(tmp_path / "nonexistent.rcan.yaml"), simulate=False)
         with patch("glob.glob", return_value=[]):
             with patch("builtins.input", return_value="n"):
@@ -933,13 +953,9 @@ class TestCmdRun:
         out = capsys.readouterr().out
         assert "castor wizard" in out
 
+    @pytest.mark.skip(_LEGACY_SKIP)
     def test_config_missing_suggests_existing_rcan(self, tmp_path, capsys):
-        """When config is missing but other .rcan.yaml files exist, suggest them.
-
-        Note: the current code prints the suggestion and then falls through to
-        ``from castor.main import main`` which is expected to run the actual
-        loop, so we mock the castor.main module to avoid side effects.
-        """
+        """Legacy: when config is missing but other .rcan.yaml files exist, suggest them."""
         args = _make_args(config=str(tmp_path / "missing.rcan.yaml"), simulate=False)
         mock_main_fn = MagicMock()
         with patch("glob.glob", return_value=["other.rcan.yaml"]):
@@ -948,8 +964,9 @@ class TestCmdRun:
         out = capsys.readouterr().out
         assert "other.rcan.yaml" in out
 
+    @pytest.mark.skip(_LEGACY_SKIP)
     def test_config_missing_wizard_accept(self, tmp_path):
-        """When config is missing and user accepts wizard, it runs the wizard."""
+        """Legacy: when config is missing and user accepts wizard, it runs the wizard."""
         args = _make_args(config=str(tmp_path / "nonexistent.rcan.yaml"), simulate=False)
         mock_wizard = MagicMock()
         with patch("glob.glob", return_value=[]):
@@ -958,8 +975,9 @@ class TestCmdRun:
                     cmd_run(args)
         mock_wizard.assert_called_once()
 
+    @pytest.mark.skip(_LEGACY_SKIP)
     def test_config_missing_eof_in_input(self, tmp_path, capsys):
-        """When EOFError is raised in input, treat as decline."""
+        """Legacy: when EOFError is raised in input, treat as decline."""
         args = _make_args(config=str(tmp_path / "nonexistent.rcan.yaml"), simulate=False)
         with patch("glob.glob", return_value=[]):
             with patch("builtins.input", side_effect=EOFError):
@@ -967,8 +985,9 @@ class TestCmdRun:
         out = capsys.readouterr().out
         assert "castor wizard" in out
 
+    @pytest.mark.skip(_LEGACY_SKIP)
     def test_config_missing_keyboard_interrupt_in_input(self, tmp_path, capsys):
-        """When KeyboardInterrupt is raised in input, treat as decline."""
+        """Legacy: when KeyboardInterrupt is raised in input, treat as decline."""
         args = _make_args(config=str(tmp_path / "nonexistent.rcan.yaml"), simulate=False)
         with patch("glob.glob", return_value=[]):
             with patch("builtins.input", side_effect=KeyboardInterrupt):

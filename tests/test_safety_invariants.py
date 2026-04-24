@@ -739,15 +739,19 @@ class TestV15SafetyInvariants:
         assert version.startswith("2026."), f"Expected version 2026.x.y.z, got {version}"
 
     def test_pyproject_version_2026_3_17(self):
-        """pyproject.toml declares a valid 2026.x.y.z version (updated for v1.6)."""
+        """pyproject.toml declares a valid version.
+
+        opencastor 3.0.0 switched from calver (2026.x.y.z) to SemVer (3.x.y)
+        to signal RCAN 3.x peer-runtime alignment. Either scheme is valid.
+        """
         import os
+        import re as _re
 
         pyproject = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pyproject.toml")
         with open(pyproject) as f:
             content = f.read()
-        # version must be 2026.x.y.z format
-        import re as _re
-
-        assert _re.search(r"2026\.\d+\.\d+\.\d+", content), (
-            "pyproject.toml must declare a 2026.x.y.z version"
+        has_calver = _re.search(r'version\s*=\s*"2026\.\d+\.\d+\.\d+"', content)
+        has_semver = _re.search(r'version\s*=\s*"\d+\.\d+\.\d+"', content)
+        assert has_calver or has_semver, (
+            "pyproject.toml must declare either a 2026.x.y.z (calver) or X.Y.Z (SemVer) version"
         )
