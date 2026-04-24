@@ -11,10 +11,14 @@ context-derivable (e.g. ``generated_at`` defaults to UTC now).
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import datetime, timezone
 from typing import Any
 
 from rcan import (
+    FriaConformance,
+    FriaDocument,
+    FriaSigningKey,
     build_eu_register_entry,
     build_ifu,
     build_incident_report,
@@ -23,6 +27,8 @@ from rcan import (
 
 from castor.rcan3.rrf_client import RrfClient
 from castor.rcan3.signer import CastorSigner
+
+_FRIA_FIELDS = {f.name for f in dataclasses.fields(FriaDocument)}
 
 
 def _now_iso() -> str:
@@ -34,21 +40,54 @@ async def submit_fria(
     rrf: RrfClient,
     signer: CastorSigner,
     rrn: str,
-    conformance: dict[str, Any],
+    deployment: dict[str, Any] | None = None,
+    conformance: FriaConformance | None = None,
 ) -> dict[str, Any]:
     """Submit a §22 FRIA (Fundamental Rights Impact Assessment) to RRF intake.
 
-    The FRIA envelope is opaque to this module — callers supply the
-    conformance block as a dict. Build the body inline here rather than
-    routing through a rcan-py builder (there is no ``build_fria`` helper in
-    rcan-py 3.3; the raw dict is the spec surface).
+    Builds a fully-compliant :class:`rcan.FriaDocument` using the real
+    dataclass constructor so the emitted body satisfies RRF ingress validation.
+
+    Parameters
+    ----------
+    deployment:
+        Deployment block for the FRIA.  Defaults to an empty dict when not
+        provided; callers should pass real deployment metadata for production
+        submissions.
+    conformance:
+        Optional :class:`rcan.FriaConformance` dataclass.  Omit to leave the
+        conformance section null.
     """
-    body = {
+    pub = signer.public_key_jwk
+    signing_key = FriaSigningKey(
+        alg=pub["alg"],
+        kid=pub["kid"],
+        public_key=pub["x"],
+    )
+
+    pre_sig_body: dict[str, Any] = {
         "schema": "rcan-fria-v1",
+        "generated_at": _now_iso(),
         "system": {"rrn": rrn},
-        "conformance": conformance,
+        "deployment": deployment or {},
+        "signing_key": dataclasses.asdict(signing_key),
     }
-    signed = signer.sign(body)
+    signed = signer.sign(pre_sig_body)
+
+    # Validate round-trip: construct FriaDocument from the signed fields to
+    # confirm structural compliance before sending (pq_signing_pub / pq_kid
+    # are rcan-py transport fields — filter to FriaDocument's own fields).
+    # signing_key is stored as a plain dict in the signed body; pass the
+    # FriaSigningKey object directly to avoid duplicate-keyword errors.
+    _round_trip_fields = {
+        k: v for k, v in signed.items() if k in _FRIA_FIELDS and k != "signing_key"
+    }
+    FriaDocument(
+        **_round_trip_fields,
+        signing_key=signing_key,
+        conformance=conformance,
+    )
+
     return await rrf.submit_compliance("fria", signed)
 
 

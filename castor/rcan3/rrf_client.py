@@ -9,9 +9,12 @@ Endpoints used:
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger("OpenCastor.RrfClient")
 
 _COMPLIANCE_ARTIFACTS = {
     "fria",
@@ -64,8 +67,11 @@ class RrfClient:
     async def register(self, signed_body: dict[str, Any]) -> dict[str, Any]:
         resp = await self._require().post("/v2/robots/register", json=signed_body)
         if resp.status_code >= 400:
+            logger.warning("RRF register failed: %d %s", resp.status_code, resp.text)
             raise RrfError(f"{resp.status_code}: {resp.text}")
-        return resp.json()
+        result = resp.json()
+        logger.info("RRF register: %s → rrn=%s", self._base_url, result.get("rrn"))
+        return result
 
     async def get_robot(self, rrn: str) -> dict[str, Any]:
         resp = await self._require().get(f"/v2/robots/{rrn}")
@@ -81,5 +87,8 @@ class RrfClient:
             )
         resp = await self._require().post(f"/v2/compliance/{artifact}", json=signed_body)
         if resp.status_code >= 400:
+            logger.warning("RRF compliance submit failed: %d %s", resp.status_code, resp.text)
             raise RrfError(f"{resp.status_code}: {resp.text}")
-        return resp.json()
+        result = resp.json()
+        logger.info("RRF compliance submit: artifact=%s → %s", artifact, result)
+        return result

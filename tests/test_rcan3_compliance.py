@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 import respx
 from httpx import Response
@@ -26,9 +28,63 @@ async def test_submit_fria_end_to_end(tmp_path):
             rrf=rrf,
             signer=signer,
             rrn="RRN-000000000001",
-            conformance={"status": "declared", "date": "2026-04-23"},
         )
     assert out["accepted"] is True
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_submit_fria_body_is_fria_document_compliant(tmp_path):
+    """Emitted body must round-trip through FriaDocument (structural compliance)."""
+    import json
+
+    from rcan import FriaConformance, FriaDocument, FriaSigningKey
+
+    from castor.rcan3.compliance import submit_fria
+    from castor.rcan3.identity import load_or_generate_identity
+    from castor.rcan3.rrf_client import RrfClient
+    from castor.rcan3.signer import CastorSigner
+
+    captured: list[bytes] = []
+
+    def _capture(request):
+        captured.append(request.read())
+        return Response(202, json={"accepted": True})
+
+    respx.post("https://rcan.dev/v2/compliance/fria").mock(side_effect=_capture)
+
+    ident = load_or_generate_identity(keydir=tmp_path)
+    signer = CastorSigner(ident)
+    fria_conformance = FriaConformance(score=1.0, pass_count=5, warn_count=0, fail_count=0)
+    async with RrfClient(base_url="https://rcan.dev") as rrf:
+        await submit_fria(
+            rrf=rrf,
+            signer=signer,
+            rrn="RRN-000000000001",
+            deployment={"env": "test"},
+            conformance=fria_conformance,
+        )
+
+    assert len(captured) == 1
+    body = json.loads(captured[0])
+
+    # Verify required fields are present
+    assert body.get("schema") == "rcan-fria-v1"
+    assert "generated_at" in body
+    assert "system" in body
+    assert "deployment" in body
+    assert "sig" in body
+
+    # Round-trip through FriaDocument must succeed.
+    # signing_key is serialised as a plain dict on the wire; pass the
+    # FriaSigningKey object directly so there's no duplicate-kwarg collision.
+    fria_fields = {f.name for f in dataclasses.fields(FriaDocument)}
+    pub = ident.public_key_jwk
+    FriaDocument(
+        **{k: v for k, v in body.items() if k in fria_fields and k != "signing_key"},
+        signing_key=FriaSigningKey(alg=pub["alg"], kid=pub["kid"], public_key=pub["x"]),
+        conformance=fria_conformance,
+    )
 
 
 @pytest.mark.asyncio

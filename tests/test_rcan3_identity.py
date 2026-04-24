@@ -25,12 +25,14 @@ def test_load_or_generate_is_idempotent(tmp_path):
 
 
 def test_keys_are_chmod_600(tmp_path):
-    """Private key file has mode 0o600 (owner rw only)."""
+    """Both private key files have mode 0o600 (owner rw only)."""
     from castor.rcan3.identity import load_or_generate_identity
 
     load_or_generate_identity(keydir=tmp_path)
     priv = tmp_path / "ml_dsa.priv.jwk"
-    assert oct(priv.stat().st_mode)[-3:] == "600"
+    ed_priv = tmp_path / "ed25519.priv.jwk"
+    assert oct(priv.stat().st_mode)[-3:] == "600", "ml_dsa.priv.jwk must be 0o600"
+    assert oct(ed_priv.stat().st_mode)[-3:] == "600", "ed25519.priv.jwk must be 0o600"
 
 
 def test_jwk_format_has_kty_and_alg(tmp_path):

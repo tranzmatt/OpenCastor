@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,6 +28,8 @@ from rcan.crypto import (
     encode_public_key_jwk,
     generate_ml_dsa_keypair,
 )
+
+logger = logging.getLogger("OpenCastor.Identity")
 
 DEFAULT_KEYDIR = Path.home() / ".castor" / "keys"
 _PUB_FILE = "ml_dsa.pub.jwk"
@@ -67,9 +70,12 @@ def load_or_generate_identity(keydir: Path | None = None) -> CastorIdentity:
                 ed_priv_key = Ed25519PrivateKey.generate()
                 ed_secret = ed_priv_key.private_bytes_raw()
                 ed_priv_data = {"d": _bytes_to_b64url(ed_secret)}
-                ed_path.write_text(json.dumps(ed_priv_data, indent=2))
-                os.chmod(ed_path, 0o600)
+                # Use os.open with explicit mode to avoid the umask-default race window.
+                fd = os.open(str(ed_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w") as f:
+                    f.write(json.dumps(ed_priv_data, indent=2))
             ed_public = ed_priv_key.public_key().public_bytes_raw()
+            logger.debug("loaded existing identity from %s", kd)
             return CastorIdentity(
                 keypair=kp,
                 public_key_jwk=pub,
@@ -78,6 +84,7 @@ def load_or_generate_identity(keydir: Path | None = None) -> CastorIdentity:
                 ed25519_public=ed_public,
             )
         except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.error("corrupt keypair at %s — not regenerating automatically", kd)
             raise ValueError(
                 f"corrupt keypair at {kd} — refusing to regenerate automatically. "
                 "Move or delete the existing keys manually if intentional. "
@@ -93,13 +100,18 @@ def load_or_generate_identity(keydir: Path | None = None) -> CastorIdentity:
     ed_public = ed_priv_key.public_key().public_bytes_raw()
 
     pub_path.write_text(json.dumps(pub, indent=2))
-    priv_path.write_text(json.dumps(priv, indent=2))
-    os.chmod(priv_path, 0o600)
+    # Use os.open with explicit mode to avoid the umask-default race window.
+    fd = os.open(str(priv_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(json.dumps(priv, indent=2))
 
     ed_priv_data = {"d": _bytes_to_b64url(ed_secret)}
-    ed_path.write_text(json.dumps(ed_priv_data, indent=2))
-    os.chmod(ed_path, 0o600)
+    # Use os.open with explicit mode to avoid the umask-default race window.
+    fd = os.open(str(ed_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(json.dumps(ed_priv_data, indent=2))
 
+    logger.info("generated new hybrid identity at %s", kd)
     return CastorIdentity(
         keypair=kp,
         public_key_jwk=pub,

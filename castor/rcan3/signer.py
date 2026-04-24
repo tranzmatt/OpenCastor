@@ -11,11 +11,14 @@ fields alongside the original body fields.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from rcan import sign_body, verify_body
 
 from castor.rcan3.identity import CastorIdentity
+
+logger = logging.getLogger("OpenCastor.Signer")
 
 
 class CastorSigner:
@@ -48,10 +51,19 @@ class CastorSigner:
     def verify(self, signed_body: dict[str, Any]) -> bool:
         """Verify ``signed_body`` against this signer's public key.
 
-        Returns False on tamper/invalid signature rather than raising, so
-        callers can surface a clean reject path.
+        Returns False on tamper/malformed signature (KeyError, ValueError,
+        TypeError) rather than raising, so callers can surface a clean reject
+        path.
+
+        ImportError, ConnectionError, OSError and other environment failures
+        propagate — they indicate an infrastructure problem, not a tamper event,
+        and silently returning False would mask them.
         """
         try:
             return verify_body(signed_body, self._identity.keypair.public_key_bytes)
-        except Exception:
+        except (KeyError, ValueError, TypeError) as e:
+            # Malformed signature structure or body — treat as verification failure.
+            logger.debug("signature verification rejected malformed input: %s", e)
             return False
+        # ImportError / ConnectionError / OSError propagate — environment problem,
+        # not a tamper event.
