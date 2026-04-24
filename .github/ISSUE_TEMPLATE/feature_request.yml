@@ -1,61 +1,47 @@
-name: Feature Request
-description: Suggest a new feature or improvement
+name: Feature request
+description: Propose a new feature or improvement
+title: "[feat] "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Have an idea? We'd love to hear it. Feature requests from the community drive OpenCastor's roadmap.
-
+        Thanks for proposing an improvement! Before filing, check the
+        [ecosystem CONTRIBUTING doc](https://github.com/craigm26/opencastor-ops/blob/main/CONTRIBUTING.md)
+        to make sure this is the right repo.
   - type: textarea
-    id: description
+    id: problem
     attributes:
-      label: What would you like?
-      description: A clear description of the feature.
-      placeholder: "Add support for ROS2 as a driver protocol so I can use OpenCastor with my existing ROS2 setup."
+      label: Problem
+      description: What are you trying to do that's hard today? Describe the user experience, not the solution.
     validations:
       required: true
-
-  - type: dropdown
-    id: category
+  - type: textarea
+    id: proposed
     attributes:
-      label: Category
-      options:
-        - New AI provider
-        - New hardware driver
-        - New messaging channel
-        - CLI / developer experience
-        - Dashboard / UI
-        - Safety / reliability
-        - Performance
-        - Documentation
-        - Other
+      label: Proposed approach
+      description: How would you solve this? Sketches, pseudocode, API shapes all welcome.
     validations:
       required: true
-
-  - type: textarea
-    id: use_case
-    attributes:
-      label: Use case
-      description: Why do you need this? What problem does it solve?
-    validations:
-      required: false
-
   - type: textarea
     id: alternatives
     attributes:
       label: Alternatives considered
-      description: Have you tried any workarounds?
+      description: Other approaches you ruled out and why.
     validations:
       required: false
-
-  - type: dropdown
-    id: willing_to_pr
+  - type: textarea
+    id: scope
     attributes:
-      label: Would you be willing to submit a PR?
-      options:
-        - "Yes"
-        - "Yes, with guidance"
-        - "No"
+      label: Scope
+      description: What's in scope for the first iteration? What's explicitly out of scope?
+    validations:
+      required: false
+  - type: input
+    id: related
+    attributes:
+      label: Related issues / PRs
+      description: Cross-references in this or other ecosystem repos.
+      placeholder: "e.g. RobotRegistryFoundation/robot-md#3"
     validations:
       required: false
