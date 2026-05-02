@@ -218,6 +218,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: continuonai/rcan-spec/.github/actions/emit-version-tuple@v3.2.0
+        with:
+          project: opencastor
+          ran: ${{ secrets.OPENCASTOR_RELEASE_RAN }}
+          field: runtime_version
+          value: ${{ steps.version.outputs.VERSION }}
+          depends_on: '{"protocol_version":">=3.2.0","manifest_spec_version":">=1.5.0","gateway_version":">=0.2.0"}'
+          pq_signing_key: ${{ secrets.OPENCASTOR_RELEASE_PQ_PRIV }}
+          pq_kid: ${{ secrets.OPENCASTOR_RELEASE_KID }}
+          ed25519_signing_key: ${{ secrets.OPENCASTOR_RELEASE_PRIV }}
+          ed25519_kid: ${{ secrets.OPENCASTOR_RELEASE_KID }}
+          release_tag: ${{ github.ref_name }}
+
   publish:
     needs: release
     runs-on: ubuntu-latest
