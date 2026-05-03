@@ -20,6 +20,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to emit version-tuple for (backfill mode; leave empty for normal dispatch)"
+        required: false
+        default: ''
 
 # Cancel in-progress runs for the same tag
 concurrency:
@@ -307,3 +313,42 @@ jobs:
             echo "OIDC trusted publishing failed for this run. Configure a matching trusted publisher at:" >> "$GITHUB_STEP_SUMMARY"
             echo "https://pypi.org/manage/project/opencastor/settings/publishing/?provider=github&owner=craigm26&repository=OpenCastor&workflow_filename=release.yml" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  backfill-emit:
+    name: Emit signed version-tuple envelope (backfill)
+    if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Determine tag
+        id: tag
+        run: |
+          TAG="${{ inputs.tag }}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Ensure GitHub release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "${{ steps.tag.outputs.tag }}" >/dev/null 2>&1; then
+            gh release create "${{ steps.tag.outputs.tag }}" \
+              --title "OpenCastor ${{ steps.tag.outputs.tag }}" \
+              --generate-notes
+          fi
+
+      - uses: continuonai/rcan-spec/.github/actions/emit-version-tuple@v3.2.0
+        with:
+          project: opencastor
+          ran: ${{ secrets.OPENCASTOR_RELEASE_RAN }}
+          field: runtime_version
+          value: ${{ steps.tag.outputs.version }}
+          depends_on: '{"protocol_version":">=3.2.0","manifest_spec_version":">=1.5.0","gateway_version":">=0.2.0"}'
+          pq_signing_key: ${{ secrets.OPENCASTOR_RELEASE_PQ_PRIV }}
+          pq_kid: ${{ secrets.OPENCASTOR_RELEASE_KID }}
+          ed25519_signing_key: ${{ secrets.OPENCASTOR_RELEASE_PRIV }}
+          ed25519_kid: ${{ secrets.OPENCASTOR_RELEASE_KID }}
+          release_tag: ${{ steps.tag.outputs.tag }}
