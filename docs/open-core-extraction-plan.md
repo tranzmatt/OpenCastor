@@ -12,36 +12,67 @@
 
 ---
 
-## Migration patterns
+## Architecture (revised 2026-05-04 after Phase 1 deeper audit)
 
-Three patterns, depending on the OpenCastor side's current shape:
+> **Audit finding that supersedes the original plan-body framing.** Phase 1 Task 4's deeper read of `castor/confidence_gate.py` + `castor/hitl_gate.py` vs `robot_md_gateway/cert/gates.py` revealed that the OpenCastor and gateway modules are *at different layers, not duplicates*. The same shape applies to all 7 modules in the original schedule.
+>
+> **OpenCastor's `castor/safety/`, `castor/confidence_gate.py`, `castor/hitl_gate.py`, `castor/authority.py`, etc. are runtime orchestration** — they evaluate confidence in real time before driver dispatch, hold async pending queues for two-step §8 PENDING_AUTH/AUTHORIZE flow, route notifications to WhatsApp/Telegram, manage workspace + joint + force bounds, etc.
+>
+> **The gateway's `cert/*` modules are envelope-time cert-property verifiers** — they inspect a received envelope's payload, return `(bool, reason)`, and record to `cert_report` (singleton). They do not orchestrate; they verify proof-of-orchestration.
+>
+> Concrete divergence on the gates module alone:
+>
+> | Axis | OpenCastor `ConfidenceGateManager.check` | Gateway `check_confidence` |
+> |---|---|---|
+> | Return | `GateOutcome` enum (PASS / ESCALATE / BLOCK / BYPASS) | `tuple[bool, str]` |
+> | Scope vocab | "control" / "config" / "training" / "status" | "READ" / "NAVIGATE" / "MANIPULATE" / "ESTOP" |
+> | When called | Real-time, before driver dispatch (~20 call sites in `castor/`) | At envelope receive |
+> | Side effect | Logs + flow control | Records to `cert_report` (RC-003) |
+>
+> Same divergence pattern on HiTL: `HiTLGateManager.check` is async with pending queues; `check_hitl` is sync envelope inspection.
+>
+> **The two layers complement each other; neither replaces the other.** The right "extraction" is *not* module-by-module replacement. It is a **runtime-level integration**: OpenCastor wires `robot_md_gateway.receiver.make_app(...)` as a cert-property verifier layer over its envelope-receive boundary. The existing OpenCastor runtime orchestration code stays.
 
-1. **Additive.** OpenCastor has no equivalent today; the extraction is purely "take the dependency + start using it." No deletion, no adapter. The first parity test asserts the gateway code path runs; subsequent tests assert behavior at OpenCastor's call sites.
+## Integration boundary
 
-2. **Replace-with-adapter.** OpenCastor has a private duplicate with a similar shape. Extract by: (a) keeping only the public symbol the OpenCastor side exposes today, (b) re-exporting it from the gateway module, (c) deleting OpenCastor's implementation, (d) parity test asserts identical behavior on shared fixtures.
+The gateway exposes `make_app(...)` at `robot_md_gateway.receiver.make_app`. It returns a FastAPI app with a single `POST /v1/invoke` route that runs every received envelope through the full 14-property cert pipeline. Each property is opt-in via a constructor parameter:
 
-3. **Format-conversion.** OpenCastor has a private duplicate but with an *incompatible* output format (e.g. audit chain serialized as `list[dict]` vs gateway's hash-linked signed bundle). Extraction requires changing OpenCastor's downstream consumers — cannot be a transparent adapter. Per-task acceptance: the gateway format becomes the on-disk format; OpenCastor's existing readers add a one-shot back-compat shim if needed for older bundles.
+| Cert property | `make_app(...)` parameter | Module |
+|---|---|---|
+| MF-001 / MF-002 (manifest provenance) | `resolver: RRFResolver` (required) | `manifest_provenance.py` |
+| GW-002 / GW-003 (tier + tool allowlist) | `tool_allowlist`, `bearer_tiers` | `cert/policy.py` |
+| RC-001 (envelope signature) | `require_envelope_signature` | `cert/envelope.py` |
+| RC-002 (replay protection) | `replay_cache` | `cert/envelope.py` |
+| RC-003 (confidence) | `confidence_policy` | `cert/gates.py` |
+| RC-004 (HiTL chain inspection) | `hitl_policy` | `cert/gates.py` |
+| RR-001 / RR-002 (revocation) | `revocation_resolver`, `revocation_cache` | `cert/revocation.py` |
+| SF-001 / SF-002 (safety state) | `safety_monitor` | `cert/safety.py` |
+| AC-001 (audit) | `audit_chain` | `cert/audit.py` |
+
+OpenCastor's integration shape per spec §6 + §9 Weeks 7–12: route every incoming RCAN INVOKE envelope through this verifier layer **before** dispatching to OpenCastor's runtime orchestration. The existing runtime orchestration (HiTLGateManager, ConfidenceGateManager, BoundsChecker, SafetyLayer, etc.) stays intact and runs after the cert-property verifier passes the envelope through.
+
+The "≥80% of safety-kernel surface in gateway" exit criterion (spec §9 Week 11) is satisfied because the **envelope-time cert-property surface lives in the gateway** — every cross-runtime promise OpenCastor makes about safety properties is structurally enforced by gateway code, not OpenCastor code. OpenCastor's local orchestration code remains as the runtime mechanism that satisfies those promises in real time.
 
 ---
 
-## Module-by-module schedule
+## Revised Phase 1 schedule
 
-| # | Module | Pattern | Week | OpenCastor source (real path) | Gateway source (`src/robot_md_gateway/`) | Notes |
-|---|---|---|---|---|---|---|
-| 1 | Manifest provenance verifier | **Additive** | 7 | (no module today) | `manifest_provenance.py` (Plan 3 Task 14) | OpenCastor has *no* signed-ROBOT.md verifier today. `castor/safety/p66_manifest.py` is a Protocol-66 conformance declaration — different concept. Extraction is "add a call site." |
-| 2 | LoA / RBAC / tier policy | Replace-with-adapter | 8 | `castor/safety/authorization.py` (`WorkAuthority`, `WorkOrder`, `DestructiveActionDetector`) | `cert/policy.py` (`ToolAllowlist`, `check_tool`, `check_tier`) | Different axes today. OpenCastor's `WorkAuthority` is permission/work-order orchestration; gateway's `ToolAllowlist` is tier/tool gating per cert spec GW-002/GW-003. Extraction defines a thin OpenCastor-side function that delegates tier checks to the gateway, leaves WorkAuthority's order-orchestration locally. |
-| 3 | Confidence + HiTL gates | Replace-with-adapter | 8 | `castor/confidence_gate.py` + `castor/hitl_gate.py` (`ConfidenceGate`, `ConfidenceGateManager`, `HiTLGate`, `HiTLGateManager`) | `cert/gates.py` (`ConfidencePolicy`, `check_confidence`, `HiTLPolicy`, `check_hitl`) | Functionally equivalent but different APIs (manager vs policy+function). Adapter wraps gateway's policy in a manager-shaped facade so existing OpenCastor callers don't change. Parity test: RC-003 below-threshold + RC-004 missing-chain produce identical decisions. |
-| 4 | Replay protection | **Additive** | 9 | (no module today) | `cert/envelope.py` (`ReplayCache`, `check_replay`) | `castor/safety/anti_subversion.py` is prompt-injection scanning, NOT replay protection — *different concept entirely*. Extraction adds a replay-cache call site at OpenCastor's envelope-receiving boundary. |
-| 5 | Key-state checks (revocation) | **Format-conversion** | 9 | `castor/apikeys.py` (`ApiKeyManager` — local API-key lifecycle) | `cert/revocation.py` (`RevocationCache`, `is_revoked`, `RRFRevocationResolver`) | Different trust models. OpenCastor's `apikeys.py` manages *local* API-key revocation; gateway's `revocation.py` does *kid* revocation via RRF. They coexist post-extraction; only the kid-revocation path moves to gateway. Adapter is conceptual: OpenCastor's runtime gains an RRFRevocationResolver instance for inbound envelopes. |
-| 6 | ESTOP precedence + bounded action | Replace-with-adapter (partial) | 10 | `castor/safety/state.py` (`SafetyStateSnapshot`, `SafetyTelemetry`) + `castor/safety/bounds.py` (`BoundsChecker`, `JointBounds`) | `cert/safety.py` (`SafetyMonitor`, `GatewayState`, `on_estop_wire`, `can_actuate`) | Gateway's binary state machine (READY/SAFE_STOP/ESTOP_ACTIVE) + heartbeat-staleness rule extract cleanly. OpenCastor's workspace/joint/force bounds are out-of-scope — they stay in OpenCastor as runtime ergonomics. Adapter: OpenCastor's `state.py` becomes a wrapper that delegates ESTOP precedence to `cert.safety.SafetyMonitor` while keeping bounds-checking local. |
-| 7 | Audit-bundle export | **Format-conversion** | 10 | `castor/authority.py` (`AuthorityResponseData.audit_chain` as `list[dict]`) | `cert/audit.py` (`AuditChain`, `AuditEntry`, `verify_audit_bundle` — hash-linked + Ed25519-signed) | **Incompatible serialization.** Gateway format becomes authoritative. OpenCastor's downstream consumers (Flutter client, cloud bridge) gain a one-shot reader for both formats during a deprecation window; new bundles emit only the gateway format. |
+Phase 1 is now a **single integration track**, not 6 module-by-module extractions. The track has 4 sub-tasks of increasing breadth, each opt-in via `make_app(...)` parameters:
 
-Per spec §9 Week 11 exit criterion: ≥80% of safety-kernel surface in gateway. Computed by line count of code that imports/delegates to `robot_md_gateway.cert.*` divided by total safety-kernel line count in `castor/safety/` + `castor/{authority,confidence_gate,hitl_gate,apikeys}.py`.
+| # | Sub-task | What it does | Cert properties exercised | Test deliverable |
+|---|---|---|---|---|
+| 1 | **Test fixture + minimal smoke** | Add a `make_app(...)` test fixture + TestClient. Smoke-test that gateway is reachable and tool-allowlist denies an unknown tool. | GW-002, GW-003 | `tests/cert/test_track_2_parity_gateway_smoke.py` |
+| 2 | **Sign + replay + revoke** | Wire envelope-signature, replay-cache, revocation-resolver. Test envelopes round-trip through verifier; replay denied; revoked-kid denied. | RC-001, RC-002, RR-001, RR-002 | `tests/cert/test_track_2_parity_envelope_verification.py` |
+| 3 | **Confidence + HiTL chain inspection** | Wire `confidence_policy` + `hitl_policy` cert-side verifiers (envelope-time) alongside OpenCastor's runtime `ConfidenceGateManager` + `HiTLGateManager` orchestration. Cert-side verifies the envelope's `inference_confidence` field meets the threshold for its scope, and that `delegation_chain` is properly formed. Runtime-side continues real-time orchestration unchanged. | RC-003, RC-004, MF-001, MF-002 | `tests/cert/test_track_2_parity_gates_envelope.py` |
+| 4 | **Safety + audit** | Wire `safety_monitor` + `audit_chain`. Cert-side verifies envelope-time safety state (gateway's binary state machine — separate from OpenCastor's `SafetyLayer` runtime) and emits audit entries to a hash-linked Ed25519-signed chain. Audit chain is *additive* on top of OpenCastor's existing `castor/authority.py` `audit_chain` list — both run; the gateway-format bundle becomes the canonical Track 2 evidence artifact. | SF-001, SF-002, AC-001 | `tests/cert/test_track_2_parity_safety_audit.py` |
 
-After each module's extraction, OpenCastor:
-1. Replaces the local code path with a delegation to gateway (additive cases) or removes the duplicate behind an adapter (replace cases) or converts the format with an explicit transition window (format-conversion cases).
-2. Files a per-module parity test under `tests/cert/test_track_2_parity_<module>.py` that exercises both code paths against the same fixtures.
-3. Updates this doc's "Status" cell for the module from "planned" → "extracted."
+Each sub-task fills in a slice of the Plan 6 Task 13b parity placeholder at `tests/cert/test_track_2_parity.py::test_track_2_parity_full_suite_pending_plan_7`. Sub-task 4 also makes that placeholder name redundant — at completion it's renamed to `test_track_2_parity_full_suite` and the docstring updated.
+
+**What this *isn't*:** there is no source-code refactor of `castor/confidence_gate.py`, `castor/hitl_gate.py`, `castor/safety/state.py`, `castor/authority.py`, etc. They keep their current shape. The integration is **at OpenCastor's RCAN INVOKE envelope-receive boundary** (likely `castor/api.py` or its routes module) — that's where `make_app(...)` hooks in.
+
+**Production wiring is out of scope for Phase 1 (in this revised form).** Phase 1 ends with the integration tested in `tests/cert/`. Wiring `make_app(...)` into OpenCastor's production envelope-receive flow is a Phase 2 task that this doc adds when scoped.
+
+Per spec §9 Week 11 exit criterion: ≥80% of safety-kernel surface in gateway. Under the revised framing this is satisfied because **the envelope-time cert-property surface (14 properties) is entirely in `robot-md-gateway`** and OpenCastor exercises that surface via `make_app(...)`. OpenCastor's runtime orchestration code is *not* part of "safety-kernel surface" in the spec's sense — it's the runtime mechanism that satisfies safety promises, not the structural enforcement layer.
 
 ---
 
@@ -65,12 +96,10 @@ Per-module parity tests live at `tests/cert/test_track_2_parity_<module>.py`, wi
 
 Per spec §9 Week 11 "≥80% of safety-kernel surface in gateway":
 
-- All 7 modules above have a "extracted" status in this doc.
-- OpenCastor's `castor/safety/` + audit code consists of:
-  - **Local-only modules** that don't move to gateway (e.g. `castor/safety/bounds.py` workspace/joint/force, `castor/safety/p66_manifest.py` Protocol-66 conformance declaration, `castor/safety/protocol.py` configurable rule engine — these are runtime ergonomics, not safety-kernel proper).
-  - **Adapter / delegation modules** that import from `robot_md_gateway.cert.*`.
-- OpenCastor's full L1-L4 + Track 2 cert reports are signed by the OpenCastor release key and pass against the same ROBOT.md fixtures as the gateway.
-- Track 2 NORMATIVE-conditional declaration in `~/opencastor-ops/operations/2026-05-04-track-2-normative.md` updates from "OpenCastor parity pending Plan 7 Phase 1" → "OpenCastor parity verified."
+- All 14 cert properties (MF-001/002, GW-002/003, RC-001/002/003/004, RR-001/002, SF-001/002, AC-001) exercised against OpenCastor's test envelopes via `robot_md_gateway.receiver.make_app(...)`. The full-suite parity test at `tests/cert/test_track_2_parity.py::test_track_2_parity_full_suite` (renamed from `_pending_plan_7`) passes.
+- OpenCastor's full L1-L4 + Track 2 cert reports are signed by the OpenCastor release key and pass against the same ROBOT.md fixtures the gateway uses.
+- Track 2 NORMATIVE-conditional declaration in `~/opencastor-ops/operations/2026-05-04-track-2-normative.md` updates from "OpenCastor parity pending Plan 7 Phase 1" → "OpenCastor parity verified — 14 cert properties exercised via runtime-level make_app(...) integration."
+- Phase 2 (production wiring of `make_app(...)` into `castor/api.py`) is *not* part of Phase 1 exit. Phase 1 ships test-only integration; Phase 2 ships production wiring.
 
 ---
 
@@ -78,17 +107,15 @@ Per spec §9 Week 11 "≥80% of safety-kernel surface in gateway":
 
 Today's audit (Phase 0 Task 1) reframes the extraction shape. The original Plan 7 plan body assumes 6 of 7 modules are "private duplicate replace-with-adapter" extractions; reality is that 5 of 7 are **additive** (OpenCastor has *no* equivalent today) and only 2 require true module replacement. This shifts the right execution order.
 
-### Recommended Phase 1 sequence (revised)
+### Recommended Phase 1 sequence (revised 2026-05-04 after deeper audit)
 
-| Order | Task | Pattern | Rationale |
+| Order | Sub-task | What | Why this order |
 |---|---|---|---|
-| 1 | Task 4 — Confidence + HiTL gates | Replace-with-adapter | True duplicate. Cleanest first replace; lets us prove the adapter pattern on a low-risk module before touching format-sensitive ones. |
-| 2 | Task 6 — ESTOP precedence (state-machine portion only) | Replace-with-adapter (partial) | Track 2 cert property SF-001 depends on this. Gateway's `SafetyMonitor` becomes the source of truth; bounds-checking stays local. |
-| 3 | Task 3 — LoA / RBAC tier policy | **Additive** | Gateway's tier gating is new capability for OpenCastor. Wire in at the runtime envelope-receiving boundary alongside the existing `WorkAuthority`. |
-| 4 | Task 5a — Replay protection | **Additive** | Same boundary as Task 3. Add `ReplayCache` instance to runtime. |
-| 5 | Task 5b — Key-state / kid revocation | **Additive** | Same boundary. Add `RRFRevocationResolver`. Local API-key path stays untouched. |
-| 6 | Task 7 — Audit-bundle export | **Format-conversion** (highest risk) | Last because downstream consumers (Flutter client, cloud bridge) need a back-compat reader during the transition. Plan 7 plan body should expect this to slip beyond Week 10. |
-| 7 | Task 8 — ≥80% milestone declaration | Bookkeeping | Only meaningful after Tasks 3-7 land. |
+| 1 | Sub-task 1 — Test fixture + smoke | Add a `make_app(...)` test fixture and a 1-3 test smoke that exercises the gateway's `/v1/invoke` route via TestClient with `tool_allowlist` only. | Lowest risk; proves the integration shape works in OpenCastor's test env. No production code change. |
+| 2 | Sub-task 2 — Sign + replay + revoke | Add envelope signature + replay + revocation tests. Requires a signed envelope fixture + revocation resolver mock. | Validates the cert-property side of the integration without touching OpenCastor runtime. |
+| 3 | Sub-task 3 — Confidence + HiTL chain | Add `confidence_policy` + `hitl_policy` to the fixture; assert RC-003/RC-004 fire correctly. | Most subtle layer: requires understanding OpenCastor's runtime gates *don't* move; the cert-side fires alongside them. |
+| 4 | Sub-task 4 — Safety + audit | Add `safety_monitor` + `audit_chain` to the fixture; assert SF-001/SF-002/AC-001 fire and audit chain emits hash-linked entries. | Last because audit chain is the largest surface; gives complete 14-property coverage. |
+| 5 | Milestone bookkeeping | Update `operations/2026-XX-XX-open-core-extraction-milestone.md`; rename `test_track_2_parity_full_suite_pending_plan_7` to `test_track_2_parity_full_suite`; update Track 2 NORMATIVE-conditional declaration to NORMATIVE. | After all 14 properties exercised. |
 
 ### Recommended Phase 3 sequence
 
@@ -105,19 +132,19 @@ Phase 3 is **independent of Phase 1** — it can be dispatched as a parallel sub
 
 ### What stays out of scope this session
 
-- All Phase 1 task execution (today is Phase 0 close; Phase 1 starts in a follow-up session against this revised order).
-- Phase 2 (pendant firmware) — hardware-blocked on stuck BOOT button.
-- Phase 4 (Week-12 demo) — gated on Plan 5 governance kickoff + Plan 6 Phase 5 ESTOP procurement.
+- All Phase 1 sub-task execution (today is Phase 0 close + audit-driven re-scope; Phase 1 sub-task 1 starts in a follow-up session).
+- Production wiring of `make_app(...)` into OpenCastor's `castor/api.py` envelope-receive flow — this is Phase 2 in the revised plan.
+- Phase 2 of the original Plan 7 plan body (pendant firmware) — hardware-blocked on stuck BOOT button.
+- Phase 4 of the original Plan 7 plan body (Week-12 demo) — gated on Plan 5 governance kickoff + Plan 6 Phase 5 ESTOP procurement.
 
 ---
 
-## Out-of-scope (explicitly retained in OpenCastor)
+## What stays in OpenCastor
 
-These are *not* part of the extraction. They stay in OpenCastor because they're operational ergonomics, not safety-kernel structure:
+Under the runtime-level integration framing, *no source code moves out of OpenCastor* — the gateway runs alongside, not instead. OpenCastor's:
 
-- `castor/safety/bounds.py` — workspace + joint + force-limit geometry (per-robot configuration, not safety-policy).
-- `castor/safety/p66_manifest.py` — Protocol-66 conformance declaration (a *list of which rules are implemented*, not an enforcement engine).
-- `castor/safety/protocol.py` — configurable safety-rule engine (`SafetyRule`, `RuleViolation`); commercial differentiator.
-- `castor/safety/anti_subversion.py` — prompt-injection scanning (not in the safety-kernel cert spec at all).
-- `castor/apikeys.py` *local* API-key lifecycle (kid-revocation portion *does* move; local API-key management stays).
-- All driver, fleet, cloud-bridge, premium-policy code.
+- **Runtime orchestration** stays as-is: `castor/confidence_gate.py`, `castor/hitl_gate.py`, `castor/authority.py`, `castor/safety/{state,bounds,monitor,authorization,p66_manifest,protocol,anti_subversion}.py`, `castor/apikeys.py`. These do real-time work the gateway never does.
+- **Driver, fleet, cloud-bridge, premium-policy code** stays — commercial differentiator, never in scope for extraction.
+- **Existing audit-chain export** (`castor/authority.py` `audit_chain` as `list[dict]`) stays. The gateway's hash-linked Ed25519-signed chain is *additive*, not a replacement. Phase 1 sub-task 4 wires both; downstream Phase 2 production-wiring task may decide to deprecate the OpenCastor-format chain after consumers migrate.
+
+What changes structurally is **where OpenCastor's promises about envelope-time safety properties get enforced**: now those promises are routed through `robot-md-gateway` rather than satisfied by OpenCastor code that "looks the same as the gateway." That is the open-core boundary the spec §6 + §9 Week 11 are describing.
